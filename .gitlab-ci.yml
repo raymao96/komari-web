@@ -1,0 +1,52 @@
+stages:
+  - build
+
+variables:
+  NODE_VERSION: "22"
+
+build_theme_package:
+  stage: build
+  image: node:${NODE_VERSION}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "keep-cfaccess"'
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends jq zip
+    - npm ci --cache .npm --prefer-offline || npm i
+    - npm run build
+    - export VERSION_DATE=$(date +"%y.%m.%d")
+    - export COMMIT_HASH=$(git rev-parse --short HEAD)
+    - echo "Version ${VERSION_DATE}, commit ${COMMIT_HASH}"
+    - >-
+      jq --arg version "$VERSION_DATE"
+      --arg desc "Preview theme for Komari Monitor (commit: $COMMIT_HASH)"
+      '.version = $version | .description = $desc'
+      komari-theme.json > komari-theme-updated.json
+    - mv komari-theme-updated.json komari-theme.json
+    - echo "Updated theme configuration:" && cat komari-theme.json
+    - echo "Checking required files..."
+    - ls -la preview.png || (echo "preview.png not found" && exit 1)
+    - ls -la komari-theme.json || (echo "komari-theme.json not found" && exit 1)
+    - ls -la dist/ || (echo "dist/ directory not found" && exit 1)
+    - echo "All required files found!"
+    - mkdir -p theme-package
+    - cp preview.png theme-package/
+    - cp komari-theme.json theme-package/
+    - cp -r dist/ theme-package/
+    - export ZIP_NAME="komari-theme-v${VERSION_DATE}-${COMMIT_HASH}.zip"
+    - cd theme-package && zip -r "../${ZIP_NAME}" . && cd ..
+    - 'echo "Created package: ${ZIP_NAME}"'
+    - ls -la "${ZIP_NAME}"
+  artifacts:
+    name: "komari-theme-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - preview.png
+      - komari-theme.json
+      - dist/
+      - "*.zip"
+    expire_in: 90 days
