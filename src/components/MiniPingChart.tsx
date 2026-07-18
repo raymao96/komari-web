@@ -35,6 +35,7 @@ import {
   pingMetricStatKey,
   pingTaskId,
   pingTaskName,
+  trimMetricChartBoundaryRows,
   type MetricChartRow,
 } from "@/utils/metricSeries";
 
@@ -44,6 +45,7 @@ type RenderSeries = {
   taskId?: string;
   name: string;
   color: string;
+  pointCount: number;
   tags?: MetricTags;
 };
 
@@ -156,6 +158,10 @@ const MiniPingChart = ({
         taskId,
         name: remainingTags ? `${taskLabel} ${remainingTags}` : taskLabel,
         color: metricSeriesColor(index),
+        pointCount: (series.points ?? []).reduce(
+          (count, point) => count + (typeof point.value === "number" ? 1 : 0),
+          0,
+        ),
         tags,
       });
 
@@ -178,7 +184,11 @@ const MiniPingChart = ({
   }, [metricSeries, t, taskMap]);
 
   const chartData = useMemo(
-    () => applyMetricEwma(built.rows, built.series, ewmaEnabled),
+    () =>
+      trimMetricChartBoundaryRows(
+        applyMetricEwma(built.rows, built.series, ewmaEnabled),
+        built.series.map((item) => item.dataKey),
+      ),
     [built.rows, built.series, ewmaEnabled],
   );
 
@@ -314,7 +324,7 @@ const MiniPingChart = ({
                   dataKey={item.dataKey}
                   name={item.dataKey}
                   stroke={item.color}
-                  dot={false}
+                  dot={item.pointCount <= 30}
                   isAnimationActive={false}
                   strokeWidth={2}
                   connectNulls={false}

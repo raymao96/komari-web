@@ -72,6 +72,7 @@ import {
   formatRemainingTags,
   isPingMetric,
   metricChartBoundaryTicks,
+  trimMetricChartBoundaryRows,
   metricSeriesColor,
   metricSeriesDataKey,
   metricSeriesKey,
@@ -152,6 +153,7 @@ type RenderSeries = {
   label: string;
   color: string;
   kind: MetricKind;
+  pointCount?: number;
   unit?: string;
   yAxisId?: "left" | "right";
   tags?: Record<string, string>;
@@ -541,7 +543,11 @@ const buildTimeViews = (
   t: ReturnType<typeof useTranslation>["t"],
   maxMetricRetentionDays: number,
 ): TimeView[] => {
-  const views: TimeView[] = [{ key: "real-time", label: t("common.real_time") }];
+  const views: TimeView[] = [
+    { key: "real-time", label: t("common.real_time") },
+    { key: "10m", label: t("chart.minutes", { count: 10 }), hours: 10 / 60 },
+    { key: "1h", label: t("chart.hours", { count: 1 }), hours: 1 },
+  ];
   const validRetentionDays =
     Number.isFinite(maxMetricRetentionDays) && maxMetricRetentionDays > 0
       ? maxMetricRetentionDays
@@ -604,6 +610,10 @@ const buildRowsFromMetricSeries = (
         label,
         color: metricSeriesColor(index),
         kind,
+        pointCount: (series.points ?? []).reduce(
+          (count, point) => count + (typeof point.value === "number" ? 1 : 0),
+          0,
+        ),
         unit: series.unit,
         tags,
       });
@@ -1547,7 +1557,10 @@ const LoadChart = ({ data = [], onRealtimeActiveChange }: LoadChartProps) => {
               )
             : metricBuilt;
           const built = prepareChartData(rawBuilt, chart.metrics);
-          const chartRows = applyMetricEwma(built.rows, built.series, ewmaEnabled);
+          const chartRows = trimMetricChartBoundaryRows(
+            applyMetricEwma(built.rows, built.series, ewmaEnabled),
+            built.series.map((item) => item.dataKey),
+          );
           const chartTicks = metricChartBoundaryTicks(chartRows);
           const chartConfig = toChartConfig(built.series);
           const latestText = getLatestText(chartRows, built.series);
@@ -1751,7 +1764,7 @@ const LoadChart = ({ data = [], onRealtimeActiveChange }: LoadChartProps) => {
                         name={item.dataKey}
                         yAxisId={item.yAxisId}
                         stroke={item.color}
-                        dot={false}
+                        dot={item.pointCount !== undefined && item.pointCount <= 30}
                         isAnimationActive={false}
                         strokeWidth={2}
                         connectNulls={false}

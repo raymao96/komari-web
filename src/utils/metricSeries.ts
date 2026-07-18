@@ -27,9 +27,7 @@ const hasTags = (tags?: MetricTags): tags is MetricTags =>
   Boolean(tags && Object.keys(tags).length > 0);
 
 export const metricTags = (value: MetricTagged): MetricTags | undefined => {
-  if (hasTags(value.tag)) return value.tag;
-  if (hasTags(value.tags)) return value.tags;
-  return value.tag ?? value.tags;
+  return value.tags;
 };
 
 export const metricTagsKey = (tags?: MetricTags) => {
@@ -62,7 +60,7 @@ export const metricSeriesColor = (index: number) => {
 export const normalizeMetricSeries = (series: MetricSeries): MetricSeries[] => {
   const seriesTags = metricTags(series);
   if (!series.points?.length) {
-    return [{ ...series, tag: seriesTags, tags: seriesTags, points: [] }];
+    return [{ ...series, tags: seriesTags, points: [] }];
   }
 
   const groups = new Map<string, { tags?: MetricTags; points: MetricPoint[] }>();
@@ -71,13 +69,12 @@ export const normalizeMetricSeries = (series: MetricSeries): MetricSeries[] => {
     const tags = hasTags(pointTags) ? pointTags : seriesTags;
     const key = metricTagsKey(tags);
     const group = groups.get(key) ?? { tags, points: [] };
-    group.points.push({ ...point, tag: tags, tags });
+    group.points.push({ ...point, tags });
     groups.set(key, group);
   }
 
   return Array.from(groups.values(), (group) => ({
     ...series,
-    tag: group.tags,
     tags: group.tags,
     count: group.points.length,
     points: group.points,
@@ -124,6 +121,27 @@ export const pingMetricStatKey = (entityId: string, taskId: string) =>
   `${entityId}:${taskId}`;
 
 export type MetricChartRow = Record<string, string | number | null>;
+
+export const trimMetricChartBoundaryRows = (
+  rows: MetricChartRow[],
+  dataKeys: readonly string[],
+) => {
+  if (rows.length === 0 || dataKeys.length === 0) return rows;
+
+  const hasValue = (row: MetricChartRow) =>
+    dataKeys.some((dataKey) => {
+      const value = row[dataKey];
+      return typeof value === "number" && Number.isFinite(value);
+    });
+
+  let first = 0;
+  while (first < rows.length && !hasValue(rows[first])) first += 1;
+  if (first === rows.length) return [];
+
+  let last = rows.length - 1;
+  while (last > first && !hasValue(rows[last])) last -= 1;
+  return rows.slice(first, last + 1);
+};
 
 export const metricChartBoundaryTicks = (rows: MetricChartRow[]) => {
   if (rows.length === 0) return [];
