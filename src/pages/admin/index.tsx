@@ -3,6 +3,7 @@ import {
   quoteShellArg,
   quoteShellArgs,
 } from "@/utils/shellQuote";
+import { publicVersion } from "@/utils/version";
 import React, { useEffect, useState } from "react";
 import {
   NodeDetailsProvider,
@@ -30,6 +31,7 @@ import {
   Pencil,
   Plus,
   Radar,
+  RotateCw,
   Settings,
   Terminal,
   Trash2Icon,
@@ -83,6 +85,13 @@ import {
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
 import { useSettings } from "@/lib/api";
+import {
+  dateInputToISOString,
+  timestampToDateInput,
+} from "@/lib/dateInput";
+import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
+import { openRemoteTerminal } from "@/utils/remoteLaunch";
+import { localizeTokenRotationError } from "@/utils/tokenRotation";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 
 
@@ -100,11 +109,9 @@ const Layout = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const filteredNodes = Array.isArray(nodeDetail)
-    ? nodeDetail
-        .filter((node) =>
-          node.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        .sort((a, b) => a.weight - b.weight)
+    ? nodeDetail.filter((node) =>
+        node.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     : [];
 
   useEffect(() => {
@@ -317,7 +324,7 @@ const AutoDiscoverySection = ({
     if (selectedPlatform === "windows") {
       scriptFile = "install.ps1";
     }
-    let scriptUrl = `https://gitlab.com/raymao96/komari-agent/-/raw/keep-cfaccess/${scriptFile}?ref_type=heads`;
+    let scriptUrl = `https://raw.githubusercontent.com/raymao96/komari-agent/refs/heads/main/${scriptFile}`;
     if (enableGhproxy && ghproxy) {
       scriptUrl = scriptUrl.slice(8); // 去掉 https://
       if (ghproxy.endsWith("/")) {
@@ -375,7 +382,7 @@ const AutoDiscoverySection = ({
           `touch .komari-auto-discovery.json && ` +
           `docker run -d --name komari-agent --restart=always ` +
           `-v .komari-auto-discovery.json:/app/auto-discovery.json ` +
-          `ghcr.io/komari-monitor/komari-agent:latest ` +
+          `ghcr.io/nuomiiiii/komari-agent:latest ` +
           quoteShellArgs(dockerArgs);
         break;
       }
@@ -612,7 +619,7 @@ const AutoDiscoverySection = ({
             </Flex>
           </div>
 
-          <Flex direction="column" gap="2">
+          <Flex direction="column" gap="2" className="[&_label]:font-normal">
             <Flex gap="2" align="center">
               <Checkbox
                 checked={enableGhproxy}
@@ -1135,7 +1142,7 @@ const SortableRow = ({
           )}
         </Flex>
       </TableCell>
-      <TableCell>{node.version}</TableCell>
+      <TableCell>{publicVersion(node.version)}</TableCell>
       <TableCell>
         <Text
           size="2"
@@ -1333,12 +1340,13 @@ const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) 
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-4">
+      <RotateTokenButton node={node} />
       <GenerateCommandButton node={node} settings={settings} />
       <IconButton
         title={t("terminal.title")}
         variant="ghost"
         onClick={() => {
-          window.open(`/terminal?uuid=${node.uuid}`, "_blank");
+          if (!openRemoteTerminal(node.uuid)) toast.error("浏览器阻止了远程管理窗口");
         }}
       >
         <Terminal size="18" />
@@ -1349,6 +1357,118 @@ const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) 
     </div>
   );
 };
+
+function RotateTokenButton({ node }: { node: NodeDetail }) {
+  const { t } = useTranslation();
+  const { refresh } = useNodeDetails();
+  const [open, setOpen] = React.useState(false);
+  const [twoFactorCode, setTwoFactorCode] = React.useState("");
+  const [error, setError] = React.useState("");
+  const [rotating, setRotating] = React.useState(false);
+
+  const rotateToken = async () => {
+    setRotating(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/client/token/rotate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uuid: node.uuid,
+          ...(twoFactorCode ? { "2fa_code": twoFactorCode } : {}),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(
+            payload?.message === "Invalid 2FA code"
+              ? "动态口令无效"
+              : "请输入动态口令",
+          );
+        }
+        throw new Error(localizeTokenRotationError(payload?.message));
+      }
+      if (!(payload?.data?.token || payload?.token)) {
+        throw new Error("Server 未返回新 Token");
+      }
+      setTwoFactorCode("");
+      setOpen(false);
+      toast.success("Token 已重置，请使用新指令更新 Agent；新 Token 连接后旧 Token 自动失效");
+      refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Token 重置失败");
+    } finally {
+      setRotating(false);
+    }
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <IconButton
+        type="button"
+        size="1"
+        variant="soft"
+        color="orange"
+        title={t("admin.nodeTable.rotateToken", "重置 Token")}
+        aria-label={t("admin.nodeTable.rotateToken", "重置 Token")}
+        onClick={() => setOpen(true)}
+      >
+        <RotateCw size={14} />
+      </IconButton>
+      <Dialog.Content maxWidth="440px">
+        <Dialog.Title>
+          {t("admin.nodeTable.rotateToken", "重置 Token")}
+        </Dialog.Title>
+        <Dialog.Description>
+          {t(
+            "admin.nodeTable.rotateTokenDescription",
+            "生成新 Token 后，旧 Token 最多保留 24 小时；新 Token 首次成功连接后旧 Token 会立即失效。",
+          )}
+          <br />
+          {t(
+            "admin.nodeTable.rotateTokenInstructions",
+            "重置后在节点上重新执行更新后的部署指令即可，无需手动卸载；自动更新只替换程序文件，不会修改 Token。",
+          )}
+        </Dialog.Description>
+        <Flex direction="column" gap="2">
+          <label className="text-sm font-normal">
+            {t(
+              "admin.nodeTable.twoFactorCode",
+              "动态口令（未开启 2FA 可留空）",
+            )}
+          </label>
+          <TextField.Root
+            value={twoFactorCode}
+            inputMode="numeric"
+            autoFocus
+            onChange={(event) =>
+              setTwoFactorCode(event.target.value.replace(/\D/g, ""))
+            }
+            onKeyDown={(event) =>
+              event.key === "Enter" && !rotating && void rotateToken()
+            }
+          />
+          {error && <p className="text-sm text-red-500">{error}</p>}
+        </Flex>
+        <Flex gap="2" justify="end" mt="4">
+          <Button variant="soft" onClick={() => setOpen(false)}>
+            {t("common.cancel", "取消")}
+          </Button>
+          <Button
+            color="orange"
+            disabled={rotating}
+            onClick={() => void rotateToken()}
+          >
+            {rotating
+              ? t("common.loading", "处理中...")
+              : t("admin.nodeTable.confirmRotateToken", "确认重置")}
+          </Button>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
 
 export default NodeDetailsPage;
 function DeleteButton({ node }: { node: NodeDetail }) {
@@ -1414,6 +1534,15 @@ type InstallOptions = {
   monthRotate: string;
 };
 function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings: any }) {
+  const { t } = useTranslation();
+  const { refresh } = useNodeDetails();
+  const configuredResetDay = Number(node.traffic_reset_day);
+  const initialResetDay =
+    Number.isInteger(configuredResetDay) &&
+    configuredResetDay >= 1 &&
+    configuredResetDay <= 31
+      ? String(configuredResetDay)
+      : "";
   const [selectedPlatform, setSelectedPlatform] =
     React.useState<Platform>("linux");
   const [installOptions, setInstallOptions] = React.useState<InstallOptions>({
@@ -1430,7 +1559,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     excludeNics: "",
     includeMountpoints: "",
     interval: "",
-    monthRotate: "",
+    monthRotate: initialResetDay,
   });
 
   const [enableGhproxy, setEnableGhproxy] = React.useState(false);
@@ -1442,7 +1571,26 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   const [enableIncludeMountpoints, setEnableIncludeMountpoints] =
     React.useState(false);
   const [enableInterval, setEnableInterval] = React.useState(false);
-  const [enableMonthRotate, setEnableMonthRotate] = React.useState(false);
+  const [enableMonthRotate, setEnableMonthRotate] = React.useState(
+    initialResetDay !== "",
+  );
+  const [savingResetDay, setSavingResetDay] = React.useState(false);
+
+  React.useEffect(() => {
+    setEnableMonthRotate(initialResetDay !== "");
+    setInstallOptions((previous) => ({
+      ...previous,
+      monthRotate: initialResetDay,
+    }));
+  }, [node.uuid, initialResetDay]);
+
+  const selectedTrafficResetDay = () => {
+    if (!enableMonthRotate) return 0;
+    const value = Number(installOptions.monthRotate);
+    return Number.isInteger(value) && value >= 1 && value <= 31
+      ? value
+      : null;
+  };
 
   const generateCommand = () => {
     const host = function () {
@@ -1524,7 +1672,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     if (selectedPlatform === "windows") {
       scriptFile = "install.ps1";
     }
-    let scriptUrl = `https://gitlab.com/raymao96/komari-agent/-/raw/keep-cfaccess/${scriptFile}?ref_type=heads`;
+    let scriptUrl =
+      `https://raw.githubusercontent.com/raymao96/komari-agent/refs/heads/main/${scriptFile}`;
     if (enableGhproxy) {
       if (enableGhproxy && ghproxy) {
         scriptUrl = scriptUrl.slice(8); // 去掉 https://
@@ -1577,7 +1726,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         }
         finalCommand =
           `docker run -d --name komari-agent --restart=always ` +
-          `ghcr.io/komari-monitor/komari-agent:latest ` +
+          `ghcr.io/nuomiiiii/komari-agent:latest ` +
           quoteShellArgs(dockerArgs);
         break;
       }
@@ -1585,15 +1734,51 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     return finalCommand;
   };
 
-  const copyToClipboard = async (text: string) => {
+  const saveAndCopyCommand = async () => {
+    const trafficResetDay = selectedTrafficResetDay();
+    if (trafficResetDay === null) {
+      toast.error(
+        t(
+          "admin.nodeTable.invalidMonthRotate",
+          "网络统计月重置日必须是 1 到 31 的整数",
+        ),
+      );
+      return;
+    }
+
+    setSavingResetDay(true);
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success(t("copy_success", "已复制到剪贴板"));
+      if (trafficResetDay !== (node.traffic_reset_day ?? 0)) {
+        const response = await fetch(`/api/admin/client/${node.uuid}/edit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ traffic_reset_day: trafficResetDay }),
+        });
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(message || `HTTP ${response.status}`);
+        }
+        refresh();
+      }
+
+      await navigator.clipboard.writeText(generateCommand());
+      toast.success(
+        t(
+          "admin.nodeTable.installCommandSaved",
+          "配置已保存，指令已复制到剪贴板",
+        ),
+      );
     } catch (err) {
-      console.error("Failed to copy text: ", err);
+      console.error("Failed to save install options or copy command:", err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t("admin.nodeTable.installCommandSaveFailed", "保存配置失败"),
+      );
+    } finally {
+      setSavingResetDay(false);
     }
   };
-  const { t } = useTranslation();
   return (
     <Dialog.Root>
       <Dialog.Trigger>
@@ -1759,7 +1944,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                 </label>
               </Flex>
             </div>
-            <Flex direction="column" gap="2">
+            <Flex direction="column" gap="2" className="[&_label]:font-normal">
               <Flex gap="2" align="center">
                 <Checkbox
                   checked={enableGhproxy}
@@ -2152,7 +2337,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           <Flex justify="center">
             <Button
               style={{ width: "100%" }}
-              onClick={() => copyToClipboard(generateCommand())}
+              disabled={savingResetDay || selectedTrafficResetDay() === null}
+              onClick={saveAndCopyCommand}
             >
               <Copy size={16} />
               {t("copy")}
@@ -2177,17 +2363,24 @@ function EditButton({ node }: { node: NodeDetail }) {
   const [saving, setSaving] = useState(false);
   const [traffic_limit, setTrafficLimit] = useState(0);
   const [traffic_limit_type, setTrafficLimitType] = useState("sum");
+  const [trafficResetDay, setTrafficResetDay] = useState(0);
 
   React.useEffect(() => {
     setHidden(node.hidden);
     setTrafficLimit(node.traffic_limit || 0);
     setTrafficLimitType(node.traffic_limit_type || "sum");
-  }, [node.hidden, node.traffic_limit, node.traffic_limit_type]);
+    setTrafficResetDay(node.traffic_reset_day ?? 0);
+  }, [
+    node.hidden,
+    node.traffic_limit,
+    node.traffic_limit_type,
+    node.traffic_reset_day,
+  ]);
 
   const save = async () => {
     try {
       setSaving(true);
-      await fetch(`/api/admin/client/${node.uuid}/edit`, {
+      const response = await fetch(`/api/admin/client/${node.uuid}/edit`, {
         method: "POST",
         body: JSON.stringify({
           name: nameRef.current?.value,
@@ -2198,16 +2391,22 @@ function EditButton({ node }: { node: NodeDetail }) {
           hidden,
           traffic_limit,
           traffic_limit_type,
+          traffic_reset_day: trafficResetDay,
         }),
         headers: {
           "Content-Type": "application/json",
         },
       });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `HTTP ${response.status}`);
+      }
       refresh();
       setOpen(false);
       toast.success(t("admin.nodeEdit.saveSuccess", "保存成功"));
     } catch (error) {
       console.error("Error updating client:", error);
+      toast.error(t("admin.nodeEdit.saveError", "保存失败"));
     } finally {
       setSaving(false);
     }
@@ -2302,6 +2501,32 @@ function EditButton({ node }: { node: NodeDetail }) {
             />
           </div>
           <SettingCardCollapse title={t("admin.nodeEdit.trafficLimit")}>
+            <div className="px-4 py-2">
+              <label className="block mb-1 text-sm font-medium">
+                {t("admin.nodeEdit.trafficResetDay", "流量重置日")}
+              </label>
+              <TextField.Root
+                type="number"
+                min="0"
+                max="31"
+                value={String(trafficResetDay)}
+                onChange={(event) => {
+                  const day = Number.parseInt(event.target.value || "0", 10);
+                  setTrafficResetDay(
+                    Math.min(
+                      31,
+                      Math.max(0, Number.isFinite(day) ? day : 0),
+                    ),
+                  );
+                }}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t(
+                  "admin.nodeEdit.trafficResetDay_description",
+                  "0 表示关闭；1-31 表示每月重置日。保存后自动同步到 Agent。",
+                )}
+              </p>
+            </div>
             <SettingCardSelect
               bordless
               title={t("admin.nodeEdit.trafficLimitType")}
@@ -2441,7 +2666,7 @@ function DetailView({ node }: { node: NodeDetail }) {
                   id="detail-version"
                   className="bg-muted px-3 py-2 rounded border select-text"
                 >
-                  {node.version || (
+                  {publicVersion(node.version) || (
                     <span className="text-muted-foreground">-</span>
                   )}
                 </span>
@@ -2610,7 +2835,9 @@ function BillingButton({ node }: { node: NodeDetail }) {
   const [autoRenewal, setAutoRenewal] = React.useState<boolean>(
     node.auto_renewal || false
   );
-  const [currency, setCurrency] = React.useState<string>(node.currency || "$");
+  const [currency, setCurrency] = React.useState<string>(
+    currencyForDisplay(node.currency || "$")
+  );
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2629,10 +2856,9 @@ function BillingButton({ node }: { node: NodeDetail }) {
         (formData.get("billingCycle") as string) || "30"
       );
       const expiredAtValue = (formData.get("expiredAt") as string) || "";
-      const expiredAt = expiredAtValue
-        ? new Date(`${expiredAtValue}T00:00:00`).toISOString()
-        : null;
-      const currencyValue = (formData.get("currency") as string) || "$";
+      const expiredAt = dateInputToISOString(expiredAtValue);
+      const rawCurrency = (formData.get("currency") as string) || "$";
+      const currencyValue = currencyForStorage(rawCurrency);
 
       await fetch(`/api/admin/client/${node.uuid}/edit`, {
         method: "POST",
@@ -2647,6 +2873,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
           "Content-Type": "application/json",
         },
       });
+      setCurrency(currencyForDisplay(currencyValue));
       refresh();
       setOpen(false);
     } catch (error) {
@@ -2684,10 +2911,12 @@ function BillingButton({ node }: { node: NodeDetail }) {
                 {t("admin.nodeTable.currencyTips")}
               </label>
             </label>
-            <TextField.Root
+            <SelectOrInput
+              options={["¥", "$", "€", "£", "₽", "₣", "₹", "₫", "฿", "C$"]}
               name="currency"
-              defaultValue={currency}
-              onChange={(e) => setCurrency(e.target.value)}
+              value={currency}
+              onChange={(value) => setCurrency(value)}
+              allowCustomInput
             />
 
             <label className="font-bold flex items-center gap-1">
@@ -2719,7 +2948,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
               name="expiredAt"
               defaultValue={
                 node.expired_at
-                  ? new Date(node.expired_at).toISOString().slice(0, 10)
+                  ? timestampToDateInput(node.expired_at)
                   : "0001-01-01"
               }
               type="date"
@@ -2735,7 +2964,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
                     if (dateInput) {
                       const futureDate = new Date();
                       futureDate.setFullYear(futureDate.getFullYear() + 200);
-                      dateInput.value = futureDate.toISOString().slice(0, 10);
+                      dateInput.value = timestampToDateInput(futureDate);
                     }
                   }}
                 >

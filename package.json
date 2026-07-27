@@ -1,12 +1,13 @@
 {
   "name": "komari-web",
   "private": true,
-  "version": "0.0.1",
+  "version": "2.1.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "node --test tests/dateInput.test.ts tests/currency.test.ts tests/nodeOrder.test.ts tests/databaseRuntime.test.ts",
     "preview": "vite preview",
     "i18n:sync": "node ./script/i18n-sync.mjs",
     "i18n:sync:dry": "node ./script/i18n-sync.mjs --dry-run"

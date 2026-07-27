@@ -23,6 +23,7 @@ import { DetailsGrid } from "./DetailsGrid";
 import MiniPingChart from "./MiniPingChart";
 import { getOSImage } from "@/utils";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
+import { compareNodesByBackendOrder } from "@/lib/nodeOrder";
 
 interface NodeTableProps {
   nodes: NodeBasicInfo[];
@@ -142,7 +143,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onlineSet }) => 
         if (aOnline && !bOnline) return -1;
         if (!aOnline && bOnline) return 1;
       }
-      return a.weight - b.weight;
+      return compareNodesByBackendOrder(a, b);
     }
 
     // 自定义排序逻辑

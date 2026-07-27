@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import Tips from "./ui/tips";
 
 import { formatBytes } from "@/utils/unitHelper";
+import { compareNodesByBackendOrder } from "@/lib/nodeOrder";
 
 /** 格式化秒*/
 export function formatUptime(seconds: number, t: TFunction): string {
@@ -319,7 +320,7 @@ export const NodeGrid = ({ nodes, liveData, onlineSet }: NodeGridProps) => {
       if (aIsOnline && !bIsOnline) return -1;
       if (!aIsOnline && bIsOnline) return 1;
     }
-    return a.weight - b.weight;
+    return compareNodesByBackendOrder(a, b);
   }), [nodes, offlineServerPosition, onlineSet]);
 
   return (

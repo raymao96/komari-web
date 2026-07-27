@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Copy } from "lucide-react";
 import { t } from "i18next";
 import { Button, IconButton } from "@radix-ui/themes";
+import { publicVersion } from "@/utils/version";
 
 function formatBytes(bytes?: number | string): string {
   if (!bytes || isNaN(Number(bytes))) return "-";
@@ -102,7 +103,7 @@ export function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                   id="detail-version"
                   className="bg-muted px-3 py-2 rounded border select-text"
                 >
-                  {item.version || (
+                  {publicVersion(item.version) || (
                     <span className="text-muted-foreground">-</span>
                   )}
                 </span>

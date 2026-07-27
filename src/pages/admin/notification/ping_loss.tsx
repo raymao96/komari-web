@@ -1,0 +1,832 @@
+import Loading from "@/components/loading";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  NodeDetailsProvider,
+  useNodeDetails,
+  type NodeDetail,
+} from "@/contexts/NodeDetailsContext";
+import {
+  PingTaskProvider,
+  usePingTask,
+  type PingTask,
+} from "@/contexts/PingTaskContext";
+import {
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Dialog,
+  Flex,
+  IconButton,
+  Select,
+  Switch,
+  Tabs,
+  TextField,
+} from "@radix-ui/themes";
+import {
+  Pencil,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+
+type PingLossNotification = {
+  id: number;
+  client: string;
+  task_id: number;
+  enable: boolean;
+  window_seconds: number;
+  loss_threshold: number;
+  minimum_samples: number;
+  cooldown_seconds: number;
+  last_notified?: string | null;
+  task?: PingTask;
+};
+
+type AlertTarget = {
+  key: string;
+  client: string;
+  clientName: string;
+  serverOrder: number;
+  taskId: number;
+  task: PingTask;
+  rule?: PingLossNotification;
+};
+
+type FormState = {
+  enable: boolean;
+  windowMinutes: number;
+  lossThreshold: number;
+  minimumSamples: number;
+  cooldownMinutes: number;
+};
+
+type ViewMode = "task" | "server";
+
+const defaultForm: FormState = {
+  enable: true,
+  windowMinutes: 1,
+  lossThreshold: 5,
+  minimumSamples: 1,
+  cooldownMinutes: 5,
+};
+
+const targetKey = (client: string, taskId: number) => `${client}:${taskId}`;
+
+const parseResponse = async (response: Response) => {
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.message || "Request failed");
+  }
+  return data;
+};
+
+const buildAlertTargets = (
+  tasks: PingTask[],
+  nodes: NodeDetail[],
+  rules: PingLossNotification[],
+) => {
+  const nodesById = new Map(
+    nodes.map((node, index) => [node.uuid, { node, order: index }])
+  );
+  const tasksById = new Map(
+    tasks
+      .filter((task) => typeof task.id === "number")
+      .map((task) => [task.id as number, task]),
+  );
+  const rulesByTarget = new Map<string, PingLossNotification>();
+  for (const rule of rules) {
+    const key = targetKey(rule.client, rule.task_id);
+    if (!rulesByTarget.has(key)) rulesByTarget.set(key, rule);
+  }
+
+  const targets: AlertTarget[] = [];
+  const seen = new Set<string>();
+  for (const task of tasks) {
+    if (typeof task.id !== "number") continue;
+    for (const client of new Set(task.clients || [])) {
+      const nodeEntry = nodesById.get(client);
+      if (!nodeEntry) continue;
+      const key = targetKey(client, task.id);
+      seen.add(key);
+      targets.push({
+        key,
+        client,
+        clientName: nodeEntry.node.name || client,
+        serverOrder: nodeEntry.order,
+        taskId: task.id,
+        task,
+        rule: rulesByTarget.get(key),
+      });
+    }
+  }
+
+  for (const rule of rules) {
+    const key = targetKey(rule.client, rule.task_id);
+    if (seen.has(key)) continue;
+    const nodeEntry = nodesById.get(rule.client);
+    const task = tasksById.get(rule.task_id) || rule.task || {
+      id: rule.task_id,
+      name: `#${rule.task_id}`,
+    };
+    targets.push({
+      key,
+      client: rule.client,
+      clientName: nodeEntry?.node.name || rule.client,
+      serverOrder: nodeEntry?.order ?? Number.MAX_SAFE_INTEGER,
+      taskId: rule.task_id,
+      task,
+      rule,
+    });
+  }
+
+  return targets;
+};
+
+const sortTargets = (targets: AlertTarget[], view: ViewMode) => {
+  const compareText = (a: string, b: string) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+  return [...targets].sort((a, b) => {
+    if (view === "task") {
+      const taskWeight = (a.task.weight ?? 0) - (b.task.weight ?? 0);
+      if (taskWeight !== 0) return taskWeight;
+      const taskName = compareText(a.task.name || "", b.task.name || "");
+      if (taskName !== 0) return taskName;
+      if (a.serverOrder !== b.serverOrder) {
+        return a.serverOrder - b.serverOrder;
+      }
+      return compareText(a.clientName, b.clientName);
+    }
+    if (a.serverOrder !== b.serverOrder) {
+      return a.serverOrder - b.serverOrder;
+    }
+    const serverName = compareText(a.clientName, b.clientName);
+    if (serverName !== 0) return serverName;
+    const taskWeight = (a.task.weight ?? 0) - (b.task.weight ?? 0);
+    if (taskWeight !== 0) return taskWeight;
+    return compareText(a.task.name || "", b.task.name || "");
+  });
+};
+
+const PingLossPage = () => (
+  <PingTaskProvider>
+    <NodeDetailsProvider>
+      <PingLossContent />
+    </NodeDetailsProvider>
+  </PingTaskProvider>
+);
+
+const PingLossContent = () => {
+  const { t } = useTranslation();
+  const { nodeDetail, isLoading: nodesLoading, error: nodesError } =
+    useNodeDetails();
+  const { pingTasks, isLoading: tasksLoading, error: tasksError } =
+    usePingTask();
+  const [rules, setRules] = React.useState<PingLossNotification[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [view, setView] = React.useState<ViewMode>("task");
+  const [selected, setSelected] = React.useState<string[]>([]);
+
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/notification/ping-loss/");
+      const data = await parseResponse(response);
+      setRules(Array.isArray(data?.data) ? data.data : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const targets = React.useMemo(
+    () => buildAlertTargets(pingTasks || [], nodeDetail, rules),
+    [pingTasks, nodeDetail, rules],
+  );
+
+  React.useEffect(() => {
+    const validKeys = new Set(targets.map((target) => target.key));
+    setSelected((current) => current.filter((key) => validKeys.has(key)));
+  }, [targets]);
+
+  const filteredTargets = React.useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    const filtered = keyword
+      ? targets.filter((target) =>
+          [
+            target.clientName,
+            target.client,
+            target.task.name,
+            target.task.target,
+            target.task.type,
+          ].some((value) => String(value || "").toLowerCase().includes(keyword)),
+        )
+      : targets;
+    return sortTargets(filtered, view);
+  }, [targets, search, view]);
+
+  const selectedTargets = React.useMemo(() => {
+    const selectedSet = new Set(selected);
+    return targets.filter((target) => selectedSet.has(target.key));
+  }, [targets, selected]);
+  const availableTargets = React.useMemo(
+    () => sortTargets(targets.filter((target) => !target.rule), "task"),
+    [targets],
+  );
+
+  if (loading || nodesLoading || tasksLoading) {
+    return <Loading text={t("loading")} />;
+  }
+  if (error || nodesError || tasksError) {
+    return (
+      <div>
+        {t("common.error")}: {error || nodesError || tasksError}
+      </div>
+    );
+  }
+
+  const handleBatchSaved = async () => {
+    setSelected([]);
+    await refresh();
+  };
+
+  return (
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-4 p-1 md:p-4">
+      <Flex className="w-full" justify="between" align="center" gap="3" wrap="wrap">
+        <label className="text-2xl font-semibold">
+          {t("notification.ping_loss.full_title")}
+        </label>
+        <Flex gap="2" align="center" wrap="wrap" className="w-full sm:w-auto">
+          <TextField.Root
+            className="w-full sm:w-64"
+            value={search}
+            placeholder={t("common.search")}
+            onChange={(event) => setSearch(event.target.value)}
+          >
+            <TextField.Slot>
+              <Search size={16} />
+            </TextField.Slot>
+          </TextField.Root>
+          <ConfigurationDialog
+            targets={[]}
+            availableTargets={availableTargets}
+            onSaved={refresh}
+          >
+            <Button>
+              <Plus size={16} />
+              {t("common.add")}
+            </Button>
+          </ConfigurationDialog>
+        </Flex>
+      </Flex>
+
+      <Tabs.Root value={view} onValueChange={(value) => setView(value as ViewMode)}>
+        <Tabs.List>
+          <Tabs.Trigger value="task">{t("ping.task_view")}</Tabs.Trigger>
+          <Tabs.Trigger value="server">{t("ping.server_view")}</Tabs.Trigger>
+        </Tabs.List>
+        <Box pt="3">
+          <Tabs.Content value="task">
+            <AlertTable
+              view="task"
+              targets={filteredTargets}
+              selected={selected}
+              onSelectionChange={setSelected}
+              onSaved={refresh}
+            />
+          </Tabs.Content>
+          <Tabs.Content value="server">
+            <AlertTable
+              view="server"
+              targets={filteredTargets}
+              selected={selected}
+              onSelectionChange={setSelected}
+              onSaved={refresh}
+            />
+          </Tabs.Content>
+        </Box>
+      </Tabs.Root>
+
+      <Flex align="center" justify="between" gap="3" wrap="wrap">
+        <span className="text-sm text-muted-foreground">
+          {t("common.selected_total", {
+            count: selected.length,
+            total: targets.length,
+          })}
+        </span>
+        <ConfigurationDialog
+          targets={selectedTargets}
+          onSaved={handleBatchSaved}
+          batch
+        >
+          <Button disabled={selectedTargets.length === 0}>
+            <SlidersHorizontal size={16} />
+            {t("notification.ping_loss.batch_edit")}
+          </Button>
+        </ConfigurationDialog>
+      </Flex>
+    </div>
+  );
+};
+
+const AlertTable = ({
+  view,
+  targets,
+  selected,
+  onSelectionChange,
+  onSaved,
+}: {
+  view: ViewMode;
+  targets: AlertTarget[];
+  selected: string[];
+  onSelectionChange: (keys: string[]) => void;
+  onSaved: () => Promise<void>;
+}) => {
+  const { t } = useTranslation();
+  const selectedSet = new Set(selected);
+  const selectedVisible = targets.filter((target) => selectedSet.has(target.key));
+  const allVisibleSelected =
+    targets.length > 0 && selectedVisible.length === targets.length;
+  const headerChecked = allVisibleSelected
+    ? true
+    : selectedVisible.length > 0
+      ? "indeterminate"
+      : false;
+
+  const setVisibleSelection = (checked: boolean) => {
+    const visibleKeys = new Set(targets.map((target) => target.key));
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selected, ...visibleKeys])));
+    } else {
+      onSelectionChange(selected.filter((key) => !visibleKeys.has(key)));
+    }
+  };
+
+  return (
+    <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-lg">
+      <Table className="min-w-[1120px]">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10">
+              <Checkbox
+                checked={headerChecked}
+                aria-label={t("common.select_all")}
+                onCheckedChange={(checked) => setVisibleSelection(checked === true)}
+              />
+            </TableHead>
+            <TableHead>
+              {view === "task" ? t("ping.task") : t("common.server")}
+            </TableHead>
+            <TableHead>
+              {view === "task" ? t("common.server") : t("ping.task")}
+            </TableHead>
+            <TableHead>{t("ping.target")}</TableHead>
+            <TableHead>{t("common.status")}</TableHead>
+            <TableHead>{t("notification.ping_loss.window")}</TableHead>
+            <TableHead>{t("notification.ping_loss.threshold")}</TableHead>
+            <TableHead>{t("notification.ping_loss.minimum_samples")}</TableHead>
+            <TableHead>{t("notification.ping_loss.cooldown")}</TableHead>
+            <TableHead>{t("notification.ping_loss.last_notified")}</TableHead>
+            <TableHead>{t("common.action")}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {targets.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={11} className="py-8 text-center text-gray-500">
+                {t("notification.ping_loss.empty")}
+              </TableCell>
+            </TableRow>
+          ) : (
+            targets.map((target) => (
+              <AlertRow
+                key={target.key}
+                view={view}
+                target={target}
+                selected={selectedSet.has(target.key)}
+                onSelectedChange={(checked) =>
+                  onSelectionChange(
+                    checked
+                      ? Array.from(new Set([...selected, target.key]))
+                      : selected.filter((key) => key !== target.key),
+                  )
+                }
+                onSaved={onSaved}
+              />
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
+const AlertRow = ({
+  view,
+  target,
+  selected,
+  onSelectedChange,
+  onSaved,
+}: {
+  view: ViewMode;
+  target: AlertTarget;
+  selected: boolean;
+  onSelectedChange: (checked: boolean) => void;
+  onSaved: () => Promise<void>;
+}) => {
+  const { t } = useTranslation();
+  const rule = target.rule;
+  const taskName = target.task.name || `#${target.taskId}`;
+  const primary = view === "task" ? taskName : target.clientName;
+  const secondary = view === "task" ? target.clientName : taskName;
+
+  return (
+    <TableRow data-state={selected ? "selected" : undefined}>
+      <TableCell>
+        <Checkbox
+          checked={selected}
+          aria-label={`${primary} - ${secondary}`}
+          onCheckedChange={(checked) => onSelectedChange(checked === true)}
+        />
+      </TableCell>
+      <TableCell>{primary}</TableCell>
+      <TableCell>{secondary}</TableCell>
+      <TableCell>{target.task.target || "-"}</TableCell>
+      <TableCell>
+        {rule ? (
+          <Badge color={rule.enable ? "green" : "gray"}>
+            {rule.enable ? t("common.enabled") : t("common.disabled")}
+          </Badge>
+        ) : (
+          <Badge color="orange">{t("notification.ping_loss.not_configured")}</Badge>
+        )}
+      </TableCell>
+      <TableCell>
+        {rule
+          ? t("notification.ping_loss.minutes", {
+              count: rule.window_seconds / 60,
+            })
+          : "-"}
+      </TableCell>
+      <TableCell>{rule ? `${rule.loss_threshold.toFixed(1)}%` : "-"}</TableCell>
+      <TableCell>{rule?.minimum_samples ?? "-"}</TableCell>
+      <TableCell>
+        {rule
+          ? t("notification.ping_loss.minutes", {
+              count: rule.cooldown_seconds / 60,
+            })
+          : "-"}
+      </TableCell>
+      <TableCell>
+        {rule?.last_notified
+          ? new Date(rule.last_notified).toLocaleString()
+          : t("notification.ping_loss.never")}
+      </TableCell>
+      <TableCell>
+        <Flex gap="2" align="center">
+          <ConfigurationDialog targets={[target]} onSaved={onSaved}>
+            <IconButton
+              variant="ghost"
+              title={rule ? t("common.edit") : t("notification.ping_loss.add")}
+              aria-label={rule ? t("common.edit") : t("notification.ping_loss.add")}
+            >
+              {rule ? <Pencil size={16} /> : <SlidersHorizontal size={16} />}
+            </IconButton>
+          </ConfigurationDialog>
+          {rule ? <DeleteRuleButton rule={rule} onDeleted={onSaved} /> : null}
+        </Flex>
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const ConfigurationDialog = ({
+  children,
+  targets,
+  availableTargets,
+  onSaved,
+  batch = false,
+}: {
+  children: React.ReactNode;
+  targets: AlertTarget[];
+  availableTargets?: AlertTarget[];
+  onSaved: () => Promise<void>;
+  batch?: boolean;
+}) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [form, setForm] = React.useState<FormState>(defaultForm);
+  const [createTargetKey, setCreateTargetKey] = React.useState("");
+  const enableId = React.useId();
+  const createMode = availableTargets !== undefined;
+  const availableTargetSignature = (availableTargets || [])
+    .map((target) => target.key)
+    .join("|");
+  const activeTargets = createMode
+    ? (availableTargets || []).filter(
+        (target) => target.key === createTargetKey,
+      )
+    : targets;
+  const targetSignature = activeTargets.map((target) => target.key).join("|");
+
+  React.useEffect(() => {
+    if (!open || !createMode) return;
+    setCreateTargetKey((current) =>
+      (availableTargets || []).some((target) => target.key === current)
+        ? current
+        : availableTargets?.[0]?.key || "",
+    );
+  }, [open, createMode, availableTargetSignature]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const rule = activeTargets.find((target) => target.rule)?.rule;
+    setForm(
+      rule
+        ? {
+            enable: rule.enable,
+            windowMinutes: rule.window_seconds / 60,
+            lossThreshold: rule.loss_threshold,
+            minimumSamples: rule.minimum_samples,
+            cooldownMinutes: rule.cooldown_seconds / 60,
+          }
+        : defaultForm,
+    );
+  }, [open, targetSignature]);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (activeTargets.length === 0) {
+      toast.error(t("notification.ping_loss.select_required"));
+      return;
+    }
+    if (
+      form.windowMinutes < 1 ||
+      form.windowMinutes > 1440 ||
+      form.lossThreshold <= 0 ||
+      form.lossThreshold > 100 ||
+      form.minimumSamples < 1 ||
+      form.minimumSamples > 100000 ||
+      form.cooldownMinutes < 1 ||
+      form.cooldownMinutes > 10080
+    ) {
+      toast.error(t("notification.ping_loss.invalid_form"));
+      return;
+    }
+
+    const notifications = activeTargets.map((target) => ({
+      ...(target.rule ? { id: target.rule.id } : {}),
+      client: target.client,
+      task_id: target.taskId,
+      enable: form.enable,
+      window_seconds: Math.round(form.windowMinutes * 60),
+      loss_threshold: form.lossThreshold,
+      minimum_samples: Math.round(form.minimumSamples),
+      cooldown_seconds: Math.round(form.cooldownMinutes * 60),
+    }));
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin/notification/ping-loss/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifications }),
+      });
+      await parseResponse(response);
+      toast.success(t("common.updated_successfully"));
+      setOpen(false);
+      await onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const firstRule = activeTargets.find((target) => target.rule)?.rule;
+  const title = batch
+    ? t("notification.ping_loss.batch_edit")
+    : firstRule
+      ? t("notification.ping_loss.edit")
+      : t("notification.ping_loss.add");
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger>{children}</Dialog.Trigger>
+      <Dialog.Content maxWidth="560px">
+        <Dialog.Title>{title}</Dialog.Title>
+        <Dialog.Description className="sr-only">{title}</Dialog.Description>
+        {batch ? (
+          <span className="text-sm text-muted-foreground">
+            {t("common.selected", { count: targets.length })}
+          </span>
+        ) : null}
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
+          {createMode ? (
+            <Field label={`${t("ping.task")} / ${t("common.server")}`}>
+              <Select.Root
+                value={createTargetKey}
+                onValueChange={setCreateTargetKey}
+                disabled={(availableTargets || []).length === 0}
+              >
+                <Select.Trigger placeholder={t("common.select")} />
+                <Select.Content>
+                  {(availableTargets || []).map((target) => (
+                    <Select.Item key={target.key} value={target.key}>
+                      {target.task.name || `#${target.taskId}`} / {target.clientName}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Field>
+          ) : null}
+          <Flex justify="between" align="center">
+            <label htmlFor={enableId}>{t("common.status")}</label>
+            <Switch
+              id={enableId}
+              checked={form.enable}
+              onCheckedChange={(enable) =>
+                setForm((current) => ({ ...current, enable }))
+              }
+            />
+          </Flex>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <NumberField
+              label={t("notification.ping_loss.window_minutes")}
+              value={form.windowMinutes}
+              min={1}
+              max={1440}
+              onChange={(windowMinutes) =>
+                setForm((current) => ({ ...current, windowMinutes }))
+              }
+            />
+            <NumberField
+              label={`${t("notification.ping_loss.threshold")} (%)`}
+              value={form.lossThreshold}
+              min={0.1}
+              max={100}
+              step={0.1}
+              onChange={(lossThreshold) =>
+                setForm((current) => ({ ...current, lossThreshold }))
+              }
+            />
+            <NumberField
+              label={t("notification.ping_loss.minimum_samples")}
+              value={form.minimumSamples}
+              min={1}
+              max={100000}
+              onChange={(minimumSamples) =>
+                setForm((current) => ({ ...current, minimumSamples }))
+              }
+            />
+            <NumberField
+              label={t("notification.ping_loss.cooldown_minutes")}
+              value={form.cooldownMinutes}
+              min={1}
+              max={10080}
+              onChange={(cooldownMinutes) =>
+                setForm((current) => ({ ...current, cooldownMinutes }))
+              }
+            />
+          </div>
+
+          <Flex gap="2" justify="end" className="mt-2">
+            <Dialog.Close>
+              <Button type="button" variant="soft" color="gray">
+                {t("common.cancel")}
+              </Button>
+            </Dialog.Close>
+            <Button type="submit" disabled={saving || activeTargets.length === 0}>
+              {t("common.save")}
+            </Button>
+          </Flex>
+        </form>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+};
+
+const Field = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <label className="flex min-w-0 flex-col gap-2">
+    <span>{label}</span>
+    {children}
+  </label>
+);
+
+const NumberField = ({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+}) => (
+  <Field label={label}>
+    <TextField.Root
+      type="number"
+      value={String(value)}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(event) => onChange(Number(event.target.value))}
+    />
+  </Field>
+);
+
+const DeleteRuleButton = ({
+  rule,
+  onDeleted,
+}: {
+  rule: PingLossNotification;
+  onDeleted: () => Promise<void>;
+}) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/admin/notification/ping-loss/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: [rule.id] }),
+      });
+      await parseResponse(response);
+      toast.success(t("common.deleted_successfully"));
+      setOpen(false);
+      await onDeleted();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger>
+        <IconButton
+          variant="ghost"
+          color="red"
+          title={t("common.delete")}
+          aria-label={t("common.delete")}
+        >
+          <Trash2 size={16} />
+        </IconButton>
+      </Dialog.Trigger>
+      <Dialog.Content maxWidth="420px">
+        <Dialog.Title>{t("notification.ping_loss.delete_title")}</Dialog.Title>
+        <Dialog.Description className="sr-only">
+          {t("notification.ping_loss.delete_title")}
+        </Dialog.Description>
+        <Flex gap="2" justify="end" className="mt-6">
+          <Dialog.Close>
+            <Button type="button" variant="soft" color="gray">
+              {t("common.cancel")}
+            </Button>
+          </Dialog.Close>
+          <Button color="red" onClick={remove} disabled={deleting}>
+            {t("common.delete")}
+          </Button>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+};
+
+export default PingLossPage;

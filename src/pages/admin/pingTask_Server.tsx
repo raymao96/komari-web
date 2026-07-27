@@ -20,17 +20,6 @@ export const ServerView = ({ pingTasks }: { pingTasks: PingTask[] }) => {
   const { t } = useTranslation();
   const { nodeDetail } = useNodeDetails();
 
-  const sortedNodes = React.useMemo(
-    () =>
-      [...nodeDetail].sort((a, b) => {
-        const wa = a.weight ?? 0;
-        const wb = b.weight ?? 0;
-        if (wa !== wb) return wa - wb;
-        return a.name.localeCompare(b.name);
-      }),
-    [nodeDetail]
-  );
-
   return (
     <div className="rounded-xl overflow-hidden">
       <Table>
@@ -39,7 +28,7 @@ export const ServerView = ({ pingTasks }: { pingTasks: PingTask[] }) => {
           <TableHead>{t("ping.task")}</TableHead>
         </TableHeader>
         <TableBody>
-          {sortedNodes.map((n) => (
+          {nodeDetail.map((n) => (
             <ServerRow
               key={n.uuid}
               nodeUuid={n.uuid}
@@ -100,7 +89,6 @@ const ServerRow: React.FC<{
           id: task.id,
           name: task.name,
           type: task.type,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           target: task.target!,
           default_on: task.default_on || false,
           clients: Array.from(current),

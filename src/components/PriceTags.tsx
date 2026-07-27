@@ -1,5 +1,6 @@
 import { Badge, Flex } from "@radix-ui/themes";
 import { useTranslation } from "react-i18next";
+import { currencyForDisplay } from "@/lib/currency";
 
 const PriceTags = ({
   price = 0,
@@ -51,7 +52,7 @@ const PriceTags = ({
 
       <Badge color="iris" size="1" variant="soft" className="text-sm">
         <label className="text-xs">
-          {price == -1 ? t("common.free") : `${currency}${price}`}/
+          {price == -1 ? t("common.free") : `${currencyForDisplay(currency)}${price}`}/
           {(() => {
             if (billing_cycle >= 27 && billing_cycle <= 32) {
               return t("common.monthly");

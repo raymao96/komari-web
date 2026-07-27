@@ -24,7 +24,8 @@ import { usePublicInfo } from "@/contexts/PublicInfoContext";
 // NOTE: 鉴权守卫已移至 AdminLayout（AdminGuard），到达本组件时必定已登录，
 // 故不再需要 account/LoginDialog 来处理未登录态（修复 #585）。
 import Tips from "../ui/tips";
-import { CircleFadingArrowUp } from "lucide-react";
+import { CircleFadingArrowUp, Download, LoaderCircle } from "lucide-react";
+import { toast } from "sonner";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import { resolveI18nText } from "@/utils/i18nText";
 import {
@@ -48,8 +49,110 @@ interface AdminPanelBarProps {
   content: ReactNode;
 }
 
+interface GithubReleaseInfo {
+  tag_name: string;
+  name?: string;
+  body?: string;
+  html_url: string;
+  published_at?: string;
+  draft?: boolean;
+  prerelease?: boolean;
+}
+
+interface VersionInfo {
+  hash: string;
+  version: string;
+  deployment: "docker" | "linux" | "windows" | "unknown";
+}
+
+interface SelfUpdateCapability {
+  deployment: string;
+  distribution?: string;
+  distribution_version?: string;
+  supported: boolean;
+  reason?: string;
+  last_result?: {
+    status: string;
+    target_version: string;
+    target_hash: string;
+    message?: string;
+  };
+}
+
+type UpdatePhase = "idle" | "preparing" | "restarting";
+
+function parseSemver(input?: string | null): number[] | null {
+  if (!input) return null;
+  const normalized = String(input).trim().replace(/^v/i, "");
+  const match = normalized.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareSemver(left?: string | null, right?: string | null) {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (!a || !b) return null;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return 1;
+    if (a[i] < b[i]) return -1;
+  }
+  return 0;
+}
+
+function parseReleaseVersionHash(body?: string | null) {
+  const match = body?.match(
+    /<!--\s*komari-version-hash:\s*([a-z0-9]{7})\s*-->/i,
+  );
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function formatVersion(version?: string | null, hash?: string | null) {
+  if (!version) return "";
+  const normalizedHash = hash?.trim();
+  return normalizedHash && normalizedHash !== "unknown"
+    ? `${version} (${normalizedHash})`
+    : version;
+}
+
+function formatReleaseVersion(release?: GithubReleaseInfo | null) {
+  if (!release) return "";
+  return formatVersion(
+    release.tag_name || release.name,
+    parseReleaseVersionHash(release.body),
+  );
+}
+
+function visibleReleaseBody(body?: string | null) {
+  return (body ?? "")
+    .replace(/<!--\s*komari-version-hash:\s*[a-z0-9]{7}\s*-->/i, "")
+    .trim();
+}
+
+function isReleaseNewer(
+  release: GithubReleaseInfo,
+  currentVersion?: string | null,
+  currentHash?: string | null,
+) {
+  const comparison = compareSemver(
+    release.tag_name || release.name,
+    currentVersion,
+  );
+  if (comparison === null) return false;
+  if (comparison !== 0) return comparison > 0;
+
+  const releaseHash = parseReleaseVersionHash(release.body);
+  const normalizedCurrentHash = currentHash?.trim().toLowerCase();
+  return Boolean(
+    releaseHash &&
+      normalizedCurrentHash &&
+      normalizedCurrentHash !== "unknown" &&
+      releaseHash !== normalizedCurrentHash,
+  );
+}
+
 const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
-  const { call } = useRPC2Call();
+  const { call, callViaHTTP } = useRPC2Call();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openSubMenus, setOpenSubMenus] = useState<{ [key: string]: boolean }>({
     // 默认所有子菜单关闭
@@ -61,24 +164,16 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   const { publicInfo } = usePublicInfo();
   //const navigate = useNavigate();
   // 获取版本信息
-  const [versionInfo, setVersionInfo] = useState<{
-    hash: string;
-    version: string;
-  } | null>(null);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [selfUpdate, setSelfUpdate] = useState<SelfUpdateCapability | null>(
+    null,
+  );
+  const [updatePhase, setUpdatePhase] = useState<UpdatePhase>("idle");
   const currentLanguage =
     i18n.resolvedLanguage ||
     i18n.language ||
     (typeof navigator !== "undefined" ? navigator.language : "");
   // GitHub 最新发布信息与更新检测
-  interface GithubReleaseInfo {
-    tag_name: string;
-    name?: string;
-    body?: string;
-    html_url: string;
-    published_at?: string;
-    draft?: boolean;
-    prerelease?: boolean;
-  }
   const [latestRelease, setLatestRelease] = useState<GithubReleaseInfo | null>(
     null,
   );
@@ -161,6 +256,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
         setVersionInfo({
           hash: data.hash?.slice(0, 7),
           version: data.version,
+          deployment: data.deployment || "unknown",
         });
       } catch (error) {
         console.error("Failed to fetch version info:", error);
@@ -168,38 +264,38 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
     };
 
     fetchVersionInfo();
-  }, []);
+  }, [call]);
 
-  // 规范化版本为 [major, minor, patch] 数组，忽略前缀 v 和后缀
-  function parseSemver(input?: string | null): number[] | null {
-    if (!input) return null;
-    const s = String(input).trim().replace(/^v/i, "");
-    const match = s.match(/^(\d+)\.(\d+)\.(\d+)/);
-    if (!match) return null;
-    return [Number(match[1]), Number(match[2]), Number(match[3])];
-  }
-
-  function isNewerVersion(latest?: string | null, current?: string | null) {
-    const a = parseSemver(latest);
-    const b = parseSemver(current);
-    if (!a || !b) return false;
-    for (let i = 0; i < 3; i++) {
-      if (a[i] > b[i]) return true;
-      if (a[i] < b[i]) return false;
+  useEffect(() => {
+    if (versionInfo?.deployment !== "linux") {
+      setSelfUpdate(null);
+      return;
     }
-    return false;
-  }
+    let ignore = false;
+    call("admin:getSelfUpdateStatus")
+      .then((status: SelfUpdateCapability) => {
+        if (!ignore) setSelfUpdate(status);
+      })
+      .catch((error) => {
+        console.warn("Failed to load self-update capability:", error);
+        if (!ignore) setSelfUpdate(null);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [call, versionInfo?.deployment]);
 
   // 获取 GitHub releases 列表，并筛选出“比当前版本新的所有 release”
   useEffect(() => {
     let ignore = false;
     const currentVersion = (publicInfo as any)?.version || versionInfo?.version;
+    const currentHash = versionInfo?.hash;
     if (!currentVersion) return;
 
     async function loadReleases() {
       try {
         const resp = await fetch(
-          "https://api.github.com/repos/komari-monitor/komari/releases?per_page=100",
+          "https://api.github.com/repos/nuomiiiii/komari/releases?per_page=100",
           {
             headers: {
               Accept: "application/vnd.github+json",
@@ -212,9 +308,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
         if (ignore) return;
         const valid = (data || [])
           .filter((r) => !r.draft && !r.prerelease)
-          .filter((r) =>
-            isNewerVersion(r?.tag_name || r?.name, currentVersion),
-          );
+          .filter((r) => isReleaseNewer(r, currentVersion, currentHash));
         setReleasesSince(valid);
         setLatestRelease(valid.length ? valid[0] : null);
         setUpdateAvailable(valid.length > 0);
@@ -277,7 +371,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
         damping: 30,
       },
     },
-  };
+  } as const;
 
   // 内容区域动画变体
   const contentVariants = {
@@ -296,6 +390,89 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
       },
     },
   };
+
+  async function waitForUpdatedService(targetVersion: string, targetHash: string) {
+    const deadline = Date.now() + 150_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      try {
+        const response = await fetch("/api/version", { cache: "no-store" });
+        if (!response.ok) continue;
+        const body = await response.json();
+        const observed = body?.data ?? body;
+        if (
+          observed?.version === targetVersion &&
+          String(observed?.hash || "").toLowerCase() ===
+            targetHash.toLowerCase()
+        ) {
+          toast.success(t("common.self_update_succeeded", "更新成功，正在刷新页面"));
+          window.setTimeout(() => window.location.reload(), 800);
+          return;
+        }
+        const status = await callViaHTTP<unknown, SelfUpdateCapability>(
+          "admin:getSelfUpdateStatus",
+          {},
+          { timeout: 5_000 },
+        );
+        if (
+          status.last_result?.target_version === targetVersion &&
+          ["rolled_back", "rollback_failed", "failed"].includes(
+            status.last_result.status,
+          )
+        ) {
+          const terminalError = new Error(
+            status.last_result.status === "rolled_back"
+              ? t(
+                  "common.self_update_rolled_back",
+                  "新版本未通过健康检查，已自动恢复原版本和数据",
+                )
+              : status.last_result.message ||
+                  t("common.self_update_failed", "自动更新失败"),
+          );
+          terminalError.name = "SelfUpdateTerminalError";
+          throw terminalError;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "SelfUpdateTerminalError") {
+          throw error;
+        }
+      }
+    }
+    throw new Error(
+      t(
+        "common.self_update_timeout",
+        "更新状态确认超时，请稍后刷新页面查看当前版本",
+      ),
+    );
+  }
+
+  async function startSelfUpdate() {
+    if (!latestRelease || updatePhase !== "idle") return;
+    const targetVersion = latestRelease.tag_name || latestRelease.name || "";
+    const targetHash = parseReleaseVersionHash(latestRelease.body);
+    if (!targetVersion || !targetHash) {
+      toast.error(t("common.self_update_metadata_missing", "发布版本缺少自动更新校验信息"));
+      return;
+    }
+    setUpdatePhase("preparing");
+    try {
+      await callViaHTTP(
+        "admin:startSelfUpdate",
+        { version: targetVersion, version_hash: targetHash },
+        { timeout: 360_000 },
+      );
+      setUpdatePhase("restarting");
+      toast.info(t("common.self_update_restarting", "更新已校验，服务正在重启"));
+      await waitForUpdatedService(targetVersion, targetHash);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.self_update_failed", "自动更新失败");
+      toast.error(message);
+      setUpdatePhase("idle");
+    }
+  }
 
   function logout() {
     window.open("/api/logout", "_self");
@@ -326,25 +503,42 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
             align="center"
             className="border-b-1"
           >
-            <Flex gap="3" align="center">
+            <Flex
+              gap="3"
+              align="end"
+              style={{ minHeight: "calc(32px * var(--scaling))" }}
+            >
               <IconButton
+                size="2"
                 variant="ghost"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="shrink-0"
                 style={{
                   display: isMobile && sidebarOpen ? "none" : "flex",
                   color: "var(--gray-11)",
                 }}
               >
-                <TablerMenu2 />
+                <TablerMenu2 className="h-6 w-6" />
               </IconButton>
-              <a href="/" target="_blank" rel="noopener noreferrer">
-                <label className="text-xl font-bold">Komari</label>
+              <a
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-end leading-none"
+              >
+                <span className="text-2xl font-bold leading-none">Komari</span>
               </a>
               {updateAvailable && releasesSince.length > 0 && (
                 <Tips
                   mode="dialog"
-                  className="check-update"
-                  trigger={<CircleFadingArrowUp color="#FB4141" size="16" />}
+                  className="check-update flex h-6 w-6 items-end leading-none"
+                  trigger={
+                    <CircleFadingArrowUp
+                      className="block h-6 w-6"
+                      color="#FB4141"
+                      size="24"
+                    />
+                  }
                 >
                   <div className="flex flex-col gap-2 max-w-[80vw] md:max-w-[720px]">
                     <label className="font-bold">
@@ -352,12 +546,13 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                     </label>
                     <div className="text-sm text-muted-foreground">
                       <span style={{ marginRight: 8 }}>
-                        {(publicInfo as any)?.version || versionInfo?.version}
+                        {formatVersion(
+                          (publicInfo as any)?.version || versionInfo?.version,
+                          versionInfo?.hash,
+                        )}
                       </span>
                       <span>{"> "}</span>
-                      <span>
-                        {(latestRelease?.tag_name || latestRelease?.name) ?? ""}
-                      </span>
+                      <span>{formatReleaseVersion(latestRelease)}</span>
                     </div>
 
                     <div className="rounded-md p-2 overflow-auto max-h-80">
@@ -366,7 +561,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                           <div key={r.html_url} className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                               <div className="font-medium">
-                                {r.name || r.tag_name}
+                                {formatReleaseVersion(r)}
                               </div>
                               {r.published_at && (
                                 <div className="text-xs text-muted-foreground">
@@ -375,7 +570,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                               )}
                             </div>
                             <div className="whitespace-pre-wrap break-words">
-                              {r.body || ""}
+                              {visibleReleaseBody(r.body)}
                             </div>
                             <div
                               style={{
@@ -388,26 +583,47 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                         ))}
                       </div>
                     </div>
-                    <div className="flex justify-end">
-                      <a
-                        href={latestRelease?.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant="soft">Github</Button>
-                      </a>
+                    <div className="flex items-center justify-end gap-2">
+                      {versionInfo?.deployment === "linux" &&
+                      selfUpdate?.supported &&
+                      parseReleaseVersionHash(latestRelease?.body) ? (
+                        <Button
+                          variant="soft"
+                          onClick={startSelfUpdate}
+                          disabled={updatePhase !== "idle"}
+                        >
+                          {updatePhase === "idle" ? (
+                            <Download size={16} />
+                          ) : (
+                            <LoaderCircle size={16} className="animate-spin" />
+                          )}
+                          {updatePhase === "preparing"
+                            ? t("common.self_update_preparing", "正在下载并校验")
+                            : updatePhase === "restarting"
+                              ? t("common.self_update_restarting_short", "正在更新")
+                              : t("common.update_now", "立即更新")}
+                        </Button>
+                      ) : (
+                        <a
+                          href={latestRelease?.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="soft">GitHub</Button>
+                        </a>
+                      )}
                     </div>
                   </div>
                 </Tips>
               )}
-              <label
-                className="text-sm text-muted-foreground self-end overflow-hidden"
+              <span
+                className="text-sm text-muted-foreground leading-normal overflow-visible"
                 hidden={isMobile}
               >
                 {(publicInfo as any)?.version ||
                   (versionInfo &&
                     `${versionInfo.version} (${versionInfo.hash})`)}
-              </label>
+              </span>
             </Flex>
             <Flex gap="3" align="center" overflowX="auto">
               <ThemeSwitch />
@@ -645,6 +861,8 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
             backgroundColor: "var(--accent-3)",
             display: isMobile && sidebarOpen ? "none" : "block",
             height: "100%", // Ensure the container takes full height
+            minWidth: 0,
+            maxWidth: "100%",
             overflow: "hidden", // Prevent this container from scrolling
           }}
         >

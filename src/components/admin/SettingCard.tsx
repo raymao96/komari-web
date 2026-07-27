@@ -135,8 +135,13 @@ export function SettingCardSwitch({
   return (
     <SettingCard {...props} direction="column">
       <SettingCard.Action>
-        <Flex direction="row" gap="2" align="center">
-          <label>{label}</label>
+        <Flex
+          direction="row"
+          gap="2"
+          align="center"
+          className="shrink-0 whitespace-nowrap"
+        >
+          <label className="whitespace-nowrap">{label}</label>
           <Switch
             ref={switchRef}
             checked={checked}

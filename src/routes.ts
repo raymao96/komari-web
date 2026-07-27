@@ -27,6 +27,16 @@ export const routes: RouteObject[] = [
     ),
   },
   {
+    path: "/admin/update/storage-v4",
+    element: React.createElement(
+      lazy(() => import("./pages/admin/update_storage_v4"))
+    ),
+  },
+  {
+    path: "/install",
+    element: React.createElement(lazy(() => import("./pages/install"))),
+  },
+  {
     path: "/admin",
     element: React.createElement(AdminLayout),
     children: [
@@ -41,6 +51,12 @@ export const routes: RouteObject[] = [
         path: "theme_raw",
         element: React.createElement(
           lazy(() => import("./pages/admin/theme_raw.tsx"))
+        ),
+      },
+      {
+        path: "market/themes",
+        element: React.createElement(
+          lazy(() => import("./pages/admin/market/themes"))
         ),
       },
       {
@@ -136,6 +152,12 @@ export const routes: RouteObject[] = [
             path: "traffic-report",
             element: React.createElement(
               lazy(() => import("./pages/admin/notification/traffic_report"))
+            ),
+          },
+          {
+            path: "ping-loss",
+            element: React.createElement(
+              lazy(() => import("./pages/admin/notification/ping_loss"))
             ),
           },
         ],

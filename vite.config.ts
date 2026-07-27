@@ -154,19 +154,22 @@ export default defineConfig(({ mode }) => {
         process.env[k] = envConfig[k];
       }
     }
-    if (!process.env.VITE_API_TARGET) {
-      process.env.VITE_API_TARGET = "http://127.0.0.1:25774";
-    }
+    const apiTarget = process.env.VITE_API_TARGET || "http://127.0.0.1:25774";
+    process.env.VITE_API_TARGET = apiTarget;
+    const apiOrigin = new URL(apiTarget).origin;
     baseConfig.server = {
       proxy: {
         "/api": {
-          target: process.env.VITE_API_TARGET,
+          target: apiTarget,
           changeOrigin: true,
           rewriteWsOrigin: true,
           ws: true,
+          headers: {
+            Origin: apiOrigin,
+          },
         },
         "/themes": {
-          target: process.env.VITE_API_TARGET,
+          target: apiTarget,
           changeOrigin: true,
         },
       },

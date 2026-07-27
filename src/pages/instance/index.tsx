@@ -12,6 +12,7 @@ import { DetailsGrid } from "@/components/DetailsGrid";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AccountProvider } from "@/contexts/AccountContext";
+import { compareNodesByBackendOrder } from "@/lib/nodeOrder";
 
 export default function InstancePage() {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ export default function InstancePage() {
         if (!aIsOnline && bIsOnline) return 1;
       }
 
-      return a.weight - b.weight;
+      return compareNodesByBackendOrder(a, b);
     };
 
     const groups = new Map<string | null, typeof nodeList>();

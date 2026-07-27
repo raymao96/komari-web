@@ -66,8 +66,8 @@ const LoginDialog = ({ trigger, autoOpen = false, showSettings = true, info, onL
             ...(twoFac && !account?.["2fa_enabled"] ? { "2fa_code": twoFac } : {}),
           }),
         });
-        const data = await res.json();
-        if (res.status === 200) {
+        const data: { message?: string } = await res.json().catch(() => ({}));
+        if (res.ok) {
           refresh();
           if (typeof onLoginSuccess === "function") {
             onLoginSuccess();
@@ -79,7 +79,7 @@ const LoginDialog = ({ trigger, autoOpen = false, showSettings = true, info, onL
             setRequire2FA(true);
             return;
           }
-          setErrorMsg(data.message || "Login failed");
+          setErrorMsg(data.message || `Login failed (${res.status})`);
         }
       } catch (err) {
         setErrorMsg("Network error");

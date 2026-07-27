@@ -21,6 +21,8 @@ export type NodeDetail = {
   price: number;
   remark: string | undefined;
   public_remark: string;
+  remote_control_protected: boolean;
+  traffic_reset_day?: number | null;
   group: string | undefined;
   billing_cycle: number;
   expired_at: string;

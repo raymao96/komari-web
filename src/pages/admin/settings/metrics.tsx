@@ -90,6 +90,43 @@ function toNumber(value: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+type MetricDatabaseDriver = "sqlite" | "mysql" | "postgresql";
+
+function resolveMetricDatabaseDriver(
+  settings: SettingsResponse,
+): MetricDatabaseDriver {
+  const dsn = String(settings.metric_db_dsn ?? "").trim().toLowerCase();
+  if (
+    dsn.startsWith("postgres://") ||
+    dsn.startsWith("postgresql://") ||
+    dsn.includes("dbname=") ||
+    (dsn.includes("host=") && dsn.includes("user="))
+  ) {
+    return "postgresql";
+  }
+  if (
+    dsn.startsWith("mysql://") ||
+    dsn.includes("@tcp(") ||
+    dsn.includes("@unix(") ||
+    dsn.includes("@/")
+  ) {
+    return "mysql";
+  }
+  if (
+    !dsn ||
+    dsn === ":memory:" ||
+    dsn.startsWith("file:") ||
+    /\.(db|sqlite|sqlite3)(\?|$)/.test(dsn)
+  ) {
+    return "sqlite";
+  }
+
+  const configured = String(settings.metric_db_driver ?? "").toLowerCase();
+  return configured === "mysql" || configured === "postgresql"
+    ? configured
+    : "sqlite";
+}
+
 function isI18nTextDict(value: unknown): value is Record<string, string> {
   return (
     typeof value === "object" &&
@@ -210,6 +247,7 @@ export default function MetricsSettings() {
   );
 
   const downsamplingEnabled = settings.metric_downsampling_enabled === true;
+  const metricDatabaseDriver = resolveMetricDatabaseDriver(settings);
 
   const handleDownsamplingChange = React.useCallback(
     async (checked: boolean) => {
@@ -285,6 +323,16 @@ export default function MetricsSettings() {
       </SettingCardLabel>
 
       <SettingCardSwitch
+        title={t("settings.metrics.low_resource_title")}
+        description={t("settings.metrics.low_resource_description")}
+        label={t("settings.metrics.low_resource_enabled")}
+        defaultChecked={settings.low_resource_mode === true}
+        onChange={async (checked) => {
+          await saveMetricSettings({ low_resource_mode: checked });
+        }}
+      />
+
+      <SettingCardSwitch
         title={t("settings.metrics.downsampling_title")}
         description={t("settings.metrics.downsampling_description")}
         label={t("settings.metrics.downsampling_enabled")}
@@ -314,39 +362,52 @@ export default function MetricsSettings() {
         }}
       />
 
-      <SettingCardShortTextInput
-        title={t("settings.metrics.max_open_conns_title")}
-        description={t("settings.metrics.max_open_conns_description")}
-        descriptionPlacement="footer"
-        type="number"
-        defaultValue={String(toNumber(settings.metric_max_open_conns, 25))}
-        placeholder="25"
-        OnSave={async (value) => {
-          const n = parseInt(value, 10);
-          if (isNaN(n) || n <= 0) {
-            toast.error(t("settings.metrics.conns_invalid"));
-            return;
-          }
-          await saveMetricSettings({ metric_max_open_conns: n });
-        }}
-      />
+      {metricDatabaseDriver === "sqlite" ? (
+        <Callout.Root color="blue" variant="surface">
+          <Callout.Icon>
+            <Info size={16} />
+          </Callout.Icon>
+          <Callout.Text>
+            {t("settings.metrics.sqlite_connection_strategy")}
+          </Callout.Text>
+        </Callout.Root>
+      ) : (
+        <>
+          <SettingCardShortTextInput
+            title={t("settings.metrics.max_open_conns_title")}
+            description={t("settings.metrics.max_open_conns_description")}
+            descriptionPlacement="footer"
+            type="number"
+            defaultValue={String(toNumber(settings.metric_max_open_conns, 25))}
+            placeholder="25"
+            OnSave={async (value) => {
+              const n = parseInt(value, 10);
+              if (isNaN(n) || n <= 0) {
+                toast.error(t("settings.metrics.conns_invalid"));
+                return;
+              }
+              await saveMetricSettings({ metric_max_open_conns: n });
+            }}
+          />
 
-      <SettingCardShortTextInput
-        title={t("settings.metrics.max_idle_conns_title")}
-        description={t("settings.metrics.max_idle_conns_description")}
-        descriptionPlacement="footer"
-        type="number"
-        defaultValue={String(toNumber(settings.metric_max_idle_conns, 5))}
-        placeholder="5"
-        OnSave={async (value) => {
-          const n = parseInt(value, 10);
-          if (isNaN(n) || n < 0) {
-            toast.error(t("settings.metrics.conns_invalid"));
-            return;
-          }
-          await saveMetricSettings({ metric_max_idle_conns: n });
-        }}
-      />
+          <SettingCardShortTextInput
+            title={t("settings.metrics.max_idle_conns_title")}
+            description={t("settings.metrics.max_idle_conns_description")}
+            descriptionPlacement="footer"
+            type="number"
+            defaultValue={String(toNumber(settings.metric_max_idle_conns, 5))}
+            placeholder="5"
+            OnSave={async (value) => {
+              const n = parseInt(value, 10);
+              if (isNaN(n) || n < 0) {
+                toast.error(t("settings.metrics.conns_invalid"));
+                return;
+              }
+              await saveMetricSettings({ metric_max_idle_conns: n });
+            }}
+          />
+        </>
+      )}
 
       {/*<Callout.Root color="green" variant="surface">
         <Callout.Icon>

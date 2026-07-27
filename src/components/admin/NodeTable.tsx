@@ -59,6 +59,7 @@ import { toast } from "sonner";
 import { LoadingIcon } from "../Icones/icon";
 import { Dialog, Flex, Button, IconButton, Checkbox, TextField } from "@radix-ui/themes";
 import Loading from "../loading";
+import { publicVersion } from "@/utils/version";
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
@@ -144,7 +145,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "version",
     header: t("admin.nodeTable.clientVersion"),
-    cell: ({ row }) => <div className="w-32">{row.getValue("version")}</div>,
+    cell: ({ row }) => <div className="w-32">{publicVersion(row.original.version)}</div>,
   },
   {
     id: "actions",

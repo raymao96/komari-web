@@ -65,8 +65,7 @@ const AdminLayout = () => {
     <>
       <Dialog.Root open={open}>
         <Dialog.Content>
-          <Dialog.Content>
-            <Dialog.Title>法律声明与合规指引</Dialog.Title>
+          <Dialog.Title>法律声明与合规指引</Dialog.Title>
             <div className="flex flex-col gap-2">
               <div className="max-h-[70vh] overflow-y-auto space-y-4">
                 <pre className="text-wrap">{Eula}</pre>
@@ -93,7 +92,6 @@ const AdminLayout = () => {
                 </Button>
               </div>
             </div>
-          </Dialog.Content>
         </Dialog.Content>
       </Dialog.Root>
       <AccountProvider>
