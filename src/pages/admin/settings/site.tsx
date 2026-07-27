@@ -20,6 +20,20 @@ export default function SiteSettings() {
   const { t } = useTranslation();
   const { settings, loading, error, refetch } = useSettings();
   const [shareHours, setShareHours] = useState(1);
+  const [faviconRevision, setFaviconRevision] = useState(() => Date.now());
+
+  const refreshFavicon = () => {
+    const revision = Date.now();
+    setFaviconRevision(revision);
+    document.querySelectorAll<HTMLLinkElement>('link[rel*="icon"]').forEach((link) => {
+      const href = link.getAttribute("href") || "/favicon.ico";
+      const url = new URL(href, window.location.origin);
+      if (url.pathname.endsWith("/favicon.ico")) {
+        url.searchParams.set("v", String(revision));
+        link.href = `${url.pathname}${url.search}${url.hash}`;
+      }
+    });
+  };
 
   // 恢复备份对话框与上传状态
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -328,7 +342,7 @@ export default function SiteSettings() {
           <Flex gap="2" align="center">
             {t("settings.custom.favicon_current", "当前 Favicon")}
             <img
-              src="/favicon.ico"
+              src={`/favicon.ico?v=${faviconRevision}`}
               alt="Favicon"
               style={{ width: 32, height: 32 }}
             />
@@ -372,6 +386,7 @@ export default function SiteSettings() {
                           })
                           .then((data) => {
                             if (data.status === "success") {
+                              refreshFavicon();
                               toast.success(t("settings.custom.favicon_default_success"));
                             } else {
                               toast.error(
@@ -411,6 +426,7 @@ export default function SiteSettings() {
                       );
                       const data = await response.json();
                       if (data.status === "success") {
+                        refreshFavicon();
                         toast.success(
                           t(
                             "settings.custom.favicon_update_success"

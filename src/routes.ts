@@ -27,6 +27,12 @@ export const routes: RouteObject[] = [
     ),
   },
   {
+    path: "/admin/update/storage-v4",
+    element: React.createElement(
+      lazy(() => import("./pages/admin/update_storage_v4"))
+    ),
+  },
+  {
     path: "/install",
     element: React.createElement(lazy(() => import("./pages/install"))),
   },
@@ -111,6 +117,12 @@ export const routes: RouteObject[] = [
             path: "xtermjs",
             element: React.createElement(
               lazy(() => import("./pages/admin/settings/xtermjs"))
+            ),
+          },
+          {
+            path: "reverse-proxy",
+            element: React.createElement(
+              lazy(() => import("./pages/admin/settings/reverse-proxy"))
             ),
           },
           {

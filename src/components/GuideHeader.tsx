@@ -9,7 +9,7 @@ export default function GuideHeader() {
     <Flex justify="between" align="center" gap="4" className="w-full">
       <Flex align="center" gap="2">
         <img
-          src="/assets/pwa-icon.png"
+          src="/assets/logo.png?v=869680cc"
           alt="Komari"
           className="size-9 object-contain"
         />

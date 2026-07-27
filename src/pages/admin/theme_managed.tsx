@@ -28,6 +28,7 @@ interface ThemeFieldBase {
 }
 
 interface ThemeConfigResponse {
+  name?: I18nText;
   configuration?: ThemeConfiguration;
   [k: string]: any;
 }
@@ -47,6 +48,7 @@ const ThemeManaged: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState<ThemeFieldBase[]>([]);
   const [values, setValues] = useState<Record<string, any>>({});
+  const [themeDisplayName, setThemeDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [firstLoading, setFirstLoading] = useState(true);
 
@@ -56,6 +58,7 @@ const ThemeManaged: React.FC = () => {
       if (!theme) {
         setFields([]);
         setValues({});
+        setThemeDisplayName("");
         return;
       }
       setLoading(true);
@@ -67,6 +70,10 @@ const ThemeManaged: React.FC = () => {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data: ThemeConfigResponse = await resp.json();
         const configuration = data.configuration;
+        setThemeDisplayName(
+          resolveI18nText(data.name, currentLanguage) ||
+            (theme === "default" ? "" : theme),
+        );
         if (
           getThemeConfigurationType(configuration) !==
             THEME_CONFIGURATION_MANAGED ||
@@ -97,7 +104,7 @@ const ThemeManaged: React.FC = () => {
       }
     }
     load();
-  }, [theme, themeSettings, t]);
+  }, [currentLanguage, theme, themeSettings, t]);
 
   const handleValueChange = (key: string, val: any) => {
     setValues((v) => ({ ...v, [key]: val }));
@@ -155,7 +162,7 @@ const ThemeManaged: React.FC = () => {
         <Heading size="4">
           {theme
             ? t("theme.manage_with_name", {
-                name: theme === "default" ? "" : theme,
+                name: themeDisplayName,
               })
             : t("theme.manage")}
         </Heading>

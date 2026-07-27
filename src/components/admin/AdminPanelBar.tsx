@@ -228,7 +228,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
         const rawLabel: string =
           resolveI18nText(cfg.name, currentLanguage) ??
           t("theme.manage_with_name", {
-            name: currentTheme === "default" ? "" : currentTheme,
+            name:
+              resolveI18nText(data?.name, currentLanguage) ??
+              (currentTheme === "default" ? "" : currentTheme),
           });
         const icon: string = cfg.icon || "Palette"; // fallback icon
         const item: ExtendedMenuItem = {
