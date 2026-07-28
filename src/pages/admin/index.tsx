@@ -324,7 +324,7 @@ const AutoDiscoverySection = ({
     if (selectedPlatform === "windows") {
       scriptFile = "install.ps1";
     }
-    let scriptUrl = `https://raw.githubusercontent.com/nuomiiiii/komari-agent/refs/heads/main/${scriptFile}`;
+    let scriptUrl = `https://raw.githubusercontent.com/raymao96/komari-agent/refs/heads/github-nuomiiiii/${scriptFile}`;
     if (enableGhproxy && ghproxy) {
       scriptUrl = scriptUrl.slice(8); // 去掉 https://
       if (ghproxy.endsWith("/")) {
@@ -1673,7 +1673,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       scriptFile = "install.ps1";
     }
     let scriptUrl =
-      `https://raw.githubusercontent.com/nuomiiiii/komari-agent/refs/heads/main/${scriptFile}`;
+      `https://raw.githubusercontent.com/raymao96/komari-agent/refs/heads/github-nuomiiiii/${scriptFile}`;
     if (enableGhproxy) {
       if (enableGhproxy && ghproxy) {
         scriptUrl = scriptUrl.slice(8); // 去掉 https://
@@ -1726,7 +1726,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         }
         finalCommand =
           `docker run -d --name komari-agent --restart=always ` +
-          `ghcr.io/nuomiiiii/komari-agent:latest ` +
+          `ghcr.io/raymao96/komari-agent:latest ` +
           quoteShellArgs(dockerArgs);
         break;
       }
