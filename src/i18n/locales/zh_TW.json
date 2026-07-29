@@ -528,6 +528,7 @@
     "default_on": "預設啟用",
     "default_on_description": "開啟後，新加入的伺服器會自動啟用此監測；已存在的伺服器不受影響。",
     "default_on_short": "預設啟用",
+    "description": "設定並管理節點延遲探測任務，持續記錄網路延遲與連線狀態。",
     "interval": "間隔",
     "server_view": "伺服器檢視",
     "target": "目標",
@@ -535,6 +536,9 @@
     "task_view": "任務視圖",
     "title": "延遲監測",
     "type": "類型"
+  },
+  "return_route": {
+    "title": "回程線路監測"
   },
   "pwa": {
     "browser": "瀏覽器模式",
@@ -664,6 +668,9 @@
         "compaction_progress": "指標壓縮進度",
         "current_metric": "目前指標",
         "cycle_written": "本輪已寫入 {{count}} 個彙總桶",
+        "digest_handoff_hint": "原始資料已保留，此狀態不計為壓縮失敗",
+        "digest_handoff_item": "{{metric}} · {{time}}",
+        "digest_handoff_title": "摘要接力暫緩（{{count}}）",
         "health": {
           "attention": "需要關注",
           "healthy": "正常",

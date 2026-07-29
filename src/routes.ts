@@ -175,6 +175,12 @@ export const routes: RouteObject[] = [
         ),
       },
       {
+        path: "return-route",
+        element: React.createElement(
+          lazy(() => import("./pages/admin/returnRoute"))
+        ),
+      },
+      {
         path: "about",
         element: React.createElement(lazy(() => import("./pages/admin/about"))),
       },

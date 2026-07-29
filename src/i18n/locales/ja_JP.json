@@ -528,6 +528,7 @@
     "default_on": "新規サーバーで既定有効",
     "default_on_description": "有効にすると、新しく追加されるサーバーで自動的にこの監視が開始されます。既存のサーバーには影響しません。",
     "default_on_short": "既定有効",
+    "description": "ノードの遅延監視タスクを設定・管理し、ネットワーク遅延と到達性を継続的に記録します。",
     "interval": "間隔",
     "server_view": "サーバービュー",
     "target": "ターゲット",
@@ -535,6 +536,9 @@
     "task_view": "タスクビュー",
     "title": "遅延監視",
     "type": "タイプ"
+  },
+  "return_route": {
+    "title": "リターンルート監視"
   },
   "pwa": {
     "browser": "ブラウザモード",
@@ -664,6 +668,9 @@
         "compaction_progress": "メトリクス圧縮の進行状況",
         "current_metric": "現在のメトリクス",
         "cycle_written": "このサイクルで {{count}} 個の集約バケットを書き込みました",
+        "digest_handoff_hint": "元データは保持され、この状態は圧縮失敗としてカウントされません",
+        "digest_handoff_item": "{{metric}} · {{time}}",
+        "digest_handoff_title": "ダイジェスト引き継ぎ保留（{{count}}）",
         "health": {
           "attention": "確認が必要",
           "healthy": "正常に稼働中",

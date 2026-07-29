@@ -543,6 +543,7 @@
     "default_on": "Default on for new servers",
     "default_on_description": "When enabled, newly added servers will automatically start running this monitor. Existing servers are unaffected.",
     "default_on_short": "Default on",
+    "description": "Configure node latency probes and continuously track network delay and reachability.",
     "interval": "Interval",
     "server_view": "Server View",
     "target": "Target",
@@ -550,6 +551,9 @@
     "task_view": "Task View",
     "title": "Latency",
     "type": "Type"
+  },
+  "return_route": {
+    "title": "Return Route Monitoring"
   },
   "pwa": {
     "browser": "Browser Mode",
@@ -679,6 +683,9 @@
         "compaction_progress": "Metric compaction progress",
         "current_metric": "Current metric",
         "cycle_written": "{{count}} rollup buckets written this cycle",
+        "digest_handoff_hint": "The original data is preserved; this status is not counted as a compaction failure",
+        "digest_handoff_item": "{{metric}} · {{time}}",
+        "digest_handoff_title": "Digest handoff deferred ({{count}})",
         "health": {
           "attention": "Needs attention",
           "healthy": "Running normally",

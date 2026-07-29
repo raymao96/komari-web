@@ -20,6 +20,11 @@ const databaseFilesSchema = z.object({
   shm: z.number().finite().nonnegative(),
 });
 const nullableTimestampSchema = z.string().datetime().nullable();
+const digestHandoffStatusSchema = z.object({
+  metric: z.string(),
+  reason: z.string(),
+  at: nullableTimestampSchema,
+});
 const databaseRuntimeStatusSchema = z.object({
   compacting: z.boolean(),
   current_metric: z.string(),
@@ -37,6 +42,11 @@ const databaseRuntimeStatusSchema = z.object({
   consecutive_checkpoint_failures: z.number().int().nonnegative(),
   consecutive_cycle_failures: z.number().int().nonnegative(),
   last_error: z.string().optional(),
+  digest_handoff_deferred: z
+    .array(digestHandoffStatusSchema)
+    .nullable()
+    .default([])
+    .transform((value) => value ?? []),
 });
 const databaseInfoSchema = z.object({
   driver: z.string().trim().min(1),
@@ -356,6 +366,34 @@ function DatabaseRuntimePanel({ info }: { info: DatabaseInfo }) {
           }
         />
       </div>
+
+      {runtime.digest_handoff_deferred.length > 0 ? (
+        <div className="mt-4 border-l-2 border-[var(--orange-a8)] bg-[var(--orange-a2)] px-3 py-2">
+          <Text as="div" size="2" weight="medium" color="orange">
+            {t("settings.database.runtime_status.digest_handoff_title", {
+              count: runtime.digest_handoff_deferred.length,
+            })}
+          </Text>
+          <Text as="div" size="1" color="gray" className="mt-0.5">
+            {t("settings.database.runtime_status.digest_handoff_hint")}
+          </Text>
+          <div className="mt-2 space-y-2">
+            {runtime.digest_handoff_deferred.map((item) => (
+              <div key={item.metric} className="min-w-0">
+                <Text as="div" size="1" weight="medium" className="break-words">
+                  {t("settings.database.runtime_status.digest_handoff_item", {
+                    metric: item.metric,
+                    time: formatRuntimeTime(item.at, unavailable),
+                  })}
+                </Text>
+                <Text as="div" size="1" color="gray" className="break-words">
+                  {item.reason}
+                </Text>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {runtime.last_error ? (
         <Text as="div" size="1" color="red" className="mt-3 break-words">

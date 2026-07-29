@@ -528,6 +528,7 @@
     "default_on": "Aktif default untuk server baru",
     "default_on_description": "Jika diaktifkan, server yang baru ditambahkan akan otomatis menjalankan pemantauan ini. Server yang sudah ada tidak terpengaruh.",
     "default_on_short": "Aktif default",
+    "description": "Konfigurasikan tugas pemantauan latensi node dan pantau keterlambatan serta keterjangkauan jaringan secara berkelanjutan.",
     "interval": "Interval",
     "server_view": "Tampilan Server",
     "target": "Target",
@@ -535,6 +536,9 @@
     "task_view": "Tampilan Tugas",
     "title": "Latensi",
     "type": "Tipe"
+  },
+  "return_route": {
+    "title": "Pemantauan Rute Balik"
   },
   "pwa": {
     "browser": "Mode Peramban",
@@ -664,6 +668,9 @@
         "compaction_progress": "Progres pemadatan metrik",
         "current_metric": "Metrik saat ini",
         "cycle_written": "{{count}} bucket agregasi ditulis pada siklus ini",
+        "digest_handoff_hint": "Data asli dipertahankan; status ini tidak dihitung sebagai kegagalan pemadatan",
+        "digest_handoff_item": "{{metric}} · {{time}}",
+        "digest_handoff_title": "Serah-terima digest ditunda ({{count}})",
         "health": {
           "attention": "Perlu perhatian",
           "healthy": "Berjalan normal",
