@@ -2,7 +2,7 @@ import React from "react";
 
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
-import { AccountProvider, useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/AccountContext";
 import {
   Badge,
   Button,
@@ -14,13 +14,7 @@ import {
 import { Github, Globe, User } from "lucide-react";
 import Loading from "@/components/loading";
 
-const Account = () => {
-  return (
-    <AccountProvider>
-      <InnerLayout />
-    </AccountProvider>
-  );
-};
+const Account = () => <InnerLayout />;
 
 const InnerLayout = () => {
   const { t } = useTranslation();

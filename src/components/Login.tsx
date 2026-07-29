@@ -10,19 +10,31 @@ import {
 } from "@radix-ui/themes";
 import { useTranslation } from "react-i18next";
 import { TablerSettings } from "./Icones/Tabler";
-import { AccountProvider, useAccount } from "@/contexts/AccountContext";
+import {
+  AccountProvider,
+  useAccount,
+  useOptionalAccount,
+} from "@/contexts/AccountContext";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
+import { submitPasswordLogin } from "@/utils/adminAuth";
 
 type LoginDialogProps = {
   trigger?: React.ReactNode | string;
   autoOpen?: boolean;
   showSettings?: boolean;
   info?: string | React.ReactNode;
-  onLoginSuccess?: () => void;
+  onLoginSuccess?: () => void | Promise<void>;
+  redirectAfterLogin?: boolean;
 };
 
-const LoginDialog = ({ trigger, autoOpen = false, showSettings = true, info, onLoginSuccess }: LoginDialogProps) => {
-  const InnerLayout = () => {
+const LoginDialogContent = ({
+  trigger,
+  autoOpen = false,
+  showSettings = true,
+  info,
+  onLoginSuccess,
+  redirectAfterLogin = true,
+}: LoginDialogProps) => {
     const { account, loading, error, refresh } = useAccount();
     const [t] = useTranslation();
     const [username, setUsername] = React.useState("");
@@ -55,32 +67,24 @@ const LoginDialog = ({ trigger, autoOpen = false, showSettings = true, info, onL
       setErrorMsg("");
       setIsLoading(true);
       try {
-        const res = await fetch("/api/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username,
-            password,
-            ...(twoFac && !account?.["2fa_enabled"] ? { "2fa_code": twoFac } : {}),
-          }),
+        const result = await submitPasswordLogin({
+          username,
+          password,
+          twoFactorCode: twoFac,
+          twoFactorEnabled: account?.["2fa_enabled"],
+          refreshAccount: refresh,
         });
-        const data: { message?: string } = await res.json().catch(() => ({}));
-        if (res.ok) {
-          refresh();
-          if (typeof onLoginSuccess === "function") {
-            onLoginSuccess();
-            return
+
+        if (result.ok) {
+          await onLoginSuccess?.();
+          if (!onLoginSuccess && redirectAfterLogin) {
+            window.open("/admin", "_self");
           }
-          window.open("/admin", "_self");
-        } else {
-          if (data.message === "2FA code is required") {
-            setRequire2FA(true);
-            return;
-          }
-          setErrorMsg(data.message || `Login failed (${res.status})`);
+          return;
         }
+
+        if (result.requiresTwoFactor) setRequire2FA(true);
+        setErrorMsg(result.message);
       } catch (err) {
         setErrorMsg("Network error");
         console.error(err);
@@ -102,8 +106,8 @@ const LoginDialog = ({ trigger, autoOpen = false, showSettings = true, info, onL
     }
     if (error || !account) {
       return (
-        <Button disabled color="red">
-          Error
+        <Button color="red" onClick={() => void refresh()}>
+          {t("common.retry")}
         </Button>
       );
     }
@@ -252,10 +256,18 @@ const LoginDialog = ({ trigger, autoOpen = false, showSettings = true, info, onL
         </Dialog.Content>
       </Dialog.Root>
     );
-  };
+};
+
+const LoginDialog = (props: LoginDialogProps) => {
+  const inheritedAccount = useOptionalAccount();
+
+  if (inheritedAccount) {
+    return <LoginDialogContent {...props} />;
+  }
+
   return (
     <AccountProvider>
-      <InnerLayout />
+      <LoginDialogContent {...props} />
     </AccountProvider>
   );
 };

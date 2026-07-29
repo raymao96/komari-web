@@ -467,6 +467,7 @@
     "title": "日志"
   },
   "login": {
+    "account_status_failed": "无法确认当前登录状态，请检查网络连接后重试。",
     "desc": "登录到 Komari 控制面板。",
     "login_with": "使用 {{provider}} 登录",
     "login_with_github": "使用 GitHub 登录",

@@ -26,8 +26,25 @@ import { OfflineIndicator } from "./components/OfflineIndicator";
 import { Toaster } from "./components/ui/sonner";
 import { RPC2Provider } from "./contexts/RPC2Context";
 import { NodeListProvider } from "./contexts/NodeListContext";
+import { AccountProvider } from "./contexts/AccountContext";
+import { useAccount } from "./contexts/AccountContext";
+import FullPageLoading from "./components/FullPageLoading";
+
+const AdminRoutePreloader = () => {
+  const { account } = useAccount();
+
+  React.useEffect(() => {
+    if (!account?.logged_in) return;
+    void import("./pages/admin/_layout");
+    void import("./pages/admin");
+  }, [account?.logged_in]);
+
+  return null;
+};
+
 const App = () => {
 	const currentPath = window.location.pathname.replace(/\/$/, "");
+	const isAdminRoute = currentPath === "/admin" || currentPath.startsWith("/admin/");
 	const isUpgradeRoute =
 		currentPath === "/admin/update/1.2.7" ||
 		currentPath === "/admin/update/storage-v4";
@@ -77,9 +94,8 @@ const App = () => {
   );
   const routing = useRoutes(routes);
   return (
-    <Suspense fallback={<Loading />}>
-      <ThemeContext.Provider value={themeContextValue}>
-        <Theme
+    <ThemeContext.Provider value={themeContextValue}>
+      <Theme
           appearance={resolvedAppearance}
           accentColor={color}
           scaling="110%"
@@ -89,27 +105,33 @@ const App = () => {
             minHeight: "100vh",
           }}
         >
-		  {isRestrictedGuideRoute ? (
-			<>
-			  <Toaster />
-			  {routing}
-			</>
-		  ) : (
+		{isRestrictedGuideRoute ? (
+		  <>
+			<Toaster />
+			<Suspense fallback={<Loading />}>{routing}</Suspense>
+		  </>
+		) : (
+		  <AccountProvider>
+			<AdminRoutePreloader />
 			<RPC2Provider>
 			  <PublicInfoProvider>
 				<NodeListProvider>
 				  <Toaster />
 				  <OfflineIndicator />
-				  {routing}
+				  <Suspense
+					fallback={isAdminRoute ? <FullPageLoading /> : <Loading />}
+				  >
+					{routing}
+				  </Suspense>
 				  <PWAInstallPrompt />
 				  <PWAUpdatePrompt />
 				</NodeListProvider>
 			  </PublicInfoProvider>
 			</RPC2Provider>
-		  )}
-        </Theme>
-      </ThemeContext.Provider>
-    </Suspense>
+		  </AccountProvider>
+		)}
+      </Theme>
+    </ThemeContext.Provider>
   );
 };
 

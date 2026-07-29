@@ -414,6 +414,7 @@
     "title": "Log"
   },
   "login": {
+    "account_status_failed": "Unable to verify your login status. Check the connection and try again.",
     "desc": "Log in to the Komari control panel.",
     "login_with": "Login with {{provider}}",
     "login_with_github": "Login with GitHub",

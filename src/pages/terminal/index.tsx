@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, IconButton, Select, TextField, Theme } from "@radix-ui/themes";
-import { Plus, Server, ShieldAlert, X } from "lucide-react";
+import { Plus, Server, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import {
   DndContext,
@@ -30,7 +30,7 @@ type RemoteTab = {
 };
 
 const maxTabs = 16;
-type AuthorizationState = "checking" | "required" | "authorized" | "error" | "blocked";
+type AuthorizationState = "checking" | "required" | "authorized" | "error";
 
 type SortableRemoteTabProps = {
   tab: RemoteTab;
@@ -87,7 +87,6 @@ export default function TerminalWorkspace() {
   const [authorization, setAuthorization] = useState<AuthorizationState>("checking");
   const [otpInput, setOtpInput] = useState("");
   const [otpError, setOtpError] = useState("");
-  const [protectedNode, setProtectedNode] = useState<RemoteNode | null>(null);
   const initialized = useRef(false);
   const authorizationStarted = useRef(false);
   const tabSensors = useSensors(
@@ -148,13 +147,6 @@ export default function TerminalWorkspace() {
   useEffect(() => {
     if (!nodesLoaded || authorizationStarted.current) return;
     authorizationStarted.current = true;
-    const requested = initialUUID ? nodes.find((node) => node.uuid === initialUUID) : undefined;
-    if (requested?.remote_control_protected) {
-      initialized.current = true;
-      setProtectedNode(requested);
-      setAuthorization("blocked");
-      return;
-    }
     void authorizeRemote();
   }, [authorizeRemote, initialUUID, nodes, nodesLoaded]);
 
@@ -240,22 +232,13 @@ export default function TerminalWorkspace() {
       toast.error("指定的服务器不存在");
       return;
     }
-    if (node.remote_control_protected) {
-      setProtectedNode(node);
-      return;
-    }
     addTab(uuid);
   }, [addTab, nodes]);
 
-  const handleProtected = useCallback((tabID: string, node: RemoteNode) => {
-    closeTab(tabID);
-    setProtectedNode(node);
-  }, [closeTab]);
-
   const openPicker = () => {
     setPickerUUID(
-      nodes.find((node) => online.has(node.uuid) && !node.remote_control_protected)?.uuid ||
-      nodes.find((node) => !node.remote_control_protected)?.uuid ||
+      nodes.find((node) => online.has(node.uuid))?.uuid ||
+      nodes[0]?.uuid ||
       "",
     );
     setPickerOpen(true);
@@ -298,7 +281,6 @@ export default function TerminalWorkspace() {
                 online={online.has(tab.uuid)}
                 active={activeID === tab.id}
                 onDuplicate={() => openNode(tab.uuid)}
-                onProtected={() => handleProtected(tab.id, node)}
               />
             );
           })}
@@ -320,8 +302,8 @@ export default function TerminalWorkspace() {
             <Select.Trigger className="w-full" placeholder="选择服务器" />
             <Select.Content>
               {nodes.map((node) => (
-                <Select.Item key={node.uuid} value={node.uuid} disabled={node.remote_control_protected}>
-                  {online.has(node.uuid) ? "●" : "○"} {node.name}{node.remote_control_protected ? " - Komari Server（已保护）" : ""}
+                <Select.Item key={node.uuid} value={node.uuid}>
+                  {online.has(node.uuid) ? "●" : "○"} {node.name}
                 </Select.Item>
               ))}
             </Select.Content>
@@ -368,23 +350,6 @@ export default function TerminalWorkspace() {
         </Dialog.Content>
       </Dialog.Root>
 
-      <Dialog.Root open={protectedNode !== null} onOpenChange={(open) => {
-        if (!open && authorization !== "blocked") setProtectedNode(null);
-      }}>
-        <Dialog.Content maxWidth="460px">
-          <Dialog.Title><span className="remote-protected-title"><ShieldAlert size={20} />已阻止远程连接</span></Dialog.Title>
-          <Dialog.Description>
-            “{protectedNode?.name}”已被识别为 Komari Server 所在节点。为防止绕过保护策略，本次终端和文件管理操作已中断。该限制不会影响 SSH、RDP、Xshell 等其他远程方式。
-          </Dialog.Description>
-          <div className="remote-dialog-actions"><Button onClick={() => {
-            setProtectedNode(null);
-            if (authorization === "blocked") {
-              window.close();
-              window.setTimeout(() => { if (!window.closed) window.location.assign("/admin"); }, 100);
-            }
-          }}>我知道了</Button></div>
-        </Dialog.Content>
-      </Dialog.Root>
     </Theme>
   );
 }

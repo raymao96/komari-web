@@ -48,7 +48,6 @@ type Props = {
   online: boolean;
   active: boolean;
   onDuplicate: () => void;
-  onProtected: () => void;
 };
 
 type ConnectionState = "connecting" | "waiting" | "connected" | "disconnected" | "error";
@@ -104,7 +103,7 @@ function isEditableElement(element: Element | null) {
     Boolean(element?.closest('[role="dialog"]'));
 }
 
-export default function RemoteSession({ node, live, online, active, onDuplicate, onProtected }: Props) {
+export default function RemoteSession({ node, live, online, active, onDuplicate }: Props) {
   const { settings, loading: settingsLoading, error: settingsError } = useXtermjsSettings();
   const terminalHost = useRef<HTMLDivElement>(null);
   const terminal = useRef<Terminal | null>(null);
@@ -115,7 +114,6 @@ export default function RemoteSession({ node, live, online, active, onDuplicate,
   const mobileComposing = useRef(false);
   const terminalTouch = useRef<{ pointerId: number; startX: number; startY: number; moved: boolean } | null>(null);
   const activeRef = useRef(active);
-  const onProtectedRef = useRef(onProtected);
   const [terminalReady, setTerminalReady] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [connectionError, setConnectionError] = useState("");
@@ -135,7 +133,6 @@ export default function RemoteSession({ node, live, online, active, onDuplicate,
   const dragging = useRef(false);
 
   activeRef.current = active;
-  onProtectedRef.current = onProtected;
 
   const resizeTerminal = useCallback(() => {
     if (!activeRef.current) return;
@@ -356,11 +353,6 @@ export default function RemoteSession({ node, live, online, active, onDuplicate,
           if (response.status === 401) {
             setOtpOpen(true);
             setConnectionState("waiting");
-            return;
-          }
-          if (response.status === 403 && String(payload?.message || "").includes("Komari Server")) {
-            setConnectionState("error");
-            onProtectedRef.current();
             return;
           }
           throw new Error(payload?.message || "无法创建远程会话");

@@ -399,6 +399,7 @@
     "title": "ログ"
   },
   "login": {
+    "account_status_failed": "現在のログイン状態を確認できません。接続を確認して再試行してください。",
     "desc": "Komari コントロールパネルにログインします。",
     "login_with": "{{provider}} でログイン",
     "login_with_github": "GitHubでログイン",

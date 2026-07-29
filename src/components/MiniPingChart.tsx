@@ -35,7 +35,6 @@ import {
   pingMetricStatKey,
   pingTaskId,
   pingTaskName,
-  trimMetricChartBoundaryRows,
   type MetricChartRow,
 } from "@/utils/metricSeries";
 
@@ -184,11 +183,7 @@ const MiniPingChart = ({
   }, [metricSeries, t, taskMap]);
 
   const chartData = useMemo(
-    () =>
-      trimMetricChartBoundaryRows(
-        applyMetricEwma(built.rows, built.series, ewmaEnabled),
-        built.series.map((item) => item.dataKey),
-      ),
+    () => applyMetricEwma(built.rows, built.series, ewmaEnabled),
     [built.rows, built.series, ewmaEnabled],
   );
 

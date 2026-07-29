@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --test tests/dateInput.test.ts tests/currency.test.ts tests/nodeOrder.test.ts tests/databaseRuntime.test.ts tests/version.test.ts",
+    "test": "node --test tests/dateInput.test.ts tests/currency.test.ts tests/nodeOrder.test.ts tests/databaseRuntime.test.ts tests/version.test.ts tests/adminAuth.test.ts tests/returnRouteLines.test.ts",
     "preview": "vite preview",
     "i18n:sync": "node ./script/i18n-sync.mjs",
     "i18n:sync:dry": "node ./script/i18n-sync.mjs --dry-run"

@@ -399,6 +399,7 @@
     "title": "Log"
   },
   "login": {
+    "account_status_failed": "Tidak dapat memverifikasi status masuk. Periksa koneksi lalu coba lagi.",
     "desc": "Masuk ke panel kontrol Komari.",
     "login_with": "Masuk dengan {{provider}}",
     "login_with_github": "Masuk dengan GitHub",

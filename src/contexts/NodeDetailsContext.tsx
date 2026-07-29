@@ -1,4 +1,6 @@
-import React from 'react';
+import React from "react";
+import { useAccount } from "@/contexts/AccountContext";
+import { isAdminNodeBootstrapLoading } from "@/utils/adminAuth";
 
 export type NodeDetail = {
   uuid: string;
@@ -32,37 +34,119 @@ export type NodeDetail = {
 };
 
 interface NodeDetailsContextType {
-  nodeDetail: NodeDetail[] | [];
+  nodeDetail: NodeDetail[];
   isLoading: boolean;
   error: string | null;
   refresh: () => void;
 }
 const NodeDetailsContext = React.createContext<NodeDetailsContextType | undefined>(undefined);
-export const NodeDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [nodeDetail, setNodeDetail] = React.useState<NodeDetail[] | []>([]);
-  const [isLoading, setIsLoading] = React.useState<boolean>(false);
-  const [error, setError] = React.useState<string | null>(null);
+const PREAUTHENTICATED_NODE_DATA = "__preauthenticated__";
 
-  const refresh = () => {
-    fetch("/api/admin/client/list")
-      .then((response) => response.json())
-      .then((data: NodeDetail[]) => {
-        setNodeDetail(data);
-        setIsLoading(false);
+const NodeDetailsProviderValue: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { account, loading: accountLoading } = useAccount();
+  const [nodeDetail, setNodeDetail] = React.useState<NodeDetail[]>([]);
+  const [loadedAccount, setLoadedAccount] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const requestSequence = React.useRef(0);
+  const activeRequestAccount = React.useRef<string | null>(null);
+  const accountKey = account?.logged_in
+    ? account.uuid || "__authenticated__"
+    : null;
+  const isLoading = isAdminNodeBootstrapLoading(
+    accountLoading,
+    accountKey,
+    loadedAccount,
+    loadedAccount === PREAUTHENTICATED_NODE_DATA,
+  );
+
+  const load = React.useCallback((targetAccount: string) => {
+    const sequence = ++requestSequence.current;
+    activeRequestAccount.current = targetAccount;
+    setError(null);
+
+    fetch("/api/admin/client/list", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch node details (${response.status})`);
+        }
+        return response.json();
       })
-      .catch((error) => {
-        setError(error.message);
-        setIsLoading(false);
+      .then((data: NodeDetail[]) => {
+        if (sequence !== requestSequence.current) return;
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid node details response");
+        }
+        setNodeDetail(data);
+      })
+      .catch((error: unknown) => {
+        if (sequence !== requestSequence.current) return;
+        setError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (sequence === requestSequence.current) {
+          activeRequestAccount.current = null;
+          setLoadedAccount(targetAccount);
+        }
       });
-  };
-    React.useEffect(() => {
-        setIsLoading(true);
-        refresh();
-    }, []);
+  }, []);
+
+  const refresh = React.useCallback(() => {
+    if (accountKey) load(accountKey);
+  }, [accountKey, load]);
+
+  React.useEffect(() => {
+    if (accountLoading) {
+      if (
+        !activeRequestAccount.current &&
+        loadedAccount !== PREAUTHENTICATED_NODE_DATA
+      ) {
+        load(PREAUTHENTICATED_NODE_DATA);
+      }
+      return;
+    }
+
+    if (!account?.logged_in) {
+      requestSequence.current += 1;
+      activeRequestAccount.current = null;
+      setNodeDetail([]);
+      setError(null);
+      setLoadedAccount(null);
+      return;
+    }
+    if (!accountKey) return;
+
+    if (loadedAccount === PREAUTHENTICATED_NODE_DATA) {
+      setLoadedAccount(accountKey);
+      return;
+    }
+    if (
+      loadedAccount !== accountKey &&
+      activeRequestAccount.current !== PREAUTHENTICATED_NODE_DATA
+    ) {
+      load(accountKey);
+    }
+  }, [account?.logged_in, accountKey, accountLoading, load, loadedAccount]);
+
+  const value = React.useMemo(
+    () => ({ nodeDetail, isLoading, error, refresh }),
+    [nodeDetail, isLoading, error, refresh],
+  );
+
   return (
-    <NodeDetailsContext.Provider value={{ nodeDetail, isLoading, error, refresh }}>
+    <NodeDetailsContext.Provider value={value}>
       {children}
     </NodeDetailsContext.Provider>
+  );
+};
+
+export const NodeDetailsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const inherited = React.useContext(NodeDetailsContext);
+  return inherited ? children : (
+    <NodeDetailsProviderValue>{children}</NodeDetailsProviderValue>
   );
 };
 
