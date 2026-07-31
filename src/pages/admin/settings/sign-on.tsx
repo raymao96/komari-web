@@ -8,9 +8,11 @@ import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import { Button, Text } from "@radix-ui/themes";
 import { useTranslation } from "react-i18next";
 import Loading from "@/components/loading";
+import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import React from "react";
 import { renderProviderInputs } from "@/utils/renderProviders";
 import { toast } from "sonner";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 export default function SignOnSettings() {
   const { t } = useTranslation();
@@ -97,7 +99,7 @@ export default function SignOnSettings() {
   // 渲染 provider 的输入项已抽象到 utils/renderProviders.tsx 中
 
   if (loading || (!providerLoading && providerList.length === 0 && !providerError)) {
-    return <Loading />;
+    return <SettingsPageSkeleton />;
   }
   if (error) {
     return <Text color="red">{error}</Text>;
@@ -108,7 +110,7 @@ export default function SignOnSettings() {
 
   return (
     <>
-      <SettingCardLabel>{t("settings.sign_on.title")}</SettingCardLabel>
+      <AdminPageTitle>{t("settings.sign_on.title")}</AdminPageTitle>
       <SettingCardSwitch
         title={t("settings.sign_on.disable_password")}
         defaultChecked={settings.disable_password_login}

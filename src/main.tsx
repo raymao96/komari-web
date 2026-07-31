@@ -17,7 +17,7 @@ import "./i18n/config";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { Suspense } from "react";
 import { useRoutes } from "react-router-dom";
-import { routes } from "./routes";
+import { preloadAdminEntry, routes } from "./routes";
 import Loading from "./components/loading";
 import { PublicInfoProvider } from "./contexts/PublicInfoContext";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
@@ -35,8 +35,7 @@ const AdminRoutePreloader = () => {
 
   React.useEffect(() => {
     if (!account?.logged_in) return;
-    void import("./pages/admin/_layout");
-    void import("./pages/admin");
+    preloadAdminEntry();
   }, [account?.logged_in]);
 
   return null;
@@ -52,6 +51,9 @@ const App = () => {
 		isUpgradeRoute ||
 		currentPath === "/install" ||
 		currentPath === "/database-recovery";
+	if (isAdminRoute) {
+		preloadAdminEntry();
+	}
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tempKey = params.get("temp_key");

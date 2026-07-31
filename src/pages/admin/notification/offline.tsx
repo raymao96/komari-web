@@ -1,4 +1,5 @@
 import { Checkbox } from "@/components/ui/checkbox";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
   Table,
   TableBody,
@@ -182,11 +183,11 @@ const InnerLayout = () => {
     return <div>Error: {onError?.message || onNodeError}</div>;
   }
   return (
-    <div className="flex flex-col gap-4 md:p-4 p-1">
+    <div className="flex flex-col gap-4 p-0 md:p-4">
       <Flex justify="between" align="center" wrap="wrap">
-        <label className="text-2xl font-semibold">
+        <AdminPageTitle>
           {t("notification.offline.full_title", "离线通知设置")}
-        </label>
+        </AdminPageTitle>
         <TextField.Root
           type="text"
           className="max-w-64"

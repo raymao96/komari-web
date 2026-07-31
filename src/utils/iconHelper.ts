@@ -24,6 +24,7 @@ import {
   WifiOff,
   Store,
   Route,
+  LayoutDashboard,
 } from "lucide-react";
 
 
@@ -53,5 +54,6 @@ export const iconMap: Record<string, React.ComponentType<any>> = {
   WifiOff,
   Store,
   Route,
+  LayoutDashboard,
 };
 

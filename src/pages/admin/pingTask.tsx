@@ -1,4 +1,5 @@
 import Loading from "@/components/loading";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
 import {
   NodeDetailsProvider,
@@ -49,10 +50,10 @@ const InnerLayout = () => {
     return <div>{error || nodeDetailError}</div>;
   }
   return (
-    <Flex direction="column" gap="4" className="p-4">
-      <div className="flex items-start justify-between gap-4">
+    <Flex direction="column" gap="4" className="p-0 md:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{t("ping.title")}</h1>
+          <AdminPageTitle>{t("ping.title")}</AdminPageTitle>
           <Text as="p" size="2" color="gray" className="mt-1">
             {t("ping.description")}
           </Text>

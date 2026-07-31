@@ -4,4 +4,6 @@ export interface MenuItem {
   icon: string;
   children?: MenuItem[];
   newTab?: boolean;
+  rawLabel?: string;
+  reloadDocument?: boolean;
 }

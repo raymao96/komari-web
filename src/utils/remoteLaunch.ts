@@ -1,20 +1,41 @@
 const remoteLaunchKey = "komari.remote.launch";
-const remoteLaunchTTL = 30_000;
 
 type RemoteLaunchTarget = {
   uuid: string;
   expiresAt: number;
 };
 
+export function remoteTerminalPath(uuid: string): string {
+  const params = new URLSearchParams({ node: uuid });
+  return `/terminal#${params.toString()}`;
+}
+
+export function parseRemoteLaunchHash(hash: string): string | null {
+  const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
+  const uuid = params.get("node")?.trim();
+  return uuid || null;
+}
+
+export function parseLegacyRemoteLaunchTarget(
+  raw: string | null,
+  now = Date.now(),
+): string | null {
+  if (!raw) return null;
+  try {
+    const launch = JSON.parse(raw) as RemoteLaunchTarget;
+    if (typeof launch.uuid !== "string" || !launch.uuid || launch.expiresAt < now) return null;
+    return launch.uuid;
+  } catch {
+    return null;
+  }
+}
+
 export function openRemoteTerminal(uuid: string): boolean {
   if (!uuid) return false;
-  const target = window.open("about:blank", "_blank");
+  const target = window.open(remoteTerminalPath(uuid), "_blank");
   if (!target) return false;
   try {
-    const launch: RemoteLaunchTarget = { uuid, expiresAt: Date.now() + remoteLaunchTTL };
-    target.sessionStorage.setItem(remoteLaunchKey, JSON.stringify(launch));
     target.opener = null;
-    target.location.replace("/terminal");
     return true;
   } catch {
     target.close();
@@ -22,15 +43,13 @@ export function openRemoteTerminal(uuid: string): boolean {
   }
 }
 
-export function consumeRemoteLaunchTarget(): string | null {
+export function getRemoteLaunchTarget(): string | null {
+  const hashTarget = parseRemoteLaunchHash(window.location.hash);
+  if (hashTarget) return hashTarget;
+
+  // Compatibility for an already-open admin page that still launches the
+  // terminal with the pre-hash handoff used by older frontend bundles.
   const raw = window.sessionStorage.getItem(remoteLaunchKey);
   window.sessionStorage.removeItem(remoteLaunchKey);
-  if (!raw) return null;
-  try {
-    const launch = JSON.parse(raw) as RemoteLaunchTarget;
-    if (typeof launch.uuid !== "string" || !launch.uuid || launch.expiresAt < Date.now()) return null;
-    return launch.uuid;
-  } catch {
-    return null;
-  }
+  return parseLegacyRemoteLaunchTarget(raw);
 }

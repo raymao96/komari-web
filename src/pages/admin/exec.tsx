@@ -15,6 +15,7 @@ import { Play, AlertCircle, CheckCircle2, Copy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import NodeSelector from "@/components/NodeSelector";
 import { SettingCardCollapse } from "@/components/admin/SettingCard";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 interface TaskResult {
     task_id: string;
@@ -373,10 +374,10 @@ const ExecContent = () => {
     };
 
     return (
-        <div className="p-4 flex flex-col gap-3">
+        <div className="p-0 md:p-4 flex flex-col gap-3">
             {/* 页面标题 */}
             <div>
-                <h1 className="text-2xl font-bold">{t("exec.title")}</h1>
+                <AdminPageTitle>{t("exec.title")}</AdminPageTitle>
                 <Text size="2" color="gray" className="mt-1">
                     {t("exec.description")}
                 </Text>

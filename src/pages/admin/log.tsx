@@ -11,6 +11,7 @@ import { Button, Dialog, Flex } from "@radix-ui/themes";
 import { useTranslation } from "react-i18next";
 import NumberPicker from "@/components/ui/number-picker";
 import Loading from "@/components/loading";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 interface Log {
   id: number;
@@ -87,9 +88,9 @@ const LogPage = () => {
   }
 
   return (
-    <div className="flex flex-col gap-2 p-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{t("logs.title")}</h1>
+    <div className="flex flex-col gap-2 p-0 md:p-4">
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <AdminPageTitle>{t("logs.title")}</AdminPageTitle>
         <div className="flex items-center gap-2">
           Limit
           <NumberPicker defaultValue={limit} onChange={setLimit} min={1} max={100} />

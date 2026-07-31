@@ -4,10 +4,10 @@ import AdminPanelBar from "../../components/admin/AdminPanelBar";
 import LoginDialog from "../../components/Login";
 import { useAccount } from "@/contexts/AccountContext";
 import {
-  NodeDetailsProvider,
-  useNodeDetails,
-} from "@/contexts/NodeDetailsContext";
-import { updateSettingsWithToast, useSettings } from "@/lib/api";
+  SettingsProvider,
+  updateSettingsWithToast,
+  useSettings,
+} from "@/lib/api";
 import { Button, Callout, Dialog, Flex } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -52,7 +52,7 @@ const AuthStatusScreen = ({
   );
 };
 
-const AdminAuthenticatedLayout = () => {
+const AdminAuthenticatedContent = () => {
   const { settings, loading } = useSettings();
   const lang = readStoredLanguage() || "en";
   const [open, setOpen] = useState(false);
@@ -107,18 +107,17 @@ const AdminAuthenticatedLayout = () => {
   );
 };
 
+const AdminAuthenticatedLayout = () => (
+  <SettingsProvider>
+    <AdminAuthenticatedContent />
+  </SettingsProvider>
+);
+
 const AdminGuard = () => {
   const accountState = useAccount();
-  const { isLoading: nodesLoading } = useNodeDetails();
   const view = resolveAdminAuthView(accountState);
 
-  useEffect(() => {
-    if (view === "loading" || view === "admin") {
-      void import("./index");
-    }
-  }, [view]);
-
-  if (view === "loading" || (view === "admin" && nodesLoading)) {
+  if (view === "loading") {
     return <FullPageLoading />;
   }
   if (view === "error") {
@@ -150,10 +149,6 @@ const AdminGuard = () => {
   return <AdminAuthenticatedLayout />;
 };
 
-const AdminLayout = () => (
-  <NodeDetailsProvider>
-    <AdminGuard />
-  </NodeDetailsProvider>
-);
+const AdminLayout = () => <AdminGuard />;
 
 export default AdminLayout;

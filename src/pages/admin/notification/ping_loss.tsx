@@ -1,4 +1,5 @@
 import Loading from "@/components/loading";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
   Table,
   TableBody,
@@ -270,11 +271,11 @@ const PingLossContent = () => {
   };
 
   return (
-    <div className="flex w-full min-w-0 max-w-full flex-col gap-4 p-1 md:p-4">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-4 p-0 md:p-4">
       <Flex className="w-full" justify="between" align="center" gap="3" wrap="wrap">
-        <label className="text-2xl font-semibold">
+        <AdminPageTitle>
           {t("notification.ping_loss.full_title")}
-        </label>
+        </AdminPageTitle>
         <Flex gap="2" align="center" wrap="wrap" className="w-full sm:w-auto">
           <TextField.Root
             className="w-full sm:w-64"

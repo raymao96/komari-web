@@ -60,6 +60,7 @@ import { LoadingIcon } from "../Icones/icon";
 import { Dialog, Flex, Button, IconButton, Checkbox, TextField } from "@radix-ui/themes";
 import Loading from "../loading";
 import { publicVersion } from "@/utils/version";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
@@ -320,9 +321,9 @@ export function DataTable() {
         ${!isMobile ? "p-4" : ""}
       `}
     >
-      <h2 className="text-2xl font-bold mb-4">
-        {t("admin.nodeTable.nodeList")}
-      </h2>
+      <div className="mb-4">
+        <AdminPageTitle>{t("admin.nodeTable.nodeList")}</AdminPageTitle>
+      </div>
       <div className="flex items-center justify-between mb-4">
         <TextField.Root
           placeholder={t("admin.nodeTable.searchByName")}

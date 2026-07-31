@@ -11,13 +11,36 @@ export interface SettingsResponse {
   cors_origin_check_enabled: boolean;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
-  low_resource_mode: boolean;
   o_auth_provider: string;
   o_auth_enabled: boolean;
   custom_head: string;
   CreatedAt: string;
   UpdatedAt: string;
   [key: string]: any;
+}
+
+const createDefaultSettings = (): SettingsResponse => ({
+  sitename: "",
+  description: "",
+  cors_origin_check_enabled: true,
+  geo_ip_enabled: false,
+  geo_ip_provider: "",
+  o_auth_provider: "",
+  o_auth_enabled: false,
+  custom_head: "",
+  CreatedAt: "",
+  UpdatedAt: "",
+});
+
+let pendingSettingsRequest: Promise<SettingsResponse> | null = null;
+
+function getSettingsDeduplicated(): Promise<SettingsResponse> {
+  if (pendingSettingsRequest) return pendingSettingsRequest;
+
+  pendingSettingsRequest = getSettings().finally(() => {
+    pendingSettingsRequest = null;
+  });
+  return pendingSettingsRequest;
 }
 
 /**
@@ -121,42 +144,40 @@ export async function updateSingleSetting<K extends keyof SettingsResponse>(
 /**
  * Hook for managing settings state and API calls
  */
-export function useSettings() {
-  const [settings, setSettings] = React.useState<SettingsResponse>({
-    sitename: "",
-    description: "",
-    cors_origin_check_enabled: true,
-    geo_ip_enabled: false,
-    geo_ip_provider: "",
-    low_resource_mode: false,
-    o_auth_provider: "",
-    o_auth_enabled: false,
-    custom_head: "",
-    CreatedAt: "",
-    UpdatedAt: "",
-  });
+function useSettingsController() {
+  const [settings, setSettings] = React.useState<SettingsResponse>(
+    createDefaultSettings,
+  );
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   // Fetch settings on mount
   React.useEffect(() => {
+    let cancelled = false;
+
     const fetchSettings = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getSettings();
+        const data = await getSettingsDeduplicated();
+        if (cancelled) return;
         setSettings(data);
       } catch (err) {
+        if (cancelled) return;
         setError(
           err instanceof Error ? err.message : "Failed to fetch settings"
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchSettings();
+    void fetchSettings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Update a single setting
@@ -191,15 +212,35 @@ export function useSettings() {
     }
   };
 
+  const refetch = React.useCallback(async () => {
+    const data = await getSettings();
+    setSettings(data);
+    setError(null);
+  }, []);
+
   return {
     settings,
     loading,
     error,
     updateSetting,
     updateMultipleSettings,
-    refetch: async () => {
-      const data = await getSettings();
-      setSettings(data);
-    },
+    refetch,
   };
+}
+
+type SettingsContextValue = ReturnType<typeof useSettingsController>;
+
+const SettingsContext = React.createContext<SettingsContextValue | null>(null);
+
+export function SettingsProvider({ children }: { children: React.ReactNode }) {
+  const value = useSettingsController();
+  return React.createElement(SettingsContext.Provider, { value }, children);
+}
+
+export function useSettings(): SettingsContextValue {
+  const context = React.useContext(SettingsContext);
+  if (!context) {
+    throw new Error("useSettings must be used within SettingsProvider");
+  }
+  return context;
 }

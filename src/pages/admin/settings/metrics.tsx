@@ -1,10 +1,11 @@
-import Loading from "@/components/loading";
+import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { DatabaseMaintenanceCard } from "@/components/admin/DatabaseMaintenanceCard";
 import { Selector } from "@/components/Selector";
 import {
   SettingCard,
   SettingCardLabel,
   SettingCardShortTextInput,
-  SettingCardSwitch,
 } from "@/components/admin/SettingCard";
 import {
   Table,
@@ -25,12 +26,14 @@ import {
   Dialog,
   Flex,
   Progress,
+  Tabs,
   Text,
   TextField,
 } from "@radix-ui/themes";
 import {
   AlertTriangle,
   Database,
+  HardDrive,
   Info,
   ListChecks,
   RefreshCw,
@@ -76,8 +79,6 @@ type MetricRetentionChange = {
 };
 
 const SAFE_RAW_RETENTION_DAYS = 1;
-const RETENTION_WARNING_CANCELED = new Error("retention warning canceled");
-
 type MetricTextField = "name" | "description";
 type TranslationFunction = ReturnType<typeof useTranslation>["t"];
 
@@ -199,37 +200,10 @@ function metricDescription(
 export default function MetricsSettings() {
   const { t } = useTranslation();
   const { settings, loading, error, updateMultipleSettings } = useSettings();
-  const { call } = useRPC2Call();
   const [saveError, setSaveError] = React.useState<string | null>(null);
-  const [retentionWarningOpen, setRetentionWarningOpen] = React.useState(false);
-  const retentionWarningResolver = React.useRef<
-    ((confirmed: boolean) => void) | null
-  >(null);
-
-  const resolveRetentionWarning = React.useCallback((confirmed: boolean) => {
-    const resolve = retentionWarningResolver.current;
-    retentionWarningResolver.current = null;
-    setRetentionWarningOpen(false);
-    resolve?.(confirmed);
-  }, []);
-
-  const confirmExtendedRawRetention = React.useCallback(
-    () =>
-      new Promise<boolean>((resolve) => {
-        retentionWarningResolver.current?.(false);
-        retentionWarningResolver.current = resolve;
-        setRetentionWarningOpen(true);
-      }),
-    [],
-  );
-
-  React.useEffect(
-    () => () => {
-      retentionWarningResolver.current?.(false);
-      retentionWarningResolver.current = null;
-    },
-    [],
-  );
+  const [activeTab, setActiveTab] = React.useState<
+    "overview" | "monitoring" | "migration"
+  >("overview");
 
   const saveMetricSettings = React.useCallback(
     async (changes: Partial<SettingsResponse>) => {
@@ -246,41 +220,10 @@ export default function MetricsSettings() {
     [t, updateMultipleSettings],
   );
 
-  const downsamplingEnabled = settings.metric_downsampling_enabled === true;
   const metricDatabaseDriver = resolveMetricDatabaseDriver(settings);
 
-  const handleDownsamplingChange = React.useCallback(
-    async (checked: boolean) => {
-      if (!checked) {
-        let definitions: MetricDefinition[];
-        try {
-          definitions = await call<unknown, MetricDefinition[]>(
-            "admin:listMetricDefinitions",
-            {},
-          );
-          setSaveError(null);
-        } catch (e) {
-          setSaveError(e instanceof Error ? e.message : String(e));
-          throw e;
-        }
-        const hasExtendedRetention =
-          Array.isArray(definitions) &&
-          definitions.some(
-            (metric) =>
-              toNumber(metric.retention_days, SAFE_RAW_RETENTION_DAYS) >
-              SAFE_RAW_RETENTION_DAYS,
-          );
-        if (hasExtendedRetention && !(await confirmExtendedRawRetention())) {
-          throw RETENTION_WARNING_CANCELED;
-        }
-      }
-      await saveMetricSettings({ metric_downsampling_enabled: checked });
-    },
-    [call, confirmExtendedRawRetention, saveMetricSettings],
-  );
-
   if (loading) {
-    return <Loading />;
+    return <SettingsPageSkeleton />;
   }
 
   if (error) {
@@ -289,180 +232,160 @@ export default function MetricsSettings() {
 
   return (
     <Flex direction="column" gap="3">
-      <SettingCardLabel>{t("settings.metrics.title")}</SettingCardLabel>
+      <AdminPageTitle>{t("settings.storage.title")}</AdminPageTitle>
 
-      {/*<Callout.Root color="blue" variant="surface">
-        <Callout.Icon>
-          <Info size={16} />
-        </Callout.Icon>
-        <Callout.Text>{t("settings.metrics.intro")}</Callout.Text>
-      </Callout.Root>*/}
-
-      {saveError && (
-        <Callout.Root color="red" variant="surface">
-          <Callout.Icon>
-            <AlertTriangle size={16} />
-          </Callout.Icon>
-          <Callout.Text>{saveError}</Callout.Text>
-        </Callout.Root>
-      )}
-
-      <SettingCardShortTextInput
-        title={t("settings.metrics.dsn_title")}
-        description={t("settings.metrics.dsn_description")}
-        descriptionPlacement="footer"
-        defaultValue={String(settings.metric_db_dsn || "")}
-        placeholder={DSN_PLACEHOLDER}
-        OnSave={async (value) => {
-          await saveMetricSettings({ metric_db_dsn: value.trim() });
-        }}
-      />
-
-      <SettingCardLabel>
-        {t("settings.metrics.advanced_title")}
-      </SettingCardLabel>
-
-      <SettingCardSwitch
-        title={t("settings.metrics.low_resource_title")}
-        description={t("settings.metrics.low_resource_description")}
-        label={t("settings.metrics.low_resource_enabled")}
-        defaultChecked={settings.low_resource_mode === true}
-        onChange={async (checked) => {
-          await saveMetricSettings({ low_resource_mode: checked });
-        }}
-      />
-
-      <SettingCardSwitch
-        title={t("settings.metrics.downsampling_title")}
-        description={t("settings.metrics.downsampling_description")}
-        label={t("settings.metrics.downsampling_enabled")}
-        defaultChecked={downsamplingEnabled}
-        onChange={handleDownsamplingChange}
-      />
-
-      <MetricRetentionTable
-        defaultRetentionDays={toNumber(
-          settings.metric_retention_days,
-          SAFE_RAW_RETENTION_DAYS,
-        )}
-        downsamplingEnabled={downsamplingEnabled}
-        confirmExtendedRawRetention={confirmExtendedRawRetention}
-      />
-
-      <SettingCardShortTextInput
-        title={t("settings.metrics.table_prefix_title")}
-        description={t("settings.metrics.table_prefix_description")}
-        descriptionPlacement="footer"
-        defaultValue={String(settings.metric_table_prefix || "metric_")}
-        placeholder="metric_"
-        OnSave={async (value) => {
-          await saveMetricSettings({
-            metric_table_prefix: value.trim() || "metric_",
-          });
-        }}
-      />
-
-      {metricDatabaseDriver === "sqlite" ? (
-        <Callout.Root color="blue" variant="surface">
-          <Callout.Icon>
-            <Info size={16} />
-          </Callout.Icon>
-          <Callout.Text>
-            {t("settings.metrics.sqlite_connection_strategy")}
-          </Callout.Text>
-        </Callout.Root>
-      ) : (
-        <>
-          <SettingCardShortTextInput
-            title={t("settings.metrics.max_open_conns_title")}
-            description={t("settings.metrics.max_open_conns_description")}
-            descriptionPlacement="footer"
-            type="number"
-            defaultValue={String(toNumber(settings.metric_max_open_conns, 25))}
-            placeholder="25"
-            OnSave={async (value) => {
-              const n = parseInt(value, 10);
-              if (isNaN(n) || n <= 0) {
-                toast.error(t("settings.metrics.conns_invalid"));
-                return;
-              }
-              await saveMetricSettings({ metric_max_open_conns: n });
-            }}
-          />
-
-          <SettingCardShortTextInput
-            title={t("settings.metrics.max_idle_conns_title")}
-            description={t("settings.metrics.max_idle_conns_description")}
-            descriptionPlacement="footer"
-            type="number"
-            defaultValue={String(toNumber(settings.metric_max_idle_conns, 5))}
-            placeholder="5"
-            OnSave={async (value) => {
-              const n = parseInt(value, 10);
-              if (isNaN(n) || n < 0) {
-                toast.error(t("settings.metrics.conns_invalid"));
-                return;
-              }
-              await saveMetricSettings({ metric_max_idle_conns: n });
-            }}
-          />
-        </>
-      )}
-
-      {/*<Callout.Root color="green" variant="surface">
-        <Callout.Icon>
-          <Info size={16} />
-        </Callout.Icon>
-        <Callout.Text>{t("settings.metrics.restart_hint")}</Callout.Text>
-      </Callout.Root>*/}
-
-      <SettingCardLabel>
-        {t("settings.metrics.migration_title")}
-      </SettingCardLabel>
-      <MigrationCard />
-
-      <Dialog.Root
-        open={retentionWarningOpen}
-        onOpenChange={(open) => {
-          if (!open) resolveRetentionWarning(false);
-        }}
+      <Tabs.Root
+        value={activeTab}
+        onValueChange={(value) =>
+          setActiveTab(value as "overview" | "monitoring" | "migration")
+        }
       >
-        <Dialog.Content maxWidth="520px">
-          <Dialog.Title>
-            {t("settings.metrics.retention_warning_title")}
-          </Dialog.Title>
-          <Dialog.Description>
-            {t("settings.metrics.retention_warning_description")}
-          </Dialog.Description>
-          <Flex justify="end" gap="2" mt="4">
-            <Button
-              variant="soft"
-              color="gray"
-              onClick={() => resolveRetentionWarning(false)}
+        <div className="w-full overflow-x-auto pb-1">
+          <Tabs.List className="w-max min-w-full">
+            <Tabs.Trigger
+              value="overview"
+              className="min-w-[7.5rem] flex-1"
             >
-              {t("cancel")}
-            </Button>
-            <Button
-              color="orange"
-              onClick={() => resolveRetentionWarning(true)}
+              <HardDrive size={15} />
+              {t("settings.storage.overview")}
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="monitoring"
+              className="min-w-[7.5rem] flex-1"
             >
-              {t("settings.metrics.retention_warning_continue")}
-            </Button>
+              <ListChecks size={15} />
+              {t("settings.storage.monitoring_data")}
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="migration"
+              className="min-w-[7.5rem] flex-1"
+            >
+              <RefreshCw size={15} />
+              {t("settings.storage.migration_maintenance")}
+            </Tabs.Trigger>
+          </Tabs.List>
+        </div>
+
+        <Tabs.Content value="overview" className="pt-3">
+          {activeTab === "overview" ? <DatabaseMaintenanceCard /> : null}
+        </Tabs.Content>
+
+        <Tabs.Content value="monitoring" className="pt-3">
+          <Flex direction="column" gap="3">
+            {saveError && (
+              <Callout.Root color="red" variant="surface">
+                <Callout.Icon>
+                  <AlertTriangle size={16} />
+                </Callout.Icon>
+                <Callout.Text>{saveError}</Callout.Text>
+              </Callout.Root>
+            )}
+
+            <SettingCardShortTextInput
+              title={t("settings.metrics.dsn_title")}
+              description={t("settings.metrics.dsn_description")}
+              descriptionPlacement="footer"
+              defaultValue={String(settings.metric_db_dsn || "")}
+              placeholder={DSN_PLACEHOLDER}
+              OnSave={async (value) => {
+                await saveMetricSettings({ metric_db_dsn: value.trim() });
+              }}
+            />
+
+            <SettingCardLabel>
+              {t("settings.metrics.advanced_title")}
+            </SettingCardLabel>
+
+            <MetricRetentionTable
+              defaultRetentionDays={toNumber(
+                settings.metric_retention_days,
+                SAFE_RAW_RETENTION_DAYS,
+              )}
+            />
+
+            <SettingCardShortTextInput
+              title={t("settings.metrics.table_prefix_title")}
+              description={t("settings.metrics.table_prefix_description")}
+              descriptionPlacement="footer"
+              defaultValue={String(settings.metric_table_prefix || "metric_")}
+              placeholder="metric_"
+              OnSave={async (value) => {
+                await saveMetricSettings({
+                  metric_table_prefix: value.trim() || "metric_",
+                });
+              }}
+            />
+
+            {metricDatabaseDriver === "sqlite" ? (
+              <Callout.Root color="blue" variant="surface">
+                <Callout.Icon>
+                  <Info size={16} />
+                </Callout.Icon>
+                <Callout.Text>
+                  {t("settings.metrics.sqlite_connection_strategy")}
+                </Callout.Text>
+              </Callout.Root>
+            ) : (
+              <>
+                <SettingCardShortTextInput
+                  title={t("settings.metrics.max_open_conns_title")}
+                  description={t("settings.metrics.max_open_conns_description")}
+                  descriptionPlacement="footer"
+                  type="number"
+                  defaultValue={String(
+                    toNumber(settings.metric_max_open_conns, 25),
+                  )}
+                  placeholder="25"
+                  OnSave={async (value) => {
+                    const n = parseInt(value, 10);
+                    if (isNaN(n) || n <= 0) {
+                      toast.error(t("settings.metrics.conns_invalid"));
+                      return;
+                    }
+                    await saveMetricSettings({ metric_max_open_conns: n });
+                  }}
+                />
+
+                <SettingCardShortTextInput
+                  title={t("settings.metrics.max_idle_conns_title")}
+                  description={t("settings.metrics.max_idle_conns_description")}
+                  descriptionPlacement="footer"
+                  type="number"
+                  defaultValue={String(
+                    toNumber(settings.metric_max_idle_conns, 5),
+                  )}
+                  placeholder="5"
+                  OnSave={async (value) => {
+                    const n = parseInt(value, 10);
+                    if (isNaN(n) || n < 0) {
+                      toast.error(t("settings.metrics.conns_invalid"));
+                      return;
+                    }
+                    await saveMetricSettings({ metric_max_idle_conns: n });
+                  }}
+                />
+              </>
+            )}
           </Flex>
-        </Dialog.Content>
-      </Dialog.Root>
+        </Tabs.Content>
+
+        <Tabs.Content value="migration" className="pt-3">
+          {activeTab === "migration" ? (
+            <Flex direction="column" gap="3">
+              <MigrationCard />
+              <DatabaseMaintenanceCard mode="maintenance" />
+            </Flex>
+          ) : null}
+        </Tabs.Content>
+      </Tabs.Root>
     </Flex>
   );
 }
 
 function MetricRetentionTable({
   defaultRetentionDays,
-  downsamplingEnabled,
-  confirmExtendedRawRetention,
 }: {
   defaultRetentionDays: number;
-  downsamplingEnabled: boolean;
-  confirmExtendedRawRetention: () => Promise<boolean>;
 }) {
   const { t, i18n } = useTranslation();
   const { call } = useRPC2Call();
@@ -517,16 +440,6 @@ function MetricRetentionTable({
   const saveRetentionChanges = React.useCallback(
     async (changes: MetricRetentionChange[]) => {
       if (changes.length === 0) return true;
-      if (
-        !downsamplingEnabled &&
-        changes.some(
-          (change) => change.retention_days > SAFE_RAW_RETENTION_DAYS,
-        ) &&
-        !(await confirmExtendedRawRetention())
-      ) {
-        return false;
-      }
-
       setSaving(true);
       try {
         const results = await Promise.allSettled(
@@ -586,7 +499,7 @@ function MetricRetentionTable({
         setSaving(false);
       }
     },
-    [call, confirmExtendedRawRetention, downsamplingEnabled, t],
+    [call, t],
   );
 
   const handleSaveAll = async () => {

@@ -93,6 +93,7 @@ import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
 import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { localizeTokenRotationError } from "@/utils/tokenRotation";
 import { SelectOrInput } from "@/components/ui/select-or-input";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 
 const NodeDetailsPage = () => {
@@ -125,7 +126,7 @@ const Layout = () => {
   const isEmpty = Array.isArray(nodeDetail) && nodeDetail.length === 0;
 
   return (
-    <Flex direction="column" gap="4" p="4">
+    <Flex direction="column" gap="4" className="p-0 md:p-4">
       <Header
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -382,7 +383,7 @@ const AutoDiscoverySection = ({
           `touch .komari-auto-discovery.json && ` +
           `docker run -d --name komari-agent --restart=always ` +
           `-v .komari-auto-discovery.json:/app/auto-discovery.json ` +
-          `ghcr.io/nuomiiiii/komari-agent:latest ` +
+          `ghcr.io/raymao96/komari-agent:latest ` +
           quoteShellArgs(dockerArgs);
         break;
       }
@@ -429,7 +430,7 @@ const AutoDiscoverySection = ({
                 <Settings size={14} />
                 {t(
                   "admin.nodeTable.autoDiscovery.goToSettings",
-                  "前往“常规设置”开启自动发现"
+                  "前往“通用设置”开启自动发现"
                 )}
               </Button>
             </Link>
@@ -1007,11 +1008,9 @@ const Header = ({
     }
   };
   return (
-    <Flex justify="between" align="center" gap="4" wrap="wrap">
+    <Flex justify="between" align="start" gap="4" wrap="wrap">
       <Flex gap="2" align="center">
-        <Text size="5" weight="bold">
-          {t("admin.nodeTable.nodeList")}
-        </Text>
+        <AdminPageTitle>{t("admin.nodeTable.nodeList")}</AdminPageTitle>
         {selectedNodes.length > 0 && (
           <Text size="2">({selectedNodes.length} selected)</Text>
         )}

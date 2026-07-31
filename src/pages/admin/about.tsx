@@ -8,6 +8,7 @@ import { SquareArrowOutUpRight } from "lucide-react";
 import { SegmentedControl } from "@radix-ui/themes";
 import { Apache2_LICENSE, Eula, MIT_LICENSE } from "@/utils/field";
 import { SettingCardCollapse } from "@/components/admin/SettingCard";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 export default function AboutPage() {
   const [markdown, setMarkdown] = useState("");
@@ -119,8 +120,8 @@ export default function AboutPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-foreground">{t("about.title")}</h1>
+    <div className="flex flex-col gap-4 p-0 md:p-4">
+      <AdminPageTitle>{t("about.title")}</AdminPageTitle>
       <SegmentedControl.Root defaultValue={view} onValueChange={setView}>
         <SegmentedControl.Item value="open_source">
           {t("about.open_source_title")}

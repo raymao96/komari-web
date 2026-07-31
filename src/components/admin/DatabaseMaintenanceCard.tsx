@@ -235,6 +235,56 @@ function DatabaseUsageTable({ overview }: { overview: DatabaseOverview }) {
   );
 }
 
+function StorageSummaryItem({
+  label,
+  description,
+  value,
+}: {
+  label: string;
+  description: string;
+  value: number | null;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="min-w-0 px-3 py-3 sm:px-4">
+      <Text as="div" size="1" color="gray">
+        {label}
+      </Text>
+      <Text as="div" size="4" weight="bold" className="mt-1 break-words">
+        {value === null ? t("common.unknown") : formatBytes(value)}
+      </Text>
+      <Text as="div" size="1" color="gray" className="mt-1 break-words">
+        {description}
+      </Text>
+    </div>
+  );
+}
+
+function StorageSummary({ overview }: { overview: DatabaseOverview }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="mb-3 grid w-full grid-cols-1 divide-y divide-[var(--gray-a5)] border-y border-[var(--gray-a5)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <StorageSummaryItem
+        label={t("settings.database.local_total")}
+        description={t("settings.storage.total_description")}
+        value={overview.local_total}
+      />
+      <StorageSummaryItem
+        label={t("settings.database.main")}
+        description={t("settings.storage.main_description")}
+        value={overview.main.size}
+      />
+      <StorageSummaryItem
+        label={t("settings.database.monitoring")}
+        description={t("settings.storage.monitoring_description")}
+        value={overview.monitoring.size}
+      />
+    </div>
+  );
+}
+
 function formatRuntimeTime(value: string | null, fallback: string): string {
   if (!value) return fallback;
   const date = new Date(value);
@@ -300,6 +350,15 @@ function DatabaseRuntimePanel({ info }: { info: DatabaseInfo }) {
         shm: formatBytes(info.files.shm),
       })} · ${checkpointHint}`
     : checkpointHint;
+  const nextCheckpointAt = runtime.next_checkpoint_at
+    ? new Date(runtime.next_checkpoint_at)
+    : null;
+  const nextCheckpointValue =
+    runtime.compacting && runtime.total > 0 && runtime.progress >= runtime.total
+      ? t("settings.database.runtime_status.checkpoint_in_progress")
+      : nextCheckpointAt && !Number.isNaN(nextCheckpointAt.getTime()) && nextCheckpointAt.getTime() <= Date.now()
+        ? t("settings.database.runtime_status.checkpoint_waiting_schedule")
+        : formatRuntimeTime(runtime.next_checkpoint_at, unavailable);
 
   return (
     <section className="mt-4 border-t border-[var(--gray-a5)] pt-4">
@@ -361,7 +420,7 @@ function DatabaseRuntimePanel({ info }: { info: DatabaseInfo }) {
           label={t("settings.database.runtime_status.next_checkpoint")}
           value={
             runtime.checkpoint_applicable
-              ? formatRuntimeTime(runtime.next_checkpoint_at, unavailable)
+              ? nextCheckpointValue
               : t("settings.database.runtime_status.not_applicable")
           }
         />
@@ -458,7 +517,11 @@ function maintenanceFailureDescription(
   return failures.length > 0 ? failures.join("; ") : undefined;
 }
 
-export function DatabaseMaintenanceCard() {
+export function DatabaseMaintenanceCard({
+  mode = "overview",
+}: {
+  mode?: "overview" | "maintenance";
+}) {
   const { t } = useTranslation();
   const [overview, setOverview] = React.useState<DatabaseOverview | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -543,30 +606,41 @@ export function DatabaseMaintenanceCard() {
   };
 
   const actionDisabled = loading || maintaining;
+  const showOverview = mode === "overview";
 
   return (
     <SettingCard
-      title={t("settings.database.maintenance_title")}
-      description={t("settings.database.maintenance_description")}
+      title={
+        showOverview
+          ? t("settings.storage.storage_usage")
+          : t("settings.database.maintenance_title")
+      }
+      description={
+        showOverview
+          ? t("settings.storage.total_description")
+          : t("settings.database.maintenance_description")
+      }
     >
-      {overview?.local_total !== null && overview?.local_total !== undefined ? (
-        <SettingCard.Action>
-          <Flex direction="column" align="end" className="shrink-0 pl-4">
-            <Text size="1" color="gray">
-              {t("settings.database.local_total")}
-            </Text>
-            <Text size="2" weight="medium" className="whitespace-nowrap">
-              {formatBytes(overview.local_total)}
-            </Text>
-          </Flex>
-        </SettingCard.Action>
-      ) : null}
       <Flex direction="column" className="w-full pt-2" gap="0">
         {overview ? (
-          <>
-            <DatabaseUsageTable overview={overview} />
-            <DatabaseRuntimePanel info={overview.monitoring} />
-          </>
+          showOverview ? (
+            <>
+              <StorageSummary overview={overview} />
+              <DatabaseUsageTable overview={overview} />
+              <DatabaseRuntimePanel info={overview.monitoring} />
+            </>
+          ) : (
+            <Flex direction="column">
+              <MaintenanceActionRow
+                label={t("settings.database.main")}
+                info={overview.main}
+              />
+              <MaintenanceActionRow
+                label={t("settings.database.monitoring")}
+                info={overview.monitoring}
+              />
+            </Flex>
+          )
         ) : loading ? (
           <Text size="2" color="gray" className="py-3">
             {t("loading")}
@@ -592,7 +666,7 @@ export function DatabaseMaintenanceCard() {
               />
               {t("common.retry")}
             </Button>
-          ) : overview ? (
+          ) : overview && !showOverview ? (
             <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
               <Dialog.Trigger>
                 <Button

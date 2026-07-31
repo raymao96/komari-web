@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
   Badge,
   Box,
@@ -567,9 +568,9 @@ function ReturnRouteContent() {
   if (nodesLoading) return <Loading text="" />;
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4 p-4">
+    <div className="flex w-full min-w-0 flex-col gap-4 p-0 md:p-4">
       <div>
-        <h1 className="text-2xl font-bold">回程线路监测</h1>
+        <AdminPageTitle>回程线路监测</AdminPageTitle>
         <Text as="p" size="2" color="gray" className="mt-1">识别移动、电信、联通回程线路，确认切线后告警，恢复后自动通知。</Text>
       </div>
 

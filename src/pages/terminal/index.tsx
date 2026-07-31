@@ -21,7 +21,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { LiveDataResponse, Record as LiveRecord } from "@/types/LiveData";
 import RemoteSession, { type RemoteNode } from "./RemoteSession";
-import { consumeRemoteLaunchTarget } from "@/utils/remoteLaunch";
+import { getRemoteLaunchTarget } from "@/utils/remoteLaunch";
+import { useRPC2Call } from "@/contexts/RPC2Context";
+import { mergeLatestStatus } from "@/utils/liveData";
 import "./Terminal.css";
 
 type RemoteTab = {
@@ -30,6 +32,7 @@ type RemoteTab = {
 };
 
 const maxTabs = 16;
+const liveStatusInterval = 3_000;
 type AuthorizationState = "checking" | "required" | "authorized" | "error";
 
 type SortableRemoteTabProps = {
@@ -75,7 +78,7 @@ function SortableRemoteTab({ tab, label, active, online, onActivate, onClose }: 
 }
 
 export default function TerminalWorkspace() {
-  const initialUUID = useMemo(() => consumeRemoteLaunchTarget(), []);
+  const initialUUID = useMemo(() => getRemoteLaunchTarget(), []);
   const [nodes, setNodes] = useState<RemoteNode[]>([]);
   const [tabs, setTabs] = useState<RemoteTab[]>([]);
   const [activeID, setActiveID] = useState("");
@@ -89,6 +92,8 @@ export default function TerminalWorkspace() {
   const [otpError, setOtpError] = useState("");
   const initialized = useRef(false);
   const authorizationStarted = useRef(false);
+  const liveDataRef = useRef<LiveDataResponse | null>(null);
+  const { callViaHTTP } = useRPC2Call();
   const tabSensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
@@ -163,30 +168,61 @@ export default function TerminalWorkspace() {
   }, [addTab, authorization, initialUUID, nodes, nodesLoaded]);
 
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/clients`);
-    let interval: number | undefined;
-    const request = () => {
-      if (ws.readyState === WebSocket.OPEN) ws.send("get");
-    };
-    ws.onopen = () => {
-      request();
-      interval = window.setInterval(request, 3000);
-    };
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as LiveDataResponse;
-        setLive(payload.data?.data || {});
-        setOnline(new Set(payload.data?.online || []));
-      } catch {
-        // Ignore malformed live frames; the next poll replaces them.
+    let timer: number | undefined;
+    let stopped = false;
+    let running = false;
+
+    const clearTimer = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
       }
     };
-    return () => {
-      if (interval) window.clearInterval(interval);
-      ws.close();
+
+    const scheduleNext = () => {
+      clearTimer();
+      if (!stopped && !document.hidden) {
+        timer = window.setTimeout(refresh, liveStatusInterval);
+      }
     };
-  }, []);
+
+    const refresh = async () => {
+      if (running || stopped || document.hidden) return;
+      running = true;
+      try {
+        const result = await callViaHTTP<undefined, Record<string, any>>(
+          "common:getNodesLatestStatus",
+        );
+        if (stopped) return;
+        const payload = mergeLatestStatus(result, liveDataRef.current);
+        liveDataRef.current = payload;
+        setLive(payload.data.data);
+        setOnline(new Set(payload.data.online));
+      } catch {
+        // The remote session remains usable; the next poll refreshes status.
+      } finally {
+        running = false;
+        scheduleNext();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearTimer();
+      } else if (!running) {
+        void refresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    if (!document.hidden) void refresh();
+
+    return () => {
+      stopped = true;
+      clearTimer();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [callViaHTTP]);
 
   useEffect(() => {
     const active = tabs.find((tab) => tab.id === activeID);

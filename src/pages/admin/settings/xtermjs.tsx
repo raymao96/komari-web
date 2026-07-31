@@ -1,12 +1,12 @@
 import React from "react";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { Button, Callout, Flex } from "@radix-ui/themes";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
-import Loading from "@/components/loading";
+import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import {
   SettingCardButton,
-  SettingCardLabel,
   SettingCardLongTextInput,
   SettingCardShortTextInput,
   SettingCardSwitch,
@@ -133,7 +133,7 @@ export default function XtermjsSettingsPage() {
     !isTransparentBackground(settings.terminalOptions.theme.background);
 
   if (loading) {
-    return <Loading />;
+    return <SettingsPageSkeleton />;
   }
 
   if (error) {
@@ -152,7 +152,7 @@ export default function XtermjsSettingsPage() {
 
   return (
     <Flex direction="column" gap="3">
-      <SettingCardLabel>{t("settings.xtermjs.title")}</SettingCardLabel>
+      <AdminPageTitle>{t("settings.xtermjs.title")}</AdminPageTitle>
       <SettingCardButton
         title={t("settings.xtermjs.title")}
         description={t("settings.xtermjs.reset_defaults")}

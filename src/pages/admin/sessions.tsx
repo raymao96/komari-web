@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { Dialog, Flex, Button } from "@radix-ui/themes";
 import { UserAgentHelper } from "@/utils/UserAgentHelper";
 import Loading from "@/components/loading";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 type Resp = {
   current: string;
   data: Array<{
@@ -106,9 +107,9 @@ export default function Sessions() {
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-semibold mb-4">{t("sessions.title")}</h1>
-      <div className="mb-4">
+    <Flex direction="column" gap="3" className="w-full min-w-0">
+      <AdminPageTitle>{t("sessions.title")}</AdminPageTitle>
+      <div>
         <Dialog.Root>
           <Dialog.Trigger>
             <Button color="red">{t("sessions.delete_all")}</Button>
@@ -131,7 +132,7 @@ export default function Sessions() {
           </Dialog.Content>
         </Dialog.Root>
       </div>
-      <div className="overflow-hidden rounded-lg">
+      <div className="w-full min-w-0 overflow-x-auto rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
@@ -272,7 +273,7 @@ export default function Sessions() {
           </TableBody>
         </Table>
       </div>
-    </div>
+    </Flex>
   );
 }
 

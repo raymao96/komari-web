@@ -11,9 +11,10 @@ import {
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
 import { toast } from "sonner";
-import Loading from "@/components/loading";
+import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import { DownloadIcon } from "lucide-react";
 import { useState } from "react";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import UploadDialog from "@/components/UploadDialog";
 
 export default function SiteSettings() {
@@ -125,7 +126,7 @@ export default function SiteSettings() {
   };
 
   if (loading) {
-    return <Loading />;
+    return <SettingsPageSkeleton />;
   }
 
   if (error) {
@@ -134,7 +135,7 @@ export default function SiteSettings() {
 
   return (
     <>
-      <SettingCardLabel>{t("settings.site.title")}</SettingCardLabel>
+      <AdminPageTitle>{t("settings.site.title")}</AdminPageTitle>
       <SettingCardShortTextInput
         title={t("settings.site.name")}
         description={t("settings.site.name_description")}

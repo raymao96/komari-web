@@ -31,6 +31,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 interface MarketSource {
   id: string;
@@ -297,12 +298,10 @@ export default function ThemeMarketPage() {
   if (loading) return <Loading />;
 
   return (
-    <Box className="p-4 md:p-6 space-y-5">
+    <Box className="space-y-5 p-0 md:p-4">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
         <Box>
-          <Text as="div" size="6" weight="bold">
-            {t("market.themes", "Theme Market")}
-          </Text>
+          <AdminPageTitle>{t("market.themes", "Theme Market")}</AdminPageTitle>
           <Text as="div" size="2" color="gray" mt="1">
             {t("market.description", "Find and install themes from the internet.")}
           </Text>

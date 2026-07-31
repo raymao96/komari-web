@@ -9,6 +9,7 @@ import {
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
 import { toast } from "sonner";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 const GeneralNotification = () => {
   return (
     <Flex direction="column" gap="3" className="p-0 md:p-4">
@@ -30,6 +31,7 @@ const Inner = () => {
   }
   return (
     <>
+      <AdminPageTitle>{t("settings.general.title")}</AdminPageTitle>
       <SettingCardLabel>
         {t("admin.notification.expire_title")}
       </SettingCardLabel>

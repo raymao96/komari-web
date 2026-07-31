@@ -1,5 +1,6 @@
-import Loading from "@/components/loading";
-import { SettingCard, SettingCardLabel } from "@/components/admin/SettingCard";
+import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { SettingCard } from "@/components/admin/SettingCard";
 import { useSettings } from "@/lib/api";
 import {
   CLOUDFLARED_STOP_CONFIRM_TEXT,
@@ -113,7 +114,7 @@ export default function ReverseProxySettings() {
   };
 
   if (settingsLoading || loading) {
-    return <Loading />;
+    return <SettingsPageSkeleton />;
   }
 
   if (settingsError) {
@@ -129,9 +130,9 @@ export default function ReverseProxySettings() {
 
   return (
     <Flex direction="column" gap="4">
-      <SettingCardLabel>
+      <AdminPageTitle>
         {t("settings.reverse_proxy.title", "Reverse Proxy")}
-      </SettingCardLabel>
+      </AdminPageTitle>
 
       <SettingCard
         title={t(

@@ -17,6 +17,7 @@ import {
   type TrafficReportNotification,
 } from "@/contexts/TrafficReportContext";
 import React from "react";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { Clock3, Pencil, Save, Search, Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -386,11 +387,11 @@ const InnerLayout = () => {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-2 md:p-4">
+    <div className="flex flex-col gap-5 p-0 md:p-4">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
-        <h1 className="text-xl font-semibold">
+        <AdminPageTitle>
           {t("notification.traffic_report.full_title")}
-        </h1>
+        </AdminPageTitle>
         <TextField.Root
           type="text"
           className="w-full sm:w-64"

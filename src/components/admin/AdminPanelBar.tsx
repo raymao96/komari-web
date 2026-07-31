@@ -2,13 +2,14 @@ import { Cross1Icon, ExitIcon } from "@radix-ui/react-icons";
 import {
   Button,
   Callout,
+  Dialog,
   Flex,
   Grid,
   IconButton,
   Text,
 } from "@radix-ui/themes";
 import { AnimatePresence, motion } from "framer-motion"; // 引入 Framer Motion
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation /*useNavigate*/ } from "react-router-dom";
 import ColorSwitch from "../ColorSwitch";
@@ -21,10 +22,13 @@ import { iconMap } from "../../utils/iconHelper";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { TablerMenu2 } from "../Icones/Tabler";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
-// NOTE: 鉴权守卫已移至 AdminLayout（AdminGuard），到达本组件时必定已登录，
-// 故不再需要 account/LoginDialog 来处理未登录态（修复 #585）。
-import Tips from "../ui/tips";
-import { CircleFadingArrowUp, Download, LoaderCircle } from "lucide-react";
+import {
+  ArrowRight,
+  CircleFadingArrowUp,
+  Download,
+  ExternalLink,
+  LoaderCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import { resolveI18nText } from "@/utils/i18nText";
@@ -35,15 +39,19 @@ import {
   THEME_CONFIGURATION_RAW,
   THEME_CONFIGURATION_REDIRECT,
 } from "@/utils/themeConfiguration";
+import {
+  buildAdminMenuItems,
+  toggleSingleSubMenu,
+} from "@/utils/adminMenu";
 
 // 将JSON配置转换为类型安全的菜单项数组 (基础静态菜单)
-const baseMenuItems = (menuConfig as { menu: MenuItem[] }).menu;
-
-// 扩展的菜单项类型（允许直接提供 rawLabel 而不是多语言 key）
-interface ExtendedMenuItem extends MenuItem {
-  rawLabel?: string; // 不走 i18n，直接显示
-  reloadDocument?: boolean;
-}
+const parsedMenuConfig = menuConfig as {
+  menu: MenuItem[];
+  footer?: MenuItem[];
+};
+const baseMenuItems = parsedMenuConfig.menu;
+const footerMenuItems = parsedMenuConfig.footer ?? [];
+const DESKTOP_SIDEBAR_WIDTH = 212;
 
 interface AdminPanelBarProps {
   content: ReactNode;
@@ -179,11 +187,16 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   );
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [releasesSince, setReleasesSince] = useState<GithubReleaseInfo[]>([]);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
   const currentTheme = publicInfo?.theme;
 
   // 动态扩展菜单
-  const [extraMenuItems, setExtraMenuItems] = useState<ExtendedMenuItem[]>([]);
+  const [extraMenuItems, setExtraMenuItems] = useState<MenuItem[]>([]);
+  const menuItems = useMemo(
+    () => buildAdminMenuItems(baseMenuItems, extraMenuItems),
+    [extraMenuItems],
+  );
 
   useEffect(() => {
     let ignore = false;
@@ -232,7 +245,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
               (currentTheme === "default" ? "" : currentTheme),
           });
         const icon: string = cfg.icon || "Palette"; // fallback icon
-        const item: ExtendedMenuItem = {
+        const item: MenuItem = {
           labelKey: rawLabel,
           rawLabel,
           path: itemPath,
@@ -340,8 +353,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   // 根据路径自动展开子菜单（包含动态扩展项）
   useEffect(() => {
     const newState: { [key: string]: boolean } = {};
-    const combined: ExtendedMenuItem[] = [...baseMenuItems, ...extraMenuItems];
-    combined.forEach((item) => {
+    menuItems.forEach((item) => {
       if (item.children) {
         newState[item.path] = item.children.some(
           (child: MenuItem) =>
@@ -351,12 +363,12 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
       }
     });
     setOpenSubMenus(newState);
-  }, [location.pathname, extraMenuItems]);
+  }, [location.pathname, menuItems]);
 
   // 侧边栏动画变体
   const sidebarVariants = {
     open: {
-      width: isMobile ? "100vw" : "240px",
+      width: isMobile ? "100vw" : `${DESKTOP_SIDEBAR_WIDTH}px`,
       opacity: 1,
       transition: {
         type: "spring",
@@ -479,10 +491,145 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   function logout() {
     window.open("/api/logout", "_self");
   }
+
+  const renderIcon = (
+    icon: string,
+    labelKey: string,
+    className?: string,
+    active?: boolean,
+  ) => {
+    const link = /^(https?:\/\/|\/|\.\/|\.\.\/)/.test(icon);
+    if (link) {
+      return (
+        <img
+          src={icon}
+          alt={t(labelKey)}
+          style={{
+            width: 16,
+            height: 16,
+            objectFit: "contain",
+            opacity: active ? 1 : 0.7,
+            filter: active ? "none" : "grayscale(20%)",
+          }}
+          className={className}
+          loading="lazy"
+        />
+      );
+    }
+    const Icon = iconMap[icon];
+    if (Icon) {
+      return (
+        <Icon
+          className={className}
+          style={{
+            color: active ? "var(--accent-10)" : "var(--gray11)",
+          }}
+        />
+      );
+    }
+    return (
+      <span
+        className={className}
+        style={{
+          width: 16,
+          height: 16,
+          display: "inline-block",
+          borderRadius: 4,
+          background: "var(--accent-8)",
+        }}
+      />
+    );
+  };
+
+  const renderMenuItems = (items: MenuItem[]) =>
+    items.map((item) => {
+      const isOpen = openSubMenus[item.path];
+      if (item.children?.length) {
+        return (
+          <div key={item.path}>
+            <Flex
+              className="p-2 gap-2 border-l-[4px] border-transparent cursor-pointer hover:bg-accent-3 rounded-md"
+              align="center"
+              onClick={() => {
+                setOpenSubMenus((current) =>
+                  toggleSingleSubMenu(current, item.path),
+                );
+              }}
+            >
+              {renderIcon(
+                item.icon,
+                item.labelKey,
+                "flex w-4 h-5 items-center justify-center",
+              )}
+              <Text className="text-base" weight="medium" style={{ flex: 1 }}>
+                {item.rawLabel || t(item.labelKey)}
+              </Text>
+              <ChevronDownIcon
+                style={{
+                  transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                }}
+              />
+            </Flex>
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={
+                isOpen
+                  ? { height: "auto", opacity: 1 }
+                  : { height: 0, opacity: 0 }
+              }
+              transition={{ duration: 0.2 }}
+              style={{ overflow: "hidden" }}
+            >
+              <Flex direction="column" className="ml-4 gap-1">
+                {item.children.map((child) => (
+                  <SidebarItem
+                    key={child.path}
+                    to={child.path}
+                    icon={renderIcon(
+                      child.icon,
+                      child.labelKey,
+                      "flex w-4 h-5 items-center justify-center",
+                    )}
+                    onClick={() => isMobile && setSidebarOpen(false)}
+                    newTab={child.newTab}
+                    reloadDocument={child.reloadDocument}
+                  >
+                    {child.rawLabel || t(child.labelKey)}
+                  </SidebarItem>
+                ))}
+              </Flex>
+            </motion.div>
+          </div>
+        );
+      }
+      return (
+        <SidebarItem
+          key={item.path}
+          to={item.path}
+          icon={renderIcon(
+            item.icon,
+            item.labelKey,
+            "flex w-4 h-5 items-center justify-center",
+          )}
+          onClick={() => isMobile && setSidebarOpen(false)}
+          newTab={item.newTab}
+          reloadDocument={item.reloadDocument}
+        >
+          {item.rawLabel || t(item.labelKey)}
+        </SidebarItem>
+      );
+    });
+
   return (
     <>
       <Grid
-        columns={{ initial: "1fr", md: sidebarOpen ? "240px 1fr" : "0px 1fr" }} // 动态调整网格列
+        columns={{
+          initial: "1fr",
+          md: sidebarOpen
+            ? `${DESKTOP_SIDEBAR_WIDTH}px 1fr`
+            : "0px 1fr",
+        }} // 动态调整网格列
         rows={{ initial: "auto 1fr", md: "auto 1fr" }}
         style={{
           height: "100vh",
@@ -531,66 +678,84 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                 <span className="text-2xl font-bold leading-none">Komari</span>
               </a>
               {updateAvailable && releasesSince.length > 0 && (
-                <Tips
-                  mode="dialog"
-                  className="check-update flex h-6 w-6 items-end leading-none"
-                  trigger={
-                    <CircleFadingArrowUp
-                      className="block h-6 w-6"
-                      color="#FB4141"
-                      size="24"
-                    />
-                  }
-                >
-                  <div className="flex flex-col gap-2 max-w-[80vw] md:max-w-[720px]">
-                    <label className="font-bold">
-                      {t("common.update_available")}
-                    </label>
-                    <div className="text-sm text-muted-foreground">
-                      <span style={{ marginRight: 8 }}>
+                <Dialog.Root open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
+                  <Dialog.Trigger>
+                    <button
+                      type="button"
+                      className="check-update flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--red-a3)] text-[var(--red-11)] transition-colors hover:bg-[var(--red-a4)]"
+                      aria-label={t("common.update_available")}
+                      title={t("common.update_available")}
+                    >
+                      <CircleFadingArrowUp
+                        className="block h-5 w-5"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </Dialog.Trigger>
+                  <Dialog.Content
+                    className="max-h-[calc(100dvh-1.5rem)] overflow-hidden p-0"
+                    style={{
+                      width: isMobile
+                        ? "calc(100vw - 1.5rem)"
+                        : "min(920px, calc(100vw - 3rem))",
+                      maxWidth: "none",
+                    }}
+                  >
+                    <header className="border-b px-4 py-4 md:px-6 md:py-5">
+                      <Dialog.Title className="flex items-center gap-2 text-lg font-semibold">
+                        <CircleFadingArrowUp
+                          className="h-5 w-5 shrink-0 text-[var(--red-11)]"
+                          aria-hidden="true"
+                        />
+                        {t("common.update_available")}
+                      </Dialog.Title>
+                      <Dialog.Description className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <span>
                         {formatVersion(
                           (publicInfo as any)?.version || versionInfo?.version,
                           versionInfo?.hash,
                         )}
                       </span>
-                      <span>{"> "}</span>
-                      <span>{formatReleaseVersion(latestRelease)}</span>
-                    </div>
+                        <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="font-medium text-foreground">
+                          {formatReleaseVersion(latestRelease)}
+                        </span>
+                      </Dialog.Description>
+                    </header>
 
-                    <div className="rounded-md p-2 overflow-auto max-h-80">
-                      <div className="flex flex-col gap-4 text-sm">
+                    <div className="max-h-[min(62dvh,620px)] overflow-y-auto px-4 py-1 md:px-6">
+                      <div className="divide-y text-sm">
                         {releasesSince.map((r) => (
-                          <div key={r.html_url} className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <div className="font-medium">
+                          <section key={r.html_url} className="py-5 first:pt-4">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                              <h3 className="font-semibold text-foreground">
                                 {formatReleaseVersion(r)}
-                              </div>
+                              </h3>
                               {r.published_at && (
                                 <div className="text-xs text-muted-foreground">
                                   {new Date(r.published_at).toLocaleString()}
                                 </div>
                               )}
                             </div>
-                            <div className="whitespace-pre-wrap break-words">
+                            <div className="mt-3 whitespace-pre-wrap break-words leading-6 text-[var(--gray-11)]">
                               {visibleReleaseBody(r.body)}
                             </div>
-                            <div
-                              style={{
-                                height: 1,
-                                background: "var(--accent-5)",
-                                opacity: 0.5,
-                              }}
-                            />
-                          </div>
+                          </section>
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center justify-end gap-2">
+
+                    <footer className="flex items-center justify-end gap-2 border-t bg-[var(--gray-a2)] px-4 py-3 md:px-6 md:py-4">
+                      <Dialog.Close>
+                        <Button variant="soft" color="gray">
+                          {t("cancel", "取消")}
+                        </Button>
+                      </Dialog.Close>
                       {versionInfo?.deployment === "linux" &&
                       selfUpdate?.supported &&
                       parseReleaseVersionHash(latestRelease?.body) ? (
                         <Button
-                          variant="soft"
+                          color="red"
                           onClick={startSelfUpdate}
                           disabled={updatePhase !== "idle"}
                         >
@@ -611,12 +776,15 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          <Button variant="soft">GitHub</Button>
+                          <Button variant="soft">
+                            <ExternalLink size={16} />
+                            GitHub
+                          </Button>
                         </a>
                       )}
-                    </div>
-                  </div>
-                </Tips>
+                    </footer>
+                  </Dialog.Content>
+                </Dialog.Root>
               )}
               <span
                 className="text-sm text-muted-foreground leading-normal overflow-visible"
@@ -660,7 +828,10 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
               direction="column"
               justify="start"
               align="start"
-              style={{ height: "100%", minWidth: "240px" }}
+              style={{
+                height: "100%",
+                minWidth: `${DESKTOP_SIDEBAR_WIDTH}px`,
+              }}
             >
               {/* 关闭按钮 */}
               <IconButton
@@ -680,176 +851,17 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                 className="h-full md:mt-0 mt-6"
                 style={{ width: "100%" }}
               >
-                {[...baseMenuItems, ...extraMenuItems].map(
-                  (item: ExtendedMenuItem) => {
-                    // 支持 icon 为 URL/相对路径
-                    const isOpen = openSubMenus[item.path];
-                    const renderIcon = (
-                      icon: string,
-                      labelKey: string,
-                      className?: string,
-                      active?: boolean,
-                    ) => {
-                      const link = /^(https?:\/\/|\/|\.\/|\.\.\/)/.test(icon);
-                      if (link) {
-                        return (
-                          <img
-                            src={icon}
-                            alt={t(labelKey)}
-                            style={{
-                              width: 16,
-                              height: 16,
-                              objectFit: "contain",
-                              opacity: active ? 1 : 0.7,
-                              filter: active ? "none" : "grayscale(20%)",
-                            }}
-                            className={className}
-                            loading="lazy"
-                          />
-                        );
-                      }
-                      const Cmp = iconMap[icon];
-                      if (Cmp) {
-                        return (
-                          <Cmp
-                            className={className}
-                            style={{
-                              color: active
-                                ? "var(--accent-10)"
-                                : "var(--gray11)",
-                            }}
-                          />
-                        );
-                      }
-                      // fallback: simple dot
-                      return (
-                        <span
-                          className={className}
-                          style={{
-                            width: 16,
-                            height: 16,
-                            display: "inline-block",
-                            borderRadius: 4,
-                            background: "var(--accent-8)",
-                          }}
-                        />
-                      );
-                    };
-                    if (item.children && item.children.length) {
-                      return (
-                        <div key={item.path}>
-                          <Flex
-                            className="p-2 gap-2 border-l-[4px] border-transparent cursor-pointer hover:bg-accent-3 rounded-md"
-                            align="center"
-                            onClick={() => {
-                              //const currentlyOpen = openSubMenus[item.path];
-                              // 检查当前路径是否已经在该父菜单的子菜单中
-                              //const isCurrentlyInThisMenu = item.children?.some(
-                              //  (child) =>
-                              //    location.pathname === child.path ||
-                              //    location.pathname.startsWith(child.path)
-                              //);
-
-                              // 切换子菜单的展开状态
-                              setOpenSubMenus((prev) => ({
-                                ...prev,
-                                [item.path]: !prev[item.path],
-                              }));
-
-                              //// 只有在非展开状态且不在当前菜单组中时才导航到第一个子菜单项
-                              //if (
-                              //  !currentlyOpen &&
-                              //  !isCurrentlyInThisMenu &&
-                              //  item.children &&
-                              //  item.children.length > 0
-                              //) {
-                              //  //navigate(item.children[0].path);
-                              //  // 如果是移动端，关闭侧边栏
-                              //  if (isMobile) {
-                              //    setSidebarOpen(false);
-                              //  }
-                              //}
-                            }}
-                          >
-                            {renderIcon(
-                              item.icon,
-                              item.labelKey,
-                              "flex w-4 h-5 items-center justify-center",
-                            )}
-                            <Text
-                              className="text-base"
-                              weight="medium"
-                              style={{
-                                flex: 1,
-                              }}
-                            >
-                              {item.rawLabel || t(item.labelKey)}
-                            </Text>
-
-                            <ChevronDownIcon
-                              style={{
-                                transform: isOpen
-                                  ? "rotate(180deg)"
-                                  : "rotate(0deg)",
-                                transition: "transform 0.2s",
-                              }}
-                            />
-                          </Flex>
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={
-                              isOpen
-                                ? { height: "auto", opacity: 1 }
-                                : { height: 0, opacity: 0 }
-                            }
-                            transition={{ duration: 0.2 }}
-                            style={{ overflow: "hidden" }}
-                          >
-                            <Flex direction="column" className="ml-4 gap-1">
-                              {item.children.map((child: MenuItem) => (
-                                <SidebarItem
-                                  key={child.path}
-                                  to={child.path}
-                                  icon={renderIcon(
-                                    child.icon,
-                                    child.labelKey,
-                                    "flex w-4 h-5 items-center justify-center",
-                                  )}
-                                  children={
-                                    (child as ExtendedMenuItem).rawLabel ||
-                                    t(child.labelKey)
-                                  }
-                                  onClick={() =>
-                                    isMobile && setSidebarOpen(false)
-                                  }
-                                  newTab={child.newTab}
-                                  reloadDocument={
-                                    (child as ExtendedMenuItem).reloadDocument
-                                  }
-                                />
-                              ))}
-                            </Flex>
-                          </motion.div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <SidebarItem
-                        key={item.path}
-                        to={item.path}
-                        icon={renderIcon(
-                          item.icon,
-                          item.labelKey,
-                          "flex w-4 h-5 items-center justify-center",
-                        )}
-                        children={item.rawLabel || t(item.labelKey)}
-                        onClick={() => isMobile && setSidebarOpen(false)}
-                        newTab={item.newTab}
-                        reloadDocument={item.reloadDocument}
-                      />
-                    );
-                  },
-                )}
+                <Flex direction="column" gap="1" style={{ width: "100%" }}>
+                  {renderMenuItems(menuItems)}
+                </Flex>
+                <Flex
+                  direction="column"
+                  gap="1"
+                  className="mt-auto border-t border-[var(--gray-a5)] pt-2"
+                  style={{ width: "100%" }}
+                >
+                  {renderMenuItems(footerMenuItems)}
+                </Flex>
               </Flex>
             </Flex>
           </motion.div>

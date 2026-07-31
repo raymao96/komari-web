@@ -13,10 +13,10 @@ import {
   SettingCardShortTextInput,
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
-import { DatabaseMaintenanceCard } from "@/components/admin/DatabaseMaintenanceCard";
 import React from "react";
 import { toast } from "sonner";
-import Loading from "@/components/loading";
+import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 export default function GeneralSettings() {
   const { t } = useTranslation();
@@ -25,7 +25,7 @@ export default function GeneralSettings() {
     null
   );
   if (loading) {
-    return <Loading text="creeper?" />;
+    return <SettingsPageSkeleton />;
   }
 
   if (error) {
@@ -34,6 +34,7 @@ export default function GeneralSettings() {
 
   return (
     <>
+      <AdminPageTitle>{t("settings.general.title")}</AdminPageTitle>
       <SettingCardLabel>
         {t("settings.general.auto_discovery")}
       </SettingCardLabel>
@@ -117,8 +118,6 @@ export default function GeneralSettings() {
           </Flex>
         </Flex>
       </SettingCardCollapse>
-      <SettingCardLabel>{t("settings.database.title")}</SettingCardLabel>
-      <DatabaseMaintenanceCard />
     </>
   );
 }

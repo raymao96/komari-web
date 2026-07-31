@@ -1,4 +1,5 @@
 import Loading from "@/components/loading";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
 import {
   Table,
@@ -53,11 +54,11 @@ const InnerLayout = () => {
     return <div>{error || nodeDetailError}</div>;
   }
   return (
-    <Flex direction="column" gap="4" className="p-4">
-      <div className="flex justify-between items-center">
-        <label className="text-2xl font-bold">
+    <Flex direction="column" gap="4" className="p-0 md:p-4">
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <AdminPageTitle>
           {t("notification.load.title")}
-        </label>
+        </AdminPageTitle>
         <AddButton />
       </div>
 

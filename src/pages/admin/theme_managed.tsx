@@ -16,6 +16,7 @@ import {
   THEME_CONFIGURATION_MANAGED,
   type ThemeConfiguration,
 } from "@/utils/themeConfiguration";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 interface ThemeFieldBase {
   name?: I18nText; // 显示名（字符串或多语言字典）
@@ -24,6 +25,7 @@ interface ThemeFieldBase {
   key?: string; // 对应设置键（title 无需）
   default?: any; // 默认值
   options?: string; // 仅 select 支持，逗号分隔
+  optionLabels?: Record<string, I18nText>; // 可选的多语言显示文本，不改变实际保存值
   required?: boolean;
 }
 
@@ -157,15 +159,15 @@ const ThemeManaged: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" gap="4" className="p-2 md:p-4">
-      <Flex justify="between" align="center">
-        <Heading size="4">
+    <Flex direction="column" gap="4" className="p-0 md:p-4">
+      <Flex justify="between" align="center" gap="3" wrap="wrap">
+        <AdminPageTitle>
           {theme
             ? t("theme.manage_with_name", {
                 name: themeDisplayName,
               })
             : t("theme.manage")}
-        </Heading>
+        </AdminPageTitle>
         {fields.length > 0 && (
           <Button onClick={saveAll} disabled={saving}>
             {t("common.save")}
@@ -213,7 +215,15 @@ const ThemeManaged: React.FC = () => {
                 .split(",")
                 .map((s) => s.trim())
                 .filter(Boolean)
-                .map((o) => ({ value: o }));
+                .map((o) => ({
+                  value: o,
+                  label: resolveI18nText(
+                    f.optionLabels?.[o],
+                    currentLanguage,
+                  ),
+                }));
+              const selectedLabel =
+                opts.find((option) => option.value === val)?.label || val;
               return (
                 <SettingCardSelect
                   key={f.key}
@@ -222,7 +232,7 @@ const ThemeManaged: React.FC = () => {
                   value={val}
                   options={opts}
                   OnSave={(v) => handleValueChange(f.key!, v)}
-                  label={val || t("common.select")}
+                  label={selectedLabel || t("common.select")}
                 />
               );
             }

@@ -13,6 +13,8 @@ import {
 } from "@radix-ui/themes";
 import { Github, Globe, User } from "lucide-react";
 import Loading from "@/components/loading";
+import { SettingCardLabel } from "@/components/admin/SettingCard";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 const Account = () => <InnerLayout />;
 
@@ -183,10 +185,10 @@ const InnerLayout = () => {
     }
   };
   return (
-    <Flex gap="4" direction="column" align="start">
-      <Flex gap="4" direction="row" className="p-4" wrap="wrap">
+    <Flex gap="3" direction="column" align="stretch">
+      <Flex gap="3" direction="column" className="w-full">
         <Flex gap="2" direction="column" className="w-full">
-          <label className="text-2xl font-bold">{t("account.title")}</label>
+          <AdminPageTitle>{t("account.title")}</AdminPageTitle>
           <label className="text-lg">
             {t("account.greeting", { username: account?.username })}
           </label>
@@ -256,15 +258,15 @@ const InnerLayout = () => {
           </form>
         </Flex>
         <Flex direction="column" className="gap-2">
-          <label className="font-bold text-2xl">2FA</label>
+          <SettingCardLabel>2FA</SettingCardLabel>
           {account?.["2fa_enabled"] ? (
             <TwoFactorEnabled />
           ) : (
             <TwoFactorDisabled></TwoFactorDisabled>
           )}
-          <label className="font-bold text-2xl mt-2">
+          <SettingCardLabel>
             {t("settings.sso.title")}
-          </label>
+          </SettingCardLabel>
 
           {/* SSO账户绑定/解绑 */}
           <div className="mb-8 flex flex-col gap-4 ">
