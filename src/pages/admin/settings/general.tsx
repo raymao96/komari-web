@@ -181,7 +181,7 @@ const ApiCard = ({ settings }: { settings: SettingsResponse }) => {
           color="mint"
           onClick={() => {
             window.open(
-              "https://komari-document.pages.dev/install/agent-ad.html",
+              "https://nuomiiiii.github.io/komari-document/install/agent-ad.html",
               "_blank"
             );
           }}

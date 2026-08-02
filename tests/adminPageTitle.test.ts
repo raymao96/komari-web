@@ -27,7 +27,6 @@ const adminPages = [
   "src/pages/admin/settings/account-security.tsx",
   "src/pages/admin/settings/general.tsx",
   "src/pages/admin/log.tsx",
-  "src/pages/admin/about.tsx",
 ];
 
 test("all primary admin pages use the shared page title", () => {

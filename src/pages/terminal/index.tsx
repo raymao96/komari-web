@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dialog, IconButton, Select, TextField, Theme } from "@radix-ui/themes";
+import { Button, Dialog, IconButton, TextField, Theme } from "@radix-ui/themes";
 import { Plus, Server, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import {
@@ -24,6 +24,7 @@ import RemoteSession, { type RemoteNode } from "./RemoteSession";
 import { getRemoteLaunchTarget } from "@/utils/remoteLaunch";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import { mergeLatestStatus } from "@/utils/liveData";
+import RemoteNodePicker from "@/components/remote/RemoteNodePicker";
 import "./Terminal.css";
 
 type RemoteTab = {
@@ -285,7 +286,7 @@ export default function TerminalWorkspace() {
       <Toaster theme="dark" />
       <div className="remote-workspace">
         <nav className="remote-tabbar" aria-label="远程服务器标签">
-          <div className="remote-brand"><Server size={17} /><span>Komari 远程管理</span></div>
+          <div className="remote-brand"><Server size={17} /><span>Komari Lite 远程管理</span></div>
           <DndContext sensors={tabSensors} collisionDetection={closestCenter} onDragEnd={reorderTabs}>
             <div className="remote-tabs">
               <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
@@ -331,22 +332,19 @@ export default function TerminalWorkspace() {
       </div>
 
       <Dialog.Root open={pickerOpen} onOpenChange={setPickerOpen}>
-        <Dialog.Content maxWidth="420px">
+        <Dialog.Content className="remote-server-picker-dialog" maxWidth="1040px">
           <Dialog.Title>打开远程服务器</Dialog.Title>
           <Dialog.Description>可重复选择同一台服务器，每个标签都会建立独立的终端与文件会话。</Dialog.Description>
-          <Select.Root value={pickerUUID} onValueChange={setPickerUUID}>
-            <Select.Trigger className="w-full" placeholder="选择服务器" />
-            <Select.Content>
-              {nodes.map((node) => (
-                <Select.Item key={node.uuid} value={node.uuid}>
-                  {online.has(node.uuid) ? "●" : "○"} {node.name}
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Root>
+          <RemoteNodePicker
+            nodes={nodes}
+            onlineSet={online}
+            selectedUUID={pickerUUID}
+            pageSize={6}
+            onSelect={(node) => setPickerUUID(node.uuid)}
+          />
           <div className="remote-dialog-actions">
             <Button variant="soft" onClick={() => setPickerOpen(false)}>取消</Button>
-            <Button disabled={!pickerUUID} onClick={() => { openNode(pickerUUID); setPickerOpen(false); }}>打开</Button>
+            <Button disabled={!pickerUUID || !online.has(pickerUUID)} onClick={() => { openNode(pickerUUID); setPickerOpen(false); }}>打开</Button>
           </div>
         </Dialog.Content>
       </Dialog.Root>

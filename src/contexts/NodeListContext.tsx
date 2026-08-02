@@ -22,6 +22,7 @@ export type NodeBasicInfo = {
   gpu_name: string;
   /** 地区标识 */
   region: string;
+  region_override: string;
   /** 总内存(字节) */
   mem_total: number;
   /** 总交换空间(字节) */
@@ -47,6 +48,9 @@ export type NodeBasicInfo = {
   traffic_limit_type: undefined | "sum" | "max" | "min" | "up" | "down";
   /** Monthly traffic reset day. 0 disables reset; null follows Agent config. */
   traffic_reset_day?: number | null;
+  traffic_reset_allowance: number;
+  effective_traffic_limit: number;
+  effective_traffic_type: "sum" | "max" | "min" | "up" | "down";
   /** 过期时间 */
   expired_at: string;
   /** 创建时间 */
@@ -122,6 +126,7 @@ export const NodeListProvider: React.FC<{ children: React.ReactNode }> = ({
           kernel_version: n.kernel_version,
           gpu_name: n.gpu_name,
           region: n.region,
+          region_override: n.region_override ?? "",
           mem_total: n.mem_total,
           swap_total: n.swap_total,
           disk_total: n.disk_total,
@@ -136,6 +141,9 @@ export const NodeListProvider: React.FC<{ children: React.ReactNode }> = ({
           traffic_limit: n.traffic_limit ?? 0,
           traffic_limit_type: n.traffic_limit_type,
           traffic_reset_day: n.traffic_reset_day ?? null,
+          traffic_reset_allowance: n.traffic_reset_allowance ?? 0,
+          effective_traffic_limit: n.effective_traffic_limit ?? n.traffic_limit ?? 0,
+          effective_traffic_type: n.effective_traffic_type ?? n.traffic_limit_type ?? "sum",
           expired_at: n.expired_at ?? "",
           created_at: n.created_at ?? "",
           updated_at: n.updated_at ?? "",

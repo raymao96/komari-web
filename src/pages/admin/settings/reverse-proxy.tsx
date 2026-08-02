@@ -11,19 +11,486 @@ import {
   type CloudflaredStatus,
 } from "@/lib/cloudflared";
 import {
+  buildHTTPFallbackURL,
+  buildHTTPSRedirectURL,
+  getHTTPSSettings,
+  classifyHTTPSError,
+  reloadHTTPSCertificate,
+  updateHTTPSSettings,
+  type HTTPSSettings,
+  type HTTPSStatus,
+} from "@/lib/https";
+import {
   Badge,
   Button,
+  Callout,
   Dialog,
   Flex,
   IconButton,
+  Switch,
+  Tabs,
   Text,
   TextArea,
   TextField,
 } from "@radix-ui/themes";
-import { Eye, EyeOff, Play, RefreshCw, Square } from "lucide-react";
+import {
+  Cloud,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Play,
+  RefreshCw,
+  Save,
+  Square,
+} from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+
+type ReverseProxyTab = "https" | "cloudflare";
+
+export default function ReverseProxySettings() {
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = React.useState<ReverseProxyTab>("https");
+
+  return (
+    <Flex direction="column" gap="3">
+      <AdminPageTitle>
+        {t("settings.reverse_proxy.title", "Reverse Proxy")}
+      </AdminPageTitle>
+      <Tabs.Root
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ReverseProxyTab)}
+      >
+        <div className="w-full overflow-x-auto pb-1">
+          <Tabs.List className="w-max min-w-full">
+            <Tabs.Trigger value="https" className="min-w-[9rem] flex-1">
+              <LockKeyhole size={15} />
+              {t("settings.reverse_proxy.https_tab", "Built-in HTTPS")}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="cloudflare" className="min-w-[9rem] flex-1">
+              <Cloud size={15} />
+              {t(
+                "settings.reverse_proxy.cloudflare_title",
+                "Cloudflare Tunnel",
+              )}
+            </Tabs.Trigger>
+          </Tabs.List>
+        </div>
+        <Tabs.Content value="https" className="pt-3">
+          {activeTab === "https" ? <HTTPSPanel /> : null}
+        </Tabs.Content>
+        <Tabs.Content value="cloudflare" className="pt-3">
+          {activeTab === "cloudflare" ? <CloudflareTunnelPanel /> : null}
+        </Tabs.Content>
+      </Tabs.Root>
+    </Flex>
+  );
+}
+
+const emptyHTTPSSettings: HTTPSSettings = {
+  https_enabled: false,
+  https_listen: ":35938",
+  https_redirect_http: false,
+  https_certificate_path: "./data/tls/server.crt",
+  https_private_key_path: "./data/tls/server.key",
+};
+
+const emptyHTTPSStatus: HTTPSStatus = {
+  enabled: false,
+  running: false,
+  ready: false,
+  listener_ipv4: false,
+  listener_ipv6: false,
+  listener_ipv4_available: true,
+  listener_ipv6_available: true,
+  listener_probe_done: true,
+  listen: ":35938",
+  domains: [],
+};
+
+function extractListenPort(listen: string): string {
+  const match = listen.trim().match(/:(\d+)$/);
+  return match?.[1] ?? "35938";
+}
+
+function HTTPSPanel() {
+  const { t, i18n } = useTranslation();
+  const [settings, setSettings] = React.useState(emptyHTTPSSettings);
+  const [status, setStatus] = React.useState(emptyHTTPSStatus);
+  const [port, setPort] = React.useState("35938");
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [reloading, setReloading] = React.useState(false);
+
+  const localizedError = React.useCallback((error: unknown) => {
+    const key = classifyHTTPSError(error);
+    const messages = {
+      certificate_required: t(
+        "settings.reverse_proxy.https_certificate_required",
+        "请先配置有效的证书和私钥，再启用内置 HTTPS。",
+      ),
+      certificate_invalid: t(
+        "settings.reverse_proxy.https_certificate_invalid",
+        "证书或私钥无效，请检查文件是否匹配。",
+      ),
+      certificate_expired: t(
+        "settings.reverse_proxy.https_certificate_expired",
+        "证书已过期，请更换有效证书。",
+      ),
+      port_unavailable: t(
+        "settings.reverse_proxy.https_port_unavailable",
+        "HTTPS 端口不可用，请检查端口格式或占用情况。",
+      ),
+      apply_failed: t(
+        "settings.reverse_proxy.https_apply_failed",
+        "HTTPS 配置未能生效，请检查证书、私钥和监听端口。",
+      ),
+    };
+    return messages[key];
+  }, [t]);
+
+  const refresh = React.useCallback(async (silent = false, syncForm = false) => {
+    try {
+      const payload = await getHTTPSSettings();
+      setStatus(payload.status);
+      if (syncForm) {
+        setSettings(payload.settings);
+        setPort(extractListenPort(payload.settings.https_listen));
+      }
+    } catch (error) {
+      if (!silent) {
+        toast.error(error instanceof Error ? error.message : String(error));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refresh(false, true);
+    const timer = window.setInterval(() => void refresh(true), 5000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
+
+  const save = async () => {
+    const numericPort = Number.parseInt(port, 10);
+    if (!Number.isInteger(numericPort) || numericPort < 1 || numericPort > 65535) {
+      toast.error(
+        t("settings.reverse_proxy.invalid_https_port", "Invalid HTTPS port"),
+      );
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = await updateHTTPSSettings({
+        ...settings,
+        https_listen: `:${numericPort}`,
+      });
+      setSettings(payload.settings);
+      setStatus(payload.status);
+      setPort(extractListenPort(payload.settings.https_listen));
+      toast.success(t("settings.settings_saved"));
+      const fallbackURL = buildHTTPFallbackURL(
+        payload.http_origin,
+        window.location,
+      );
+      if (!payload.settings.https_enabled && fallbackURL) {
+        window.location.replace(fallbackURL);
+        return;
+      }
+      const secureURL = buildHTTPSRedirectURL(
+        payload.https_origin,
+        window.location,
+      );
+      if (
+        payload.settings.https_enabled &&
+        payload.settings.https_redirect_http &&
+        payload.status.running &&
+        payload.status.ready &&
+        secureURL
+      ) {
+        window.location.replace(secureURL);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(localizedError(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reloadCertificate = async () => {
+    setReloading(true);
+    try {
+      setStatus(await reloadHTTPSCertificate());
+      toast.success(
+        t(
+          "settings.reverse_proxy.certificate_reload_success",
+          "Certificate reloaded",
+        ),
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error(localizedError(error));
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  if (loading) {
+    return <SettingsPageSkeleton />;
+  }
+
+  const date = (value?: string) => {
+    if (!value) return t("common.none", "None");
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() <= 1) {
+      return t("common.none", "None");
+    }
+    return new Intl.DateTimeFormat(i18n.language, {
+      dateStyle: "medium",
+      timeStyle: "medium",
+    }).format(parsed);
+  };
+
+  const listenPort = status.listen.match(/:(\d+)$/)?.[1] ?? status.listen;
+  const listenerBadge = (family: "IPv4" | "IPv6", active: boolean) => {
+    if (active) {
+      return (
+        <Badge key={family} variant="soft" color="green">
+          {t("settings.reverse_proxy.listener_ready", "{{family}} listening", { family })}
+        </Badge>
+      );
+    }
+    if (status.running && !status.listener_probe_done) {
+      return (
+        <Badge key={family} variant="soft" color="gray">
+          {t("settings.reverse_proxy.listener_checking", "Checking {{family}}", { family })}
+        </Badge>
+      );
+    }
+    return (
+      <Badge key={family} variant="soft" color={status.running ? "orange" : "gray"}>
+        {t("settings.reverse_proxy.listener_unavailable", "{{family}} not listening", { family })}
+      </Badge>
+    );
+  };
+
+  return (
+    <Flex direction="column" gap="3">
+      <SettingCard
+        title={t("settings.reverse_proxy.https_status", "HTTPS status")}
+        description={t(
+          "settings.reverse_proxy.https_status_description",
+          "Runtime and certificate status",
+        )}
+        direction="column"
+      >
+        <Flex direction="column" gap="3" className="w-full pt-3">
+          <Flex gap="2" wrap="wrap">
+            <Badge variant="soft" color={status.running ? "green" : "gray"}>
+              {status.running
+                ? t("settings.reverse_proxy.running", "Running")
+                : t("settings.reverse_proxy.stopped", "Stopped")}
+            </Badge>
+            <Badge
+              variant="soft"
+              color={status.ready ? (status.running ? "green" : "blue") : "orange"}
+            >
+              {status.ready
+                ? status.running
+                  ? t("settings.reverse_proxy.certificate_ready", "Certificate ready")
+                  : t("settings.reverse_proxy.certificate_pending_enable", "Certificate ready to enable")
+                : t("settings.reverse_proxy.certificate_waiting", "Certificate not configured")}
+            </Badge>
+            {status.listener_ipv4_available
+              ? listenerBadge("IPv4", status.listener_ipv4)
+              : null}
+            {status.listener_ipv6_available
+              ? listenerBadge("IPv6", status.listener_ipv6)
+              : null}
+            {status.listen ? (
+              <Badge variant="soft">
+                {t("settings.reverse_proxy.listener_port", "Port {{port}}", { port: listenPort })}
+              </Badge>
+            ) : null}
+          </Flex>
+          {status.error ? (
+            <Callout.Root color="red" size="1">
+              <Callout.Text>{localizedError(status.error)}</Callout.Text>
+            </Callout.Root>
+          ) : null}
+          <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+            <StatusValue
+              label={t("settings.reverse_proxy.certificate_domains", "Domains")}
+              value={status.domains?.join(", ") || t("common.none", "None")}
+            />
+            <StatusValue
+              label={t("settings.reverse_proxy.certificate_issuer", "Issuer")}
+              value={status.issuer || t("common.none", "None")}
+            />
+            <StatusValue
+              label={t("settings.reverse_proxy.certificate_expires", "Expires")}
+              value={date(status.expires_at)}
+            />
+            <StatusValue
+              label={t("settings.reverse_proxy.last_certificate_check", "Last check")}
+              value={date(status.last_checked_at)}
+            />
+          </div>
+        </Flex>
+      </SettingCard>
+
+      <SettingCard
+        title={t("settings.reverse_proxy.enable_https", "Enable built-in HTTPS")}
+        description={t(
+          "settings.reverse_proxy.enable_https_description",
+          "When enabled, Komari Lite provides HTTPS access for both the web UI and Agent APIs.",
+        )}
+      >
+        <SettingCard.Action>
+          <Switch
+            checked={settings.https_enabled}
+            onCheckedChange={(checked) =>
+              setSettings((current) => ({ ...current, https_enabled: checked }))
+            }
+          />
+        </SettingCard.Action>
+      </SettingCard>
+
+      <SettingCard
+        title={t("settings.reverse_proxy.https_port", "HTTPS port")}
+        description={t(
+          "settings.reverse_proxy.https_port_description",
+          "Docker deployments can map a public port to this port.",
+        )}
+      >
+        <SettingCard.Action>
+          <TextField.Root
+            type="number"
+            min="1"
+            max="65535"
+            value={port}
+            onChange={(event) => setPort(event.target.value)}
+            className="w-28"
+          />
+        </SettingCard.Action>
+      </SettingCard>
+
+      <SettingCard
+        title={t(
+          "settings.reverse_proxy.redirect_http",
+          "Redirect HTTP to HTTPS",
+        )}
+        description={t(
+          "settings.reverse_proxy.redirect_http_description",
+          "Redirect only after HTTPS and its certificate are ready. Enable this after testing is complete.",
+        )}
+      >
+        <SettingCard.Action>
+          <Switch
+            checked={settings.https_redirect_http}
+            onCheckedChange={(checked) =>
+              setSettings((current) => ({
+                ...current,
+                https_redirect_http: checked,
+              }))
+            }
+          />
+        </SettingCard.Action>
+      </SettingCard>
+
+      <SettingCard
+        title={t("settings.reverse_proxy.certificate_paths", "Certificate paths")}
+        description={t(
+          "settings.reverse_proxy.certificate_paths_description",
+          "Komari Lite reads the certificate and private key from the server. Docker users should mount the certificate directory first and enter its path inside the container.",
+        )}
+        direction="column"
+      >
+        <Flex direction="column" gap="3" className="w-full pt-3">
+          <Field
+            label={t("settings.reverse_proxy.certificate_path", "Certificate path")}
+            value={settings.https_certificate_path}
+            onChange={(value) =>
+              setSettings((current) => ({
+                ...current,
+                https_certificate_path: value,
+              }))
+            }
+          />
+          <Field
+            label={t("settings.reverse_proxy.private_key_path", "Private key path")}
+            value={settings.https_private_key_path}
+            onChange={(value) =>
+              setSettings((current) => ({
+                ...current,
+                https_private_key_path: value,
+              }))
+            }
+          />
+          <Flex>
+            <Button
+              variant="soft"
+              disabled={reloading || !status.running}
+              onClick={() => void reloadCertificate()}
+            >
+              <RefreshCw size={16} className={reloading ? "animate-spin" : ""} />
+              {t("settings.reverse_proxy.reload_certificate", "Reload certificate")}
+            </Button>
+          </Flex>
+        </Flex>
+      </SettingCard>
+
+      <Flex justify="end">
+        <Button disabled={saving} onClick={() => void save()}>
+          <Save size={16} />
+          {t("common.save", "Save")}
+        </Button>
+      </Flex>
+    </Flex>
+  );
+}
+
+function StatusValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <Text size="1" color="gray" className="block">
+        {label}
+      </Text>
+      <Text size="2" weight="medium" className="block break-words">
+        {value}
+      </Text>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: "text" | "email";
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium">{label}</label>
+      <TextField.Root
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
 
 const emptyStatus: CloudflaredStatus = {
   installed: false,
@@ -35,7 +502,7 @@ const emptyStatus: CloudflaredStatus = {
   envTokenPresent: false,
 };
 
-export default function ReverseProxySettings() {
+function CloudflareTunnelPanel() {
   const { t } = useTranslation();
   const { settings, loading: settingsLoading, error: settingsError } =
     useSettings();
@@ -130,10 +597,6 @@ export default function ReverseProxySettings() {
 
   return (
     <Flex direction="column" gap="4">
-      <AdminPageTitle>
-        {t("settings.reverse_proxy.title", "Reverse Proxy")}
-      </AdminPageTitle>
-
       <SettingCard
         title={t(
           "settings.reverse_proxy.cloudflare_title",
@@ -141,7 +604,7 @@ export default function ReverseProxySettings() {
         )}
         description={t(
           "settings.reverse_proxy.cloudflare_description",
-          "Start and manage cloudflared directly from the Komari settings panel."
+          "Start and manage cloudflared directly from the Komari Lite settings panel."
         )}
         direction="column"
       >
@@ -186,7 +649,7 @@ export default function ReverseProxySettings() {
             <Text size="2" color="gray">
               {t(
                 "settings.reverse_proxy.env_token_hint",
-                "Environment variable `KOMARI_CLOUDFLARED_TOKEN` is present. Komari will try to restore cloudflared automatically on restart."
+                "Environment variable `KOMARI_CLOUDFLARED_TOKEN` is present. Komari Lite will try to restore cloudflared automatically on restart."
               )}
             </Text>
           ) : null}
@@ -378,7 +841,7 @@ export default function ReverseProxySettings() {
           <Dialog.Description>
             {t(
               "settings.reverse_proxy.stop_dialog_description",
-              "If you are currently accessing Komari through this tunnel, stopping cloudflared may immediately disconnect your session."
+              "If you are currently accessing Komari Lite through this tunnel, stopping cloudflared may immediately disconnect your session."
             )}
           </Dialog.Description>
 

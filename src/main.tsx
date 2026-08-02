@@ -29,6 +29,7 @@ import { NodeListProvider } from "./contexts/NodeListContext";
 import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import FullPageLoading from "./components/FullPageLoading";
+import DocumentTitle from "./components/DocumentTitle";
 
 const AdminRoutePreloader = () => {
   const { account } = useAccount();
@@ -108,15 +109,17 @@ const App = () => {
           }}
         >
 		{isRestrictedGuideRoute ? (
-		  <>
+		  <PublicInfoProvider>
+			<DocumentTitle />
 			<Toaster />
 			<Suspense fallback={<Loading />}>{routing}</Suspense>
-		  </>
+		  </PublicInfoProvider>
 		) : (
 		  <AccountProvider>
 			<AdminRoutePreloader />
 			<RPC2Provider>
 			  <PublicInfoProvider>
+				<DocumentTitle />
 				<NodeListProvider>
 				  <Toaster />
 				  <OfflineIndicator />

@@ -62,14 +62,26 @@ test("keeps the admin navigation in the intended groups", () => {
     ),
   );
 
+  const remoteManagement = menuConfig.menu.find(
+    (item) => item.path === "/admin/remote-management",
+  );
+  assert.deepEqual(
+    remoteManagement?.children?.map((item) => item.path),
+    [
+      "/admin/exec",
+      "/admin/terminal",
+      "/admin/settings/xtermjs",
+    ],
+  );
+
   assert.deepEqual(
     menuConfig.footer.map((item) => item.path),
     [
       "/admin/logs",
-      "https://komari-document.pages.dev/",
-      "/admin/about",
+      "https://nuomiiiii.github.io/komari-document/",
     ],
   );
+  assert.equal(allPaths(menuConfig.footer).includes("/admin/about"), false);
 });
 
 test("places dynamic theme configuration inside the appearance group", () => {

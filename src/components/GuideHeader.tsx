@@ -1,8 +1,9 @@
-import { Flex, Text } from "@radix-ui/themes";
+import { Flex } from "@radix-ui/themes";
 
 import ColorSwitch from "./ColorSwitch";
 import LanguageSwitch from "./Language";
 import ThemeSwitch from "./ThemeSwitch";
+import KomariLiteBrand from "./KomariLiteBrand";
 
 export default function GuideHeader() {
   return (
@@ -10,12 +11,10 @@ export default function GuideHeader() {
       <Flex align="center" gap="2">
         <img
           src="/assets/logo.png?v=869680cc"
-          alt="Komari"
+          alt="Komari Lite"
           className="size-9 object-contain"
         />
-        <Text size="3" weight="bold">
-          Komari
-        </Text>
+        <KomariLiteBrand size="sm" />
       </Flex>
       <Flex gap="2">
         <LanguageSwitch />

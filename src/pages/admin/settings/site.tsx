@@ -4,7 +4,6 @@ import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import {
   SettingCardButton,
   SettingCardCollapse,
-  SettingCardIconButton,
   SettingCardLabel,
   SettingCardLongTextInput,
   SettingCardShortTextInput,
@@ -12,7 +11,6 @@ import {
 } from "@/components/admin/SettingCard";
 import { toast } from "sonner";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
-import { DownloadIcon } from "lucide-react";
 import { useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import UploadDialog from "@/components/UploadDialog";
@@ -41,6 +39,33 @@ export default function SiteSettings() {
   const [restoring, setRestoring] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreXhr, setRestoreXhr] = useState<XMLHttpRequest | null>(null);
+
+  const downloadBackup = async (scope: "full" | "config") => {
+    const response = await fetch(`/api/admin/download/backup?scope=${scope}`);
+    if (!response.ok) {
+      const body = await response.text();
+      let message = body || `HTTP ${response.status}`;
+      try {
+        message = JSON.parse(body)?.message || message;
+      } catch {
+        // Keep the server response as-is when it is not JSON.
+      }
+      toast.error(message);
+      throw new Error(message);
+    }
+
+    const disposition = response.headers.get("content-disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+      || `Komari-Lite-${scope}.zip`;
+    const objectURL = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = objectURL;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectURL), 1_000);
+  };
 
   const uploadBackup = async (file: File) => {
     if (!file.name.endsWith(".zip")) {
@@ -450,15 +475,20 @@ export default function SiteSettings() {
         </Flex>
       </SettingCardCollapse>
       <SettingCardLabel>{t("settings.site.backup")}</SettingCardLabel>
-      <SettingCardIconButton
-        title={t("settings.site.backup_download")}
-        description={t("settings.site.backup_download_description")}
-        onClick={() => {
-          window.open("/api/admin/download/backup", "_blank");
-        }}
+      <SettingCardButton
+        title={t("settings.site.backup_full_download")}
+        description={t("settings.site.backup_full_download_description")}
+        onClick={() => downloadBackup("full")}
       >
-        <DownloadIcon size={16} />
-      </SettingCardIconButton>
+        {t("common.export")}
+      </SettingCardButton>
+      <SettingCardButton
+        title={t("settings.site.backup_config_download")}
+        description={t("settings.site.backup_config_download_description")}
+        onClick={() => downloadBackup("config")}
+      >
+        {t("common.export")}
+      </SettingCardButton>
       <SettingCardButton
         title={t("settings.site.backup_restore")}
         description={t("settings.site.backup_restore_description")}

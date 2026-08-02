@@ -25,7 +25,11 @@ import {
 import { toast } from "sonner";
 import type { Record as LiveRecord } from "@/types/LiveData";
 import { formatBytes } from "@/utils/unitHelper";
-import { createRemoteSessionLease, remoteAgentWaitTimeoutMs } from "@/utils/remoteSession";
+import {
+  createRemoteSessionLease,
+  localizeRemoteError,
+  remoteAgentWaitTimeoutMs,
+} from "@/utils/remoteSession";
 import { TerminalContext } from "@/contexts/TerminalContext";
 import {
   defaultXtermjsSettings,
@@ -38,6 +42,11 @@ import FileManager, { type FileManagerHandle } from "./FileManager";
 export type RemoteNode = {
   uuid: string;
   name: string;
+  ipv4?: string;
+  ipv6?: string;
+  group?: string;
+  region?: string;
+  region_override?: string;
   mem_total?: number;
   disk_total?: number;
   remote_control_protected?: boolean;
@@ -375,7 +384,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
           if (response.status === 429) {
             throw new Error("远程会话数量已满，请关闭不用的终端后重试");
           }
-          throw new Error(payload?.message || "无法创建远程会话");
+          throw new Error(localizeRemoteError(payload?.message || "无法创建远程会话"));
         }
         sessionLease = createRemoteSessionLease(payload.data.session_id);
         if (disposed) {
@@ -436,8 +445,9 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
               remoteReadyRef.current = false;
               setRemoteReady(false);
               setConnectionState("error");
-              setConnectionError(message.message || "远程连接失败");
-              terminal.current?.writeln(`\r\n${message.message || "Remote connection failed"}`);
+              const localizedMessage = localizeRemoteError(message.message);
+              setConnectionError(localizedMessage);
+              terminal.current?.writeln(`\r\n${localizedMessage}`);
               sessionLease?.release();
             } else if (message.type?.startsWith("file.")) {
               fileManager.current?.handleMessage(message);

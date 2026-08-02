@@ -15,6 +15,7 @@ export type NodeDetail = {
   ipv4: string;
   ipv6: string;
   region: string;
+  region_override: string;
   mem_total: number;
   swap_total: number;
   disk_total: number;
@@ -25,6 +26,9 @@ export type NodeDetail = {
   public_remark: string;
   remote_control_protected: boolean;
   traffic_reset_day?: number | null;
+  traffic_reset_allowance: number;
+  effective_traffic_limit: number;
+  effective_traffic_type: "sum" | "max" | "min" | "up" | "down";
   group: string | undefined;
   billing_cycle: number;
   expired_at: string;

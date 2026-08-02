@@ -9,11 +9,14 @@ import { VitePWA } from "vite-plugin-pwa";
 import type { Plugin, UserConfig } from "vite";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 
 function localKomariThemePlugin(): Plugin {
   const themeRequestPath = "/themes/default/komari-theme.json";
-  const localThemeFile = path.resolve(__dirname, "komari-theme.json");
+  const localThemeFile = path.resolve(configDir, "komari-theme.json");
 
   return {
     name: "local-komari-theme",
@@ -68,8 +71,8 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         includeManifestIcons: false,
         manifest: {
-          name: "Komari Monitor",
-          short_name: "Komari Monitor",
+          name: "Komari Lite",
+          short_name: "Komari Lite",
           description: "A simple server monitor tool",
           theme_color: "#2563eb",
           background_color: "#ffffff",
@@ -94,10 +97,10 @@ export default defineConfig(({ mode }) => {
         workbox: {
           cleanupOutdatedCaches: true,
           globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
-          navigateFallbackDenylist: [
-            /^\/admin(?:\/|$)/,
-            /^\/terminal(?:\/|$)/,
-          ],
+          // The public document is selected by Komari at request time. A
+          // cached SPA fallback would keep serving the previous theme after
+          // an administrator switches themes.
+          navigateFallback: null,
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/api\./i,
@@ -128,12 +131,12 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: [
-        { find: "@", replacement: path.resolve(__dirname, "./src") },
+        { find: "@", replacement: path.resolve(configDir, "./src") },
         // Force xterm to use the CJS build to avoid a rollup bug where `||=` in
         // xterm.mjs is incorrectly lowered to `void 0||(i={})` with an undeclared `i`,
         // causing `ReferenceError: i is not defined` at requestMode when vi sends DECRQM sequences.
         // Regex to match only the bare specifier, not subpaths like @xterm/xterm/css/xterm.css.
-        { find: /^@xterm\/xterm$/, replacement: path.resolve(__dirname, "node_modules/@xterm/xterm/lib/xterm.js") },
+        { find: /^@xterm\/xterm$/, replacement: path.resolve(configDir, "node_modules/@xterm/xterm/lib/xterm.js") },
       ],
     },
     build: {
@@ -162,21 +165,27 @@ export default defineConfig(({ mode }) => {
     const apiTarget = process.env.VITE_API_TARGET || "http://127.0.0.1:25774";
     process.env.VITE_API_TARGET = apiTarget;
     const apiOrigin = new URL(apiTarget).origin;
+    const proxy = {
+      "/api": {
+        target: apiTarget,
+        changeOrigin: true,
+        rewriteWsOrigin: true,
+        ws: true,
+        headers: {
+          Origin: apiOrigin,
+        },
+      },
+      "/themes": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+    };
     baseConfig.server = {
+      proxy,
+    };
+    baseConfig.preview = {
       proxy: {
-        "/api": {
-          target: apiTarget,
-          changeOrigin: true,
-          rewriteWsOrigin: true,
-          ws: true,
-          headers: {
-            Origin: apiOrigin,
-          },
-        },
-        "/themes": {
-          target: apiTarget,
-          changeOrigin: true,
-        },
+        ...proxy,
       },
     };
   }

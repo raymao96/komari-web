@@ -582,6 +582,48 @@
   margin-top: 18px;
 }
 
+.remote-server-picker-dialog.rt-DialogContent {
+  display: flex;
+  width: min(94vw, 1040px);
+  max-height: calc(100dvh - 24px);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.remote-server-picker-dialog .remote-node-picker {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  margin-top: 18px;
+}
+
+.remote-server-picker-dialog .remote-node-picker-results {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.remote-server-picker-dialog .remote-node-picker-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.remote-server-picker-dialog .remote-node-picker-card {
+  min-height: 204px;
+}
+
+@media (max-width: 760px) {
+  .remote-server-picker-dialog.rt-DialogContent {
+    width: min(94vw, 560px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .remote-server-picker-dialog .remote-node-picker-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .remote-dialog-error {
   margin: 8px 0 0;
   color: #ff8f8f;

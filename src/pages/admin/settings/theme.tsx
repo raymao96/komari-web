@@ -24,6 +24,7 @@ import {
   Search,
   AlertTriangle,
   Loader2,
+  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -49,6 +50,19 @@ interface Theme {
   active: boolean;
   createdAt: string;
   configuration?: any;
+}
+
+const THEME_CHANGE_STORAGE_KEY = "komari-active-theme-changed";
+
+async function clearThemeNavigationCache() {
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+  if ("caches" in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+  }
 }
 
 const ThemePage = () => {
@@ -259,6 +273,16 @@ const ThemePage = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      await clearThemeNavigationCache();
+      try {
+        window.localStorage.setItem(
+          THEME_CHANGE_STORAGE_KEY,
+          `${themeShort}:${Date.now()}`,
+        );
+      } catch {
+        // Theme switching still works when browser storage is unavailable.
+      }
+
       // 刷新 settings 以获取最新的主题设置
       await refetchSettings();
 
@@ -271,7 +295,6 @@ const ThemePage = () => {
       );
 
       const theme = themes.find((t) => t.short === themeShort);
-      console.log(theme);
       if (
         theme &&
         getThemeConfigurationType(theme.configuration) ===
@@ -453,7 +476,15 @@ const ThemePage = () => {
     <Box className="space-y-6">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
         <AdminPageTitle>{t("theme.title")}</AdminPageTitle>
-        <Flex gap="2">
+        <Flex gap="2" wrap="wrap" className="w-full sm:w-auto">
+          <Button
+            variant="soft"
+            className="gap-2"
+            onClick={() => navigate("/admin/market/themes")}
+          >
+            <Store size={16} />
+            {t("market.themes")}
+          </Button>
           {activeThemeHasConfig && (
             <Button
               variant="soft"
@@ -920,15 +951,6 @@ const ThemePage = () => {
         </Dialog.Content>
       </Dialog.Root>
 
-      <label className="text-muted-foreground text-sm">
-        {t("theme.find_more")}
-        <a
-          href="/admin/market/themes"
-          className="text-accent-9"
-        >
-          {t("market.themes")}
-        </a>
-      </label>
     </Box>
   );
 };

@@ -185,15 +185,15 @@ const Node = React.memo(
               {formatBytes(basic.disk_total)})
             </Text>
           </Flex>
-          {basic.traffic_limit > 0 ? (
+          {basic.effective_traffic_limit > 0 ? (
             <Flex justify="between" hidden={isMobile} direction="column">
               <UsageBar
                 label={t("nodeCard.totalTraffic")}
                 value={getTrafficPercentage(
                   liveData.network.totalUp,
                   liveData.network.totalDown,
-                  basic.traffic_limit,
-                  basic.traffic_limit_type ?? "sum",
+                  basic.effective_traffic_limit,
+                  basic.effective_traffic_type ?? "sum",
                 )}
                 max={Infinity}
               />
@@ -202,10 +202,10 @@ const Node = React.memo(
                   ↑ {totalUpload} ↓ {totalDownload}
                 </Text>
                 <Text size="1" className="md:block hidden" color="gray">
-                  {basic.traffic_limit_type &&
-                    basic.traffic_limit_type.charAt(0).toUpperCase() +
-                      basic.traffic_limit_type.slice(1)}
-                  ({formatBytes(basic.traffic_limit)})
+                  {basic.effective_traffic_type &&
+                    basic.effective_traffic_type.charAt(0).toUpperCase() +
+                      basic.effective_traffic_type.slice(1)}
+                  ({formatBytes(basic.effective_traffic_limit)})
                 </Text>
               </Flex>
             </Flex>
@@ -243,15 +243,15 @@ const Node = React.memo(
               </Text>
             </Flex>
           </Flex>
-          {basic.traffic_limit > 0 && isMobile && (
+          {basic.effective_traffic_limit > 0 && isMobile && (
             <UsageBar
-              label={`${basic.traffic_limit_type && basic.traffic_limit_type.charAt(0).toUpperCase() + basic.traffic_limit_type.slice(1)}(${formatBytes(basic.traffic_limit)})`}
+              label={`${basic.effective_traffic_type && basic.effective_traffic_type.charAt(0).toUpperCase() + basic.effective_traffic_type.slice(1)}(${formatBytes(basic.effective_traffic_limit)})`}
               max={Infinity}
               value={getTrafficPercentage(
                 liveData.network.totalUp,
                 liveData.network.totalDown,
-                basic.traffic_limit,
-                basic.traffic_limit_type ?? "sum",
+                basic.effective_traffic_limit,
+                basic.effective_traffic_type ?? "sum",
               )}
             />
           )}

@@ -8,13 +8,16 @@ import {
   IconButton,
   Text,
 } from "@radix-ui/themes";
-import { AnimatePresence, motion } from "framer-motion"; // 引入 Framer Motion
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation /*useNavigate*/ } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import ColorSwitch from "../ColorSwitch";
 import LanguageSwitch from "../Language";
 import ThemeSwitch from "../ThemeSwitch";
+import KomariLiteBrand from "../KomariLiteBrand";
 import { useIsMobile } from "@/hooks/use-mobile";
 import menuConfig from "../../config/menuConfig.json";
 import type { MenuItem } from "../../types/menu";
@@ -27,6 +30,7 @@ import {
   CircleFadingArrowUp,
   Download,
   ExternalLink,
+  Github,
   LoaderCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -52,6 +56,15 @@ const parsedMenuConfig = menuConfig as {
 const baseMenuItems = parsedMenuConfig.menu;
 const footerMenuItems = parsedMenuConfig.footer ?? [];
 const DESKTOP_SIDEBAR_WIDTH = 212;
+const MOBILE_SIDEBAR_WIDTH = "clamp(184px, 42vw, 244px)";
+const MOBILE_SIDEBAR_OPEN_TRANSITION = {
+  duration: 0.18,
+  ease: "easeOut",
+} as const;
+const MOBILE_SIDEBAR_CLOSE_TRANSITION = {
+  duration: 0.16,
+  ease: "easeIn",
+} as const;
 
 interface AdminPanelBarProps {
   content: ReactNode;
@@ -123,6 +136,39 @@ function formatVersion(version?: string | null, hash?: string | null) {
     : version;
 }
 
+function SidebarVersionLabel({
+  version,
+  hash,
+  isMobile,
+}: {
+  version: string;
+  hash?: string | null;
+  isMobile: boolean;
+}) {
+  const snapshot = !isMobile ? version.match(/^snapshot-(.+)$/i) : null;
+  const normalizedHash = hash?.trim();
+  const visibleHash =
+    normalizedHash && normalizedHash !== "unknown" ? normalizedHash : null;
+
+  if (snapshot) {
+    return (
+      <span className="min-w-0 text-sm font-normal leading-5">
+        <span className="block">Snapshot</span>
+        <span className="block break-words">
+          {snapshot[1]}
+          {visibleHash ? ` · ${visibleHash}` : ""}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="min-w-0 whitespace-nowrap text-base font-normal leading-5">
+      {formatVersion(version, hash)}
+    </span>
+  );
+}
+
 function formatReleaseVersion(release?: GithubReleaseInfo | null) {
   if (!release) return "";
   return formatVersion(
@@ -135,6 +181,94 @@ function visibleReleaseBody(body?: string | null) {
   return (body ?? "")
     .replace(/<!--\s*komari-version-hash:\s*[a-z0-9]{7}\s*-->/i, "")
     .trim();
+}
+
+function ReleaseMarkdown({ body }: { body?: string | null }) {
+  return (
+    <div className="mt-3 break-words text-[var(--gray-11)]">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h1 className="mb-3 mt-5 border-b pb-2 text-xl font-semibold leading-7 text-foreground first:mt-0">
+              {children}
+            </h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="mb-2 mt-5 border-b pb-2 text-lg font-semibold leading-7 text-foreground first:mt-0">
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="mb-2 mt-4 text-base font-semibold leading-6 text-foreground first:mt-0">
+              {children}
+            </h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="mb-2 mt-4 text-sm font-semibold text-foreground first:mt-0">
+              {children}
+            </h4>
+          ),
+          p: ({ children }) => <p className="my-3 leading-6">{children}</p>,
+          ul: ({ children }) => (
+            <ul className="my-3 list-disc space-y-1 pl-6 leading-6">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="my-3 list-decimal space-y-1 pl-6 leading-6">{children}</ol>
+          ),
+          li: ({ children }) => <li className="pl-1">{children}</li>,
+          strong: ({ children }) => (
+            <strong className="font-semibold text-foreground">{children}</strong>
+          ),
+          a: ({ children, href }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[var(--accent-11)] underline underline-offset-2"
+            >
+              {children}
+            </a>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="my-3 border-l-4 border-[var(--gray-a6)] pl-4 text-muted-foreground">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="my-5 border-[var(--gray-a5)]" />,
+          table: ({ children }) => (
+            <div className="my-4 overflow-x-auto rounded-md border border-[var(--gray-a5)]">
+              <table className="w-full min-w-max border-collapse text-left text-sm">
+                {children}
+              </table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="border-b border-r border-[var(--gray-a5)] bg-[var(--gray-a2)] px-3 py-2 font-semibold text-foreground last:border-r-0">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border-b border-r border-[var(--gray-a5)] px-3 py-2 align-top last:border-r-0">
+              {children}
+            </td>
+          ),
+          code: ({ children }) => (
+            <code className="rounded bg-[var(--gray-a3)] px-1.5 py-0.5 font-mono text-[0.9em] text-foreground">
+              {children}
+            </code>
+          ),
+          pre: ({ children }) => (
+            <pre className="my-4 overflow-x-auto rounded-md bg-[var(--gray-a3)] p-3 leading-6">
+              {children}
+            </pre>
+          ),
+        }}
+      >
+        {visibleReleaseBody(body)}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function isReleaseNewer(
@@ -190,6 +324,11 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
   const currentTheme = publicInfo?.theme;
+  const currentVersion =
+    (publicInfo as any)?.version || versionInfo?.version;
+  const currentReleaseURL = currentVersion
+    ? `https://github.com/raymao96/komari/releases/tag/${encodeURIComponent(currentVersion)}`
+    : undefined;
 
   // 动态扩展菜单
   const [extraMenuItems, setExtraMenuItems] = useState<MenuItem[]>([]);
@@ -366,32 +505,43 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   }, [location.pathname, menuItems]);
 
   // 侧边栏动画变体
-  const sidebarVariants = {
-    open: {
-      width: isMobile ? "100vw" : `${DESKTOP_SIDEBAR_WIDTH}px`,
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      },
-    },
-    closed: {
-      width: 0,
-      opacity: isMobile ? 0 : 1, // 移动端完全透明
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      },
-    },
-  } as const;
+  const sidebarVariants = isMobile
+    ? {
+        open: {
+          x: 0,
+          transition: MOBILE_SIDEBAR_OPEN_TRANSITION,
+        },
+        closed: {
+          x: "-100%",
+          transition: MOBILE_SIDEBAR_CLOSE_TRANSITION,
+        },
+      }
+    : {
+        open: {
+          width: `${DESKTOP_SIDEBAR_WIDTH}px`,
+          opacity: 1,
+          transition: {
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+          },
+        },
+        closed: {
+          width: 0,
+          opacity: 1,
+          transition: {
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+          },
+        },
+      } as const;
 
   // 内容区域动画变体
   const contentVariants = {
     open: {
-      opacity: isMobile ? 0 : 1,
-      x: isMobile ? "100%" : 0,
+      opacity: 1,
+      x: 0,
       transition: {
         duration: 0.3,
       },
@@ -578,7 +728,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                   ? { height: "auto", opacity: 1 }
                   : { height: 0, opacity: 0 }
               }
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.14 }}
               style={{ overflow: "hidden" }}
             >
               <Flex direction="column" className="ml-4 gap-1">
@@ -636,6 +786,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
           width: "100vw",
           overflow: "auto",
           backgroundColor: "var(--accent-1)",
+          position: "relative",
         }}
       >
         {/* Navbar */}
@@ -646,20 +797,22 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <Flex
-            gap="3"
+            gap={isMobile ? "1" : "3"}
             p="2"
             justify="between"
             align="center"
             className="border-b-1"
           >
             <Flex
-              gap="3"
+              gap={isMobile ? "2" : "3"}
               align="end"
               style={{ minHeight: "calc(32px * var(--scaling))" }}
             >
               <IconButton
                 size="2"
                 variant="ghost"
+                data-testid="mobile-sidebar-trigger"
+                aria-label={t("navigation.open")}
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="shrink-0"
                 style={{
@@ -675,7 +828,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                 rel="noopener noreferrer"
                 className="flex items-end leading-none"
               >
-                <span className="text-2xl font-bold leading-none">Komari</span>
+                <KomariLiteBrand size={isMobile ? "sm" : "md"} />
               </a>
               {updateAvailable && releasesSince.length > 0 && (
                 <Dialog.Root open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
@@ -737,9 +890,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                                 </div>
                               )}
                             </div>
-                            <div className="mt-3 whitespace-pre-wrap break-words leading-6 text-[var(--gray-11)]">
-                              {visibleReleaseBody(r.body)}
-                            </div>
+                            <ReleaseMarkdown body={r.body} />
                           </section>
                         ))}
                       </div>
@@ -786,16 +937,13 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                   </Dialog.Content>
                 </Dialog.Root>
               )}
-              <span
-                className="text-sm text-muted-foreground leading-normal overflow-visible"
-                hidden={isMobile}
-              >
-                {(publicInfo as any)?.version ||
-                  (versionInfo &&
-                    `${versionInfo.version} (${versionInfo.hash})`)}
-              </span>
             </Flex>
-            <Flex gap="3" align="center" overflowX="auto">
+            <Flex
+              gap={isMobile ? "1" : "3"}
+              align="center"
+              overflowX="auto"
+              className="shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               <ThemeSwitch />
               <ColorSwitch />
               <LanguageSwitch />
@@ -808,18 +956,38 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
 
         {/* Sidebar */}
         <AnimatePresence>
+          {isMobile && sidebarOpen && (
+            <motion.button
+              key="mobile-sidebar-backdrop"
+              type="button"
+              aria-label={t("close", "关闭导航")}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setSidebarOpen(false)}
+              className="absolute inset-0 z-[9] cursor-default border-0 bg-[var(--black-a6)] p-0"
+            />
+          )}
           <motion.div
+            key="admin-sidebar"
             variants={sidebarVariants}
-            initial="closed"
+            initial={false}
             animate={sidebarOpen ? "open" : "closed"}
             exit="closed"
             style={{
               backgroundColor: "var(--accent-1)",
+              width: isMobile ? MOBILE_SIDEBAR_WIDTH : undefined,
               height: "100%",
               position: isMobile ? "absolute" : "relative",
+              top: isMobile ? 0 : undefined,
+              left: isMobile ? 0 : undefined,
               zIndex: isMobile ? 10 : 1,
               overflowY: "auto",
               overflowX: "hidden",
+              willChange: isMobile ? "transform" : "width",
+              backfaceVisibility: isMobile ? "hidden" : undefined,
+              pointerEvents: isMobile && !sidebarOpen ? "none" : "auto",
             }}
           >
             <Flex
@@ -830,12 +998,14 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
               align="start"
               style={{
                 height: "100%",
-                minWidth: `${DESKTOP_SIDEBAR_WIDTH}px`,
+                minWidth: isMobile ? "100%" : `${DESKTOP_SIDEBAR_WIDTH}px`,
               }}
             >
               {/* 关闭按钮 */}
               <IconButton
                 variant="soft"
+                data-testid="mobile-sidebar-close"
+                aria-label={t("close", "关闭导航")}
                 style={{
                   display: isMobile ? "flex" : "none",
                   margin: "8px 0px 0px 8px",
@@ -861,6 +1031,32 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                   style={{ width: "100%" }}
                 >
                   {renderMenuItems(footerMenuItems)}
+                  {currentVersion && currentReleaseURL && (
+                      <a
+                        data-testid="sidebar-version"
+                        href={currentReleaseURL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex min-h-10 w-full items-center gap-2 rounded-md border-l-[4px] border-transparent p-2 text-[var(--gray-12)] transition-colors duration-200 hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)] focus-visible:bg-[var(--accent-a3)] focus-visible:text-[var(--accent-11)]"
+                        title={`${t("common.version", "版本")}：${formatVersion(
+                          currentVersion,
+                          versionInfo?.hash,
+                        )}`}
+                      >
+                        <span className="flex h-5 w-4 shrink-0 items-center justify-center">
+                          <Github
+                            className="h-4 w-4"
+                            strokeWidth={1.5}
+                            aria-hidden="true"
+                          />
+                        </span>
+                        <SidebarVersionLabel
+                          version={currentVersion}
+                          hash={versionInfo?.hash}
+                          isMobile={isMobile}
+                        />
+                      </a>
+                    )}
                 </Flex>
               </Flex>
             </Flex>
@@ -873,7 +1069,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
           animate={sidebarOpen ? "open" : "closed"}
           style={{
             backgroundColor: "var(--accent-3)",
-            display: isMobile && sidebarOpen ? "none" : "block",
+            display: "block",
             height: "100%", // Ensure the container takes full height
             minWidth: 0,
             maxWidth: "100%",

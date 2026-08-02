@@ -139,6 +139,7 @@ const AdminGuard = () => {
       >
         <LoginDialog
           autoOpen
+          standalone
           showSettings={false}
           redirectAfterLogin={false}
         />

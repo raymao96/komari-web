@@ -437,6 +437,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   };
 
   const downloadSelected = () => {
+    setContextMenu(null);
     for (const entry of actionableEntries.filter((item) => !item.directory && !item.symlink)) {
       const id = crypto.randomUUID();
       if (!send({ type: "file.download", id, path: entry.path })) {
@@ -744,6 +745,14 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
           </button>
           <button type="button" role="menuitem" disabled={!connected || !currentPath || copiedEntries.length === 0} onClick={() => void pasteCopied()}>
             <ClipboardPaste size={15} />粘贴
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!actionableEntries.some((entry) => !entry.directory && !entry.symlink)}
+            onClick={downloadSelected}
+          >
+            <Download size={15} />下载所选文件
           </button>
           <button type="button" role="menuitem" disabled={actionableEntries.length !== 1} onClick={() => {
             const entry = actionableEntries[0];

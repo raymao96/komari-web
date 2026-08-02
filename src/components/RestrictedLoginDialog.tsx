@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Dialog, Text, TextField } from "@radix-ui/themes";
 import { LoaderCircle, LogIn } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import LoginIdentityHeader from "@/components/LoginIdentityHeader";
 
 export type RestrictedAuthStatus = {
   oauth_enabled: boolean;
@@ -70,42 +71,47 @@ export default function RestrictedLoginDialog({
   return (
     <Dialog.Root open={auth !== null && !auth.logged_in}>
       <Dialog.Content
-        maxWidth="430px"
+        maxWidth="420px"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
-        <Dialog.Title>{t("login.title")}</Dialog.Title>
-        <Dialog.Description>{t("login.desc")}</Dialog.Description>
+        <LoginIdentityHeader dialog />
         {auth?.password_login_enabled && (
           <form
-            className="mt-5 space-y-3"
+            className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
               void login();
             }}
           >
             <label className="block">
-              <Text as="div" size="2" weight="bold" mb="1">
+              <Text as="div" size="2" weight="medium" mb="1">
                 {t("login.username")}
               </Text>
               <TextField.Root
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
+                placeholder={t("login.username_placeholder")}
                 autoComplete="username"
                 autoFocus
                 disabled={busy}
+                size="3"
+                className="text-[15px]"
               />
             </label>
             <label className="block">
-              <Text as="div" size="2" weight="bold" mb="1">
+              <Text as="div" size="2" weight="medium" mb="1">
                 {t("login.password")}
               </Text>
               <TextField.Root
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                placeholder={t("login.password_placeholder")}
                 autoComplete="current-password"
                 disabled={busy}
+                size="3"
+                className="text-[15px]"
               />
             </label>
             {requireTwoFactor && (
@@ -119,6 +125,7 @@ export default function RestrictedLoginDialog({
                   autoComplete="one-time-code"
                   inputMode="numeric"
                   disabled={busy}
+                  size="3"
                 />
               </label>
             )}
@@ -129,6 +136,7 @@ export default function RestrictedLoginDialog({
             )}
             <Button
               type="submit"
+              size="3"
               className="w-full"
               disabled={busy || !username.trim() || !password}
             >

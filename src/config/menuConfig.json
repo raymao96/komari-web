@@ -38,6 +38,11 @@
           "icon": "Code"
         },
         {
+          "labelKey": "terminal.remote_title",
+          "path": "/admin/terminal",
+          "icon": "Terminal"
+        },
+        {
           "labelKey": "navigation.terminal_settings",
           "path": "/admin/settings/xtermjs",
           "icon": "Terminal"
@@ -139,14 +144,9 @@
     },
     {
       "labelKey": "common.documentation",
-      "path": "https://komari-document.pages.dev/",
+      "path": "https://nuomiiiii.github.io/komari-document/",
       "icon": "Book",
       "newTab": true
-    },
-    {
-      "labelKey": "common.about",
-      "path": "/admin/about",
-      "icon": "AtSign"
     }
   ]
 }

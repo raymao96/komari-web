@@ -1,12 +1,14 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { TextField } from "@radix-ui/themes";
+import { ChevronDown } from "lucide-react";
 
 type Primitive = string | number;
 
 export type SelectOption<T extends Primitive = string> = {
   label: string;
   value: T;
+  icon?: React.ReactNode;
   disabled?: boolean;
 };
 
@@ -107,8 +109,13 @@ export function SelectOrInput<T extends Primitive = string>(
     defaultValue ?? ""
   );
   const inputValue = isControlled ? (value as string) : innerValue;
+  const selectedOption = React.useMemo(
+    () => normalizedOptions.find((option) => getValue(option) === inputValue),
+    [getValue, inputValue, normalizedOptions],
+  );
 
   const [open, setOpen] = React.useState(false);
+  const [showAllOptions, setShowAllOptions] = React.useState(false);
   const [highlightIndex, setHighlightIndex] = React.useState<number>(-1);
 
   const allowCustom = (allowCustomInput ?? true) === true;
@@ -116,14 +123,14 @@ export function SelectOrInput<T extends Primitive = string>(
   const filtered = React.useMemo(() => {
     const text = (inputValue ?? "").trim().toLowerCase();
     const base = normalizedOptions;
-    if (!text) return base;
+    if (showAllOptions || !text) return base;
     if (filter) return base.filter((o) => filter(o, inputValue));
     return base.filter((o) => {
       const lbl = getLabel(o).toLowerCase();
       const val = getValue(o).toLowerCase();
       return lbl.includes(text) || val.includes(text);
     });
-  }, [normalizedOptions, inputValue, filter, getLabel, getValue]);
+  }, [normalizedOptions, inputValue, filter, getLabel, getValue, showAllOptions]);
 
   const commit = React.useCallback(
     (next: string, option?: SelectOption<T>) => {
@@ -149,6 +156,7 @@ export function SelectOrInput<T extends Primitive = string>(
       const v = getValue(opt);
       commit(v, opt);
       setOpen(false);
+      setShowAllOptions(false);
     },
     [displayed, getValue, commit]
   );
@@ -157,11 +165,13 @@ export function SelectOrInput<T extends Primitive = string>(
     const v = e.target.value;
     if (!isControlled) setInnerValue(v);
     onChange?.(v);
+    setShowAllOptions(false);
     if (!open) setOpen(true);
     setHighlightIndex(0);
   };
 
   const handleFocus: React.FocusEventHandler<HTMLInputElement> = (e) => {
+    setShowAllOptions(false);
     setOpen(true);
     onFocus?.(e);
   };
@@ -174,6 +184,7 @@ export function SelectOrInput<T extends Primitive = string>(
   const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     onKeyDown?.(e);
     if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setShowAllOptions(true);
       setOpen(true);
       e.preventDefault();
       return;
@@ -194,11 +205,27 @@ export function SelectOrInput<T extends Primitive = string>(
       } else if (allowCustom) {
         commit(inputValue);
         setOpen(false);
+        setShowAllOptions(false);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
+      setShowAllOptions(false);
     }
+  };
+
+  const toggleAllOptions = () => {
+    if (open && showAllOptions) {
+      setOpen(false);
+      setShowAllOptions(false);
+      return;
+    }
+    const selectedIndex = normalizedOptions.findIndex(
+      (option) => getValue(option) === inputValue,
+    );
+    setShowAllOptions(true);
+    setHighlightIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setOpen(true);
   };
 
   // Scroll highlighted into view
@@ -219,6 +246,7 @@ export function SelectOrInput<T extends Primitive = string>(
       if (!containerRef.current) return;
       if (target && containerRef.current.contains(target)) return;
       setOpen(false);
+      setShowAllOptions(false);
     };
     document.addEventListener("mousedown", onDocDown, { capture: true });
     return () =>
@@ -248,7 +276,30 @@ export function SelectOrInput<T extends Primitive = string>(
         name={name}
         //autoComplete="off"
         //{...inputProps}
-      />
+      >
+        {selectedOption?.icon ? (
+          <TextField.Slot>{selectedOption.icon}</TextField.Slot>
+        ) : null}
+        <TextField.Slot side="right" className="pr-1">
+          <button
+            type="button"
+            aria-label="Show all options"
+            aria-expanded={open && showAllOptions}
+            disabled={disabled}
+            className="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={toggleAllOptions}
+          >
+            <ChevronDown
+              size={16}
+              className={cn(
+                "transition-transform duration-150",
+                open && showAllOptions && "rotate-180",
+              )}
+            />
+          </button>
+        </TextField.Slot>
+      </TextField.Root>
       {open && (
         <div
           className={cn(
@@ -294,6 +345,7 @@ export function SelectOrInput<T extends Primitive = string>(
                     }}
                     onClick={() => selectAt(idx)}
                   >
+                    {opt.icon}
                     {getLabel(opt)}
                   </li>
                 );
