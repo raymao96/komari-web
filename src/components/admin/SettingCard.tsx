@@ -48,12 +48,12 @@ export function SettingCard({
       style={{ borderColor: "var(--gray-a5)" }}
       className={
         bordless
-          ? "border-0"
-          : "border-1 rounded-md py-2 px-4 bg-transparent  min-h-8" + className
+          ? `min-w-0 max-w-full border-0 ${className}`
+          : `min-h-8 min-w-0 max-w-full rounded-md border-1 bg-[var(--color-panel-solid)] px-4 py-2 ${className}`
       }
     >
       <Flex
-        className="w-full"
+        className="setting-card-header w-full min-w-0 max-w-full gap-3"
         direction="row"
         justify="between"
         align="center"
@@ -63,19 +63,26 @@ export function SettingCard({
         <Flex
           direction="column"
           gap="1"
-          className="min-h-10"
+          className="min-h-10 min-w-0 flex-1"
           justify={"center"}
         >
-          <label className="text-base font-medium" style={{ fontWeight: 600 }}>
+          <label
+            className="min-w-0 break-words text-base font-medium [overflow-wrap:anywhere]"
+            style={{ fontWeight: 600 }}
+          >
             {title}
           </label>
           {description && (
-            <label className="text-sm text-muted-foreground">
+            <label className="min-w-0 break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
               {description}
             </label>
           )}
         </Flex>
-        {actionChild}
+        {actionChild ? (
+          <div className="setting-card-action min-w-0 shrink-0">
+            {actionChild}
+          </div>
+        ) : null}
       </Flex>
       {otherChildren}
     </Flex>
@@ -734,7 +741,7 @@ export function SettingCardLabel({
   children: React.ReactNode | null;
 }) {
   return (
-    <label className="text-xl font-bold" style={{ fontWeight: 600 }}>
+    <label className="text-base font-semibold leading-6 text-foreground">
       {children}
     </label>
   );

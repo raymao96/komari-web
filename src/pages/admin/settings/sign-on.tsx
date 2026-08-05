@@ -12,7 +12,7 @@ import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import React from "react";
 import { renderProviderInputs } from "@/utils/renderProviders";
 import { toast } from "sonner";
-import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSectionTitle } from "@/components/admin/AdminPageTitle";
 
 export default function SignOnSettings() {
   const { t } = useTranslation();
@@ -110,7 +110,7 @@ export default function SignOnSettings() {
 
   return (
     <>
-      <AdminPageTitle>{t("settings.sign_on.title")}</AdminPageTitle>
+      <AdminSectionTitle>{t("settings.sign_on.title")}</AdminSectionTitle>
       <SettingCardSwitch
         title={t("settings.sign_on.disable_password")}
         defaultChecked={settings.disable_password_login}

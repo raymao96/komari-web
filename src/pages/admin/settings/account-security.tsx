@@ -39,7 +39,14 @@ export default function AccountSecuritySettings() {
 
   return (
     <Flex direction="column" gap="3">
-      <AdminPageTitle>{t("navigation.account_security")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.account_security_page_description",
+          "管理管理员账户、登录方式与当前会话。",
+        )}
+      >
+        {t("navigation.account_security")}
+      </AdminPageTitle>
 
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <div className="w-full overflow-x-auto pb-1">

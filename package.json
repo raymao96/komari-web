@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build --configLoader runner",
     "lint": "eslint .",
-    "test": "node --test tests/dateInput.test.ts tests/currency.test.ts tests/nodeOrder.test.ts tests/databaseRuntime.test.ts tests/version.test.ts tests/adminAuth.test.ts tests/loginLayout.test.ts tests/returnRouteLines.test.ts tests/adminMenu.test.ts tests/adminPageTitle.test.ts tests/dashboard.test.ts tests/documentTitle.test.ts tests/liveData.test.ts tests/remoteFileManager.test.ts tests/remoteLaunch.test.ts tests/remoteNodePicker.test.ts tests/remoteSession.test.ts tests/reverseProxy.test.ts tests/serviceUrl.test.ts tests/siteBackup.test.ts tests/themeMetadata.test.ts tests/trafficAllowance.test.ts tests/trafficCalibration.test.ts tests/updateDialog.test.ts",
+    "test": "node --test tests/dateInput.test.ts tests/currency.test.ts tests/nodeOrder.test.ts tests/databaseRuntime.test.ts tests/version.test.ts tests/adminAuth.test.ts tests/loginLayout.test.ts tests/returnRouteLines.test.ts tests/adminMenu.test.ts tests/adminPageTitle.test.ts tests/adminNodeLiveData.test.ts tests/dashboard.test.ts tests/documentTitle.test.ts tests/liveData.test.ts tests/priceTags.test.ts tests/remoteFileManager.test.ts tests/remoteLaunch.test.ts tests/remoteNodePicker.test.ts tests/remoteSession.test.ts tests/reverseProxy.test.ts tests/serviceUrl.test.ts tests/siteBackup.test.ts tests/themeMetadata.test.ts tests/trafficAllowance.test.ts tests/trafficCalibration.test.ts tests/updateDialog.test.ts",
     "preview": "vite preview",
     "i18n:sync": "node ./script/i18n-sync.mjs",
     "i18n:sync:dry": "node ./script/i18n-sync.mjs --dry-run"

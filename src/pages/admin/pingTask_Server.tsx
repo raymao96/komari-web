@@ -14,21 +14,56 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Selector } from "@/components/Selector";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 
 // 服务器视图：按服务器聚合展示其绑定的任务，并可快速增删绑定
-export const ServerView = ({ pingTasks }: { pingTasks: PingTask[] }) => {
+export const ServerView = ({
+  pingTasks,
+  search,
+}: {
+  pingTasks: PingTask[];
+  search: string;
+}) => {
   const { t } = useTranslation();
   const { nodeDetail } = useNodeDetails();
+  const filteredNodes = React.useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return nodeDetail;
+
+    return nodeDetail.filter((node) => {
+      if (String(node.name || "").toLowerCase().includes(keyword)) return true;
+
+      return pingTasks.some(
+        (task) =>
+          task.clients?.includes(node.uuid) &&
+          [task.name, task.target].some((value) =>
+            String(value || "")
+              .toLowerCase()
+              .includes(keyword),
+          ),
+      );
+    });
+  }, [nodeDetail, pingTasks, search]);
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(filteredNodes);
+
+  React.useEffect(() => setPage(1), [search, setPage]);
 
   return (
-    <div className="rounded-xl overflow-hidden">
-      <Table>
+    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
+      <div className="overflow-x-auto">
+      <Table className="admin-responsive-table min-w-[640px]">
         <TableHeader>
-          <TableHead className="w-48">{t("common.server")}</TableHead>
-          <TableHead>{t("ping.task")}</TableHead>
+          <TableRow>
+            <TableHead className="w-48">{t("common.server")}</TableHead>
+            <TableHead>{t("ping.task")}</TableHead>
+          </TableRow>
         </TableHeader>
         <TableBody>
-          {nodeDetail.map((n) => (
+          {pageItems.map((n) => (
             <ServerRow
               key={n.uuid}
               nodeUuid={n.uuid}
@@ -38,6 +73,15 @@ export const ServerView = ({ pingTasks }: { pingTasks: PingTask[] }) => {
           ))}
         </TableBody>
       </Table>
+      </div>
+      <AdminPagination
+        page={page}
+        total={filteredNodes.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        summary={false}
+      />
     </div>
   );
 };
@@ -123,18 +167,19 @@ const ServerRow: React.FC<{
       .finally(() => setSaving(false));
   };
 
-  const joined = ownedTasks.map((t) => t.name).join(", ");
-  const display = joined.length > 40 ? joined.slice(0, 40) + "..." : joined;
+  const taskNames = ownedTasks.map((t) => t.name).join(", ");
 
   return (
     <TableRow>
-      <TableCell>{nodeName}</TableCell>
-      <TableCell>
-        <Flex align="center" gap="2">
-          {ownedTasks.length > 0 ? display : t("common.none")}
+      <TableCell data-label={t("common.server")}>{nodeName}</TableCell>
+      <TableCell data-label={t("ping.task")}>
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="min-w-0 flex-1 whitespace-normal break-words">
+            {ownedTasks.length > 0 ? taskNames : t("common.none")}
+          </span>
           <Dialog.Root open={open} onOpenChange={setOpen}>
             <Dialog.Trigger>
-              <IconButton variant="ghost">
+              <IconButton variant="ghost" className="shrink-0">
                 <MoreHorizontal size={16} />
               </IconButton>
             </Dialog.Trigger>
@@ -185,7 +230,7 @@ const ServerRow: React.FC<{
               </Flex>
             </Dialog.Content>
           </Dialog.Root>
-        </Flex>
+        </div>
       </TableCell>
     </TableRow>
   );

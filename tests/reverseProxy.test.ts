@@ -150,3 +150,9 @@ test("every admin language covers the built-in HTTPS controls", () => {
     }
   }
 });
+
+test("Cloudflare token guidance keeps readable vertical rhythm", () => {
+  assert.match(page, /mt-3 flex flex-col gap-2/);
+  assert.match(page, /cloudflare_token_help[\s\S]*block leading-6/);
+  assert.match(page, /token_guide[\s\S]*ExternalLink/);
+});

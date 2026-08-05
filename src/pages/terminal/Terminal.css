@@ -255,6 +255,7 @@
 .remote-terminal-pane {
   position: relative;
   flex: 1;
+  overflow: hidden;
   background: var(--xterm-container-bg, #000000);
 }
 
@@ -699,6 +700,31 @@
 }
 
 @media (max-width: 900px) {
+  html.remote-terminal-open,
+  html.remote-terminal-open body,
+  html.remote-terminal-open #root,
+  html.remote-terminal-open .theme-root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .remote-workspace {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    overscroll-behavior: none;
+  }
+
+  .remote-terminal-pane,
+  .terminal-page.terminal-xterm-host {
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
   .remote-brand span {
     display: none;
   }
@@ -755,7 +781,7 @@
     position: absolute;
     z-index: 4;
     right: 8px;
-    bottom: calc(var(--mobile-keyboard-inset, 0px) + 8px);
+    bottom: calc(var(--mobile-keyboard-inset, 0px) + max(8px, env(safe-area-inset-bottom)));
     left: 8px;
     display: flex;
     align-items: center;
@@ -779,6 +805,8 @@
     padding: 0 10px;
     color: #f1f3f5;
     font: 16px/1.2 Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   .remote-mobile-command input:focus {
@@ -786,11 +814,37 @@
   }
 
   .terminal-page .xterm {
-    padding-bottom: calc(var(--xterm-padding, 16px) + var(--mobile-keyboard-inset, 0px) + 60px);
+    max-width: 100%;
+    padding-bottom: calc(var(--xterm-padding, 16px) + var(--mobile-keyboard-inset, 0px) + max(60px, env(safe-area-inset-bottom)));
+  }
+
+  .terminal-page .xterm-helper-textarea {
+    font-size: 16px !important;
   }
 }
 
 @media (max-width: 540px) {
+  .remote-session-header {
+    min-height: 0;
+    align-content: flex-start;
+  }
+
+  .remote-node-heading {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .remote-session-actions {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .remote-session-actions::-webkit-scrollbar {
+    display: none;
+  }
+
   .remote-tab {
     min-width: 112px;
     max-width: 164px;

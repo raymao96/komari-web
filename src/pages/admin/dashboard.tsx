@@ -4,15 +4,16 @@ import {
   AlertCircle,
   ArrowDownToLine,
   ArrowUpFromLine,
-  CircleCheck,
+  Clock3,
   Database,
   RefreshCw,
+  Route,
   Server,
-  ServerOff,
   WalletCards,
 } from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -27,7 +28,6 @@ import {
 import { ChartContainer } from "@/components/ui/chart";
 import {
   dashboardLocalStorageTotal,
-  dashboardOnlinePercent,
   dashboardRuntimeStorageTotal,
   shortDashboardDay,
   type DashboardData,
@@ -70,7 +70,7 @@ function OverviewSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
       {[0, 1, 2].map((item) => (
-        <div key={item} className="h-[126px] rounded-md border p-4">
+        <div key={item} className="h-[126px] rounded-md border bg-[var(--color-panel-solid)] p-4">
           <Skeleton width="7rem" height="1rem" />
           <Skeleton className="mt-4" width="9rem" height="1.9rem" />
           <Skeleton className="mt-3" width="72%" height="0.85rem" />
@@ -99,7 +99,7 @@ function SummaryPanel({
     orange: "text-[var(--orange-11)]",
   }[tone];
   return (
-    <section className="min-h-[126px] rounded-md border bg-[var(--gray-a2)] p-4">
+    <section className="min-h-[126px] rounded-md border bg-[var(--color-panel-solid)] p-4">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-muted-foreground">{label}</span>
         <span className={`flex size-7 items-center justify-center ${toneClass}`}>{icon}</span>
@@ -159,76 +159,100 @@ function relativeTime(value: string | null, locale: string, fallback: string): s
   return formatter.format(Math.round(hours / 24), "day");
 }
 
-function ServerStatusPanel({ data, locale }: { data: DashboardData; locale: string }) {
+function ReturnRouteStatusPanel({ data, locale }: { data: DashboardData; locale: string }) {
   const { t } = useTranslation();
-  const percent = dashboardOnlinePercent(data);
-  const visibleOffline = data.servers.offline_nodes.slice(0, 3);
-  const remaining = Math.max(0, data.servers.offline - visibleOffline.length);
+  const status = data.return_route;
+  const total = Math.max(0, status.active ?? status.tasks ?? 0);
+  const healthy = Math.min(total, Math.max(0, status.healthy));
+  const switched = Math.min(total - healthy, Math.max(0, status.switched));
+  const abnormal = Math.min(total - healthy - switched, Math.max(0, status.abnormal));
+  const healthyEnd = total > 0 ? (healthy / total) * 360 : 0;
+  const switchedEnd = total > 0 ? ((healthy + switched) / total) * 360 : 0;
+  const abnormalEnd = total > 0 ? ((healthy + switched + abnormal) / total) * 360 : 0;
+  const latest = status.latest_event;
+  const latestName = [latest?.node_name, latest?.task_name].filter(Boolean).join(" · ");
+  const statusMessage = switched > 0
+    ? t("admin_dashboard.return_route_changed_tasks", { count: switched })
+    : abnormal > 0
+      ? t("admin_dashboard.return_route_abnormal_tasks", { count: abnormal })
+      : t("admin_dashboard.return_route_all_normal");
 
   return (
-    <section className="h-full rounded-md border bg-[var(--accent-1)] p-4">
-      <PanelHeader
-        title={t("admin_dashboard.server_status")}
-        description={t("admin_dashboard.server_status_hint")}
-        trailing={<ServerOff size={18} className="mt-0.5 text-muted-foreground" />}
-      />
-      <div className={visibleOffline.length === 0
-        ? "flex min-h-[180px] flex-col items-center justify-center gap-6 sm:flex-row sm:gap-10"
-        : "grid min-h-[220px] grid-cols-1 items-center gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]"}
-      >
-        <div className="flex justify-center">
-          <div
-            className="relative size-32 rounded-full"
-            style={{
-              background: `conic-gradient(var(--accent-9) 0 ${percent}%, var(--gray-a5) ${percent}% 100%)`,
-            }}
-          >
-            <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-[var(--accent-1)]">
-              <span className="text-2xl font-bold tabular-nums">{percent}%</span>
-              <span className="mt-0.5 text-xs text-muted-foreground">{t("admin_dashboard.online")}</span>
-            </div>
-          </div>
-        </div>
-        {visibleOffline.length === 0 ? (
-          <div className="text-center sm:text-left">
-            <div className="flex items-center justify-center gap-2 text-base font-medium text-[var(--green-11)] sm:justify-start">
-              <CircleCheck size={20} />
-              <span>{t("admin_dashboard.all_online")}</span>
-            </div>
-            <div className="mt-3 text-sm text-muted-foreground">
-              {t("admin_dashboard.online_count", { count: data.servers.online })}
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {t("admin_dashboard.offline_count", { count: data.servers.offline })}
-            </div>
+    <Link
+      to="/admin/return-route"
+      className="group block h-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-8)]"
+    >
+      <section className="h-full min-h-[296px] rounded-md border bg-[var(--color-panel-solid)] p-4 transition-colors group-hover:border-[var(--accent-a7)]">
+        <PanelHeader
+          title={t("admin_dashboard.return_route_status")}
+          description={t("admin_dashboard.return_route_status_hint")}
+          trailing={<Route size={18} className="mt-0.5 text-muted-foreground" />}
+        />
+        {total === 0 ? (
+          <div className="flex min-h-[218px] items-center justify-center gap-5">
+            <div className="size-28 shrink-0 rounded-full border-[10px] border-[var(--gray-a5)]" />
+            <span className="max-w-44 text-sm leading-6 text-muted-foreground">
+              {t("admin_dashboard.return_route_none")}
+            </span>
           </div>
         ) : (
-          <div className="min-w-0 divide-y">
-            {visibleOffline.map((node) => (
-              <div key={node.uuid} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="size-2 shrink-0 rounded-full bg-[var(--orange-9)]" />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{node.name || node.uuid}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {node.region || t("admin_dashboard.region_unknown")}
-                    </div>
+          <>
+            <div className="text-center text-sm font-medium text-foreground sm:text-left">
+              {statusMessage}
+            </div>
+            <div className="mt-3 grid grid-cols-1 items-center gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
+              <div className="flex justify-center">
+                <div
+                  className="relative size-28 rounded-full"
+                  style={{
+                    background: `conic-gradient(var(--green-9) 0 ${healthyEnd}deg, var(--orange-9) ${healthyEnd}deg ${switchedEnd}deg, var(--red-9) ${switchedEnd}deg ${abnormalEnd}deg, var(--gray-a5) ${abnormalEnd}deg 360deg)`,
+                  }}
+                >
+                  <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-[var(--color-panel-solid)]">
+                    <span className="text-xl font-semibold tabular-nums">{healthy} / {total}</span>
+                    <span className="mt-0.5 text-xs text-muted-foreground">{t("admin_dashboard.return_route_healthy")}</span>
                   </div>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {relativeTime(node.last_seen, locale, t("admin_dashboard.no_last_seen"))}
+              </div>
+              <div className="grid grid-cols-2 gap-x-5 gap-y-2.5 text-sm sm:grid-cols-1">
+                {[
+                  [t("admin_dashboard.return_route_normal"), healthy, "bg-[var(--green-9)]"],
+                  [t("admin_dashboard.return_route_changed"), switched, "bg-[var(--orange-9)]"],
+                  [t("admin_dashboard.return_route_abnormal"), abnormal, "bg-[var(--red-9)]"],
+                  [t("admin_dashboard.return_route_recent_events"), status.recent_events, "bg-[var(--gray-8)]"],
+                ].map(([label, value, marker]) => (
+                  <div key={String(label)} className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                      <span className={`size-1.5 shrink-0 rounded-full ${marker}`} />
+                      <span className="truncate">{label}</span>
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums text-foreground">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {latest ? (
+              <div className="mt-5 flex items-end justify-between gap-3 border-t pt-3 text-xs">
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-foreground">
+                    {t("admin_dashboard.return_route_latest_change")}{latestName ? ` · ${latestName}` : ""}
+                  </div>
+                  <div className="mt-1 truncate leading-5 text-muted-foreground">
+                    {t("admin_dashboard.return_route_expected")} {latest.expected_line || t("admin_dashboard.not_available")}
+                    {" · "}
+                    {t("admin_dashboard.return_route_current")} {latest.to_line || t("admin_dashboard.not_available")}
+                  </div>
+                </div>
+                <span className="flex h-5 shrink-0 items-center gap-1 leading-5 text-muted-foreground">
+                  <Clock3 size={14} />
+                  {relativeTime(latest.occurred_at, locale, t("admin_dashboard.not_available"))}
                 </span>
               </div>
-            ))}
-            {remaining > 0 ? (
-              <div className="pt-2.5 text-sm text-muted-foreground">
-                {t("admin_dashboard.offline_more", { count: remaining })}
-              </div>
             ) : null}
-          </div>
+          </>
         )}
-      </div>
-    </section>
+      </section>
+    </Link>
   );
 }
 
@@ -257,7 +281,7 @@ function StoragePanel({ data, locale }: { data: DashboardData; locale: string })
   ];
 
   return (
-    <section className="h-full rounded-md border bg-[var(--accent-1)] p-4">
+    <section className="h-full rounded-md border bg-[var(--color-panel-solid)] p-4">
       <PanelHeader
         title={t("admin_dashboard.database_usage")}
         description={t("admin_dashboard.database_composition")}
@@ -347,10 +371,9 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col gap-3 p-0 md:p-4">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <div>
-          <AdminPageTitle>{t("admin_dashboard.title")}</AdminPageTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{t("admin_dashboard.subtitle")}</p>
-        </div>
+        <AdminPageTitle description={t("admin_dashboard.subtitle")}>
+          {t("admin_dashboard.title")}
+        </AdminPageTitle>
         {data?.generated_at ? (
           <Button style={{ marginRight: 0 }} variant="ghost" color="gray" size="1" onClick={() => void load(false)}>
             <RefreshCw size={14} />
@@ -429,7 +452,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
-            <section className="min-w-0 rounded-md border bg-[var(--accent-1)] p-4">
+            <section className="min-w-0 rounded-md border bg-[var(--color-panel-solid)] p-4">
               <PanelHeader
                 title={t("admin_dashboard.today_traffic")}
                 description={t("admin_dashboard.hourly_traffic_hint")}
@@ -466,11 +489,11 @@ export default function AdminDashboard() {
               </ChartContainer>
             </section>
 
-            <ServerStatusPanel data={data} locale={locale} />
+            <ReturnRouteStatusPanel data={data} locale={locale} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
-            <section className="min-w-0 rounded-md border bg-[var(--accent-1)] p-4">
+            <section className="min-w-0 rounded-md border bg-[var(--color-panel-solid)] p-4">
               <PanelHeader
                 title={t("admin_dashboard.daily_billable")}
                 description={t("admin_dashboard.daily_billable_hint")}

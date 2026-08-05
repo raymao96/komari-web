@@ -1,5 +1,10 @@
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSelectionCount } from "@/components/admin/AdminSelectionCount";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 import {
   Table,
   TableBody,
@@ -247,8 +252,14 @@ const PingLossContent = () => {
 
   const selectedTargets = React.useMemo(() => {
     const selectedSet = new Set(selected);
-    return targets.filter((target) => selectedSet.has(target.key));
-  }, [targets, selected]);
+    return filteredTargets.filter((target) => selectedSet.has(target.key));
+  }, [filteredTargets, selected]);
+  const selectedFilteredCount = React.useMemo(() => {
+    const selectedSet = new Set(selected);
+    return filteredTargets.filter((target) => selectedSet.has(target.key)).length;
+  }, [filteredTargets, selected]);
+  const allFilteredSelected =
+    filteredTargets.length > 0 && selectedFilteredCount === filteredTargets.length;
   const availableTargets = React.useMemo(
     () => sortTargets(targets.filter((target) => !target.rule), "task"),
     [targets],
@@ -270,81 +281,123 @@ const PingLossContent = () => {
     await refresh();
   };
 
+  const toggleSelectAll = () => {
+    const filteredKeys = new Set(filteredTargets.map((target) => target.key));
+    setSelected((current) =>
+      allFilteredSelected
+        ? current.filter((key) => !filteredKeys.has(key))
+        : Array.from(new Set([...current, ...filteredKeys])),
+    );
+  };
+
   return (
     <div className="flex w-full min-w-0 max-w-full flex-col gap-4 p-0 md:p-4">
       <Flex className="w-full" justify="between" align="center" gap="3" wrap="wrap">
-        <AdminPageTitle>
+        <AdminPageTitle
+          description={t(
+            "notification.ping_loss.description",
+            "根据延迟监测结果设置丢包阈值、统计窗口和冷却时间。",
+          )}
+        >
           {t("notification.ping_loss.full_title")}
         </AdminPageTitle>
-        <Flex gap="2" align="center" wrap="wrap" className="w-full sm:w-auto">
-          <TextField.Root
-            className="w-full sm:w-64"
-            value={search}
-            placeholder={t("common.search")}
-            onChange={(event) => setSearch(event.target.value)}
-          >
-            <TextField.Slot>
-              <Search size={16} />
-            </TextField.Slot>
-          </TextField.Root>
-          <ConfigurationDialog
-            targets={[]}
-            availableTargets={availableTargets}
-            onSaved={refresh}
-          >
-            <Button>
-              <Plus size={16} />
-              {t("common.add")}
-            </Button>
-          </ConfigurationDialog>
-        </Flex>
       </Flex>
 
       <Tabs.Root value={view} onValueChange={(value) => setView(value as ViewMode)}>
-        <Tabs.List>
-          <Tabs.Trigger value="task">{t("ping.task_view")}</Tabs.Trigger>
-          <Tabs.Trigger value="server">{t("ping.server_view")}</Tabs.Trigger>
-        </Tabs.List>
-        <Box pt="3">
-          <Tabs.Content value="task">
-            <AlertTable
-              view="task"
-              targets={filteredTargets}
-              selected={selected}
-              onSelectionChange={setSelected}
-              onSaved={refresh}
+        <div className="w-full overflow-x-auto pb-1">
+          <Tabs.List className="w-max min-w-full">
+            <Tabs.Trigger value="task" className="min-w-[8rem] flex-1">
+              {t("ping.task_view")}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="server" className="min-w-[8rem] flex-1">
+              {t("ping.server_view")}
+            </Tabs.Trigger>
+          </Tabs.List>
+        </div>
+        <div className="flex flex-col gap-3 pt-3">
+          <Box>
+            <Tabs.Content value="task">
+              <AlertTable
+                view="task"
+                targets={filteredTargets}
+                selected={selected}
+                onSelectionChange={setSelected}
+                onSaved={refresh}
+                paginationSummary={
+                  <AdminSelectionCount
+                    count={selectedFilteredCount}
+                    total={filteredTargets.length}
+                    className="hidden md:inline-flex"
+                  />
+                }
+              />
+            </Tabs.Content>
+            <Tabs.Content value="server">
+              <AlertTable
+                view="server"
+                targets={filteredTargets}
+                selected={selected}
+                onSelectionChange={setSelected}
+                onSaved={refresh}
+                paginationSummary={
+                  <AdminSelectionCount
+                    count={selectedFilteredCount}
+                    total={filteredTargets.length}
+                    className="hidden md:inline-flex"
+                  />
+                }
+              />
+            </Tabs.Content>
+          </Box>
+          <div className="order-first flex min-h-10 flex-col gap-2 px-1 md:ml-auto md:w-fit md:self-end md:flex-row md:items-center md:justify-end">
+            <AdminSelectionCount
+              count={selectedFilteredCount}
+              total={filteredTargets.length}
+              className="order-last shrink-0 self-start text-sm text-muted-foreground md:hidden"
             />
-          </Tabs.Content>
-          <Tabs.Content value="server">
-            <AlertTable
-              view="server"
-              targets={filteredTargets}
-              selected={selected}
-              onSelectionChange={setSelected}
-              onSaved={refresh}
-            />
-          </Tabs.Content>
-        </Box>
+            <Flex align="center" gap="2" className="w-full min-w-0 justify-end md:w-auto">
+              <Button
+                type="button"
+                variant="soft"
+                disabled={filteredTargets.length === 0}
+                onClick={toggleSelectAll}
+              >
+                {t(allFilteredSelected ? "common.deselect_all" : "common.select_all")}
+              </Button>
+              <ConfigurationDialog
+                targets={selectedTargets}
+                onSaved={handleBatchSaved}
+                batch
+              >
+                <Button disabled={selectedTargets.length === 0}>
+                  <SlidersHorizontal size={16} />
+                  {t("notification.ping_loss.batch_edit")}
+                </Button>
+              </ConfigurationDialog>
+              <TextField.Root
+                className="w-24 min-w-0 flex-none sm:w-64"
+                value={search}
+                placeholder={t("common.search")}
+                onChange={(event) => setSearch(event.target.value)}
+              >
+                <TextField.Slot>
+                  <Search size={16} />
+                </TextField.Slot>
+              </TextField.Root>
+              <ConfigurationDialog
+                targets={[]}
+                availableTargets={availableTargets}
+                onSaved={refresh}
+              >
+                <Button>
+                  <Plus size={16} />
+                  {t("common.add")}
+                </Button>
+              </ConfigurationDialog>
+            </Flex>
+          </div>
+        </div>
       </Tabs.Root>
-
-      <Flex align="center" justify="between" gap="3" wrap="wrap">
-        <span className="text-sm text-muted-foreground">
-          {t("common.selected_total", {
-            count: selected.length,
-            total: targets.length,
-          })}
-        </span>
-        <ConfigurationDialog
-          targets={selectedTargets}
-          onSaved={handleBatchSaved}
-          batch
-        >
-          <Button disabled={selectedTargets.length === 0}>
-            <SlidersHorizontal size={16} />
-            {t("notification.ping_loss.batch_edit")}
-          </Button>
-        </ConfigurationDialog>
-      </Flex>
     </div>
   );
 };
@@ -355,44 +408,27 @@ const AlertTable = ({
   selected,
   onSelectionChange,
   onSaved,
+  paginationSummary,
 }: {
   view: ViewMode;
   targets: AlertTarget[];
   selected: string[];
   onSelectionChange: (keys: string[]) => void;
   onSaved: () => Promise<void>;
+  paginationSummary?: React.ReactNode;
 }) => {
   const { t } = useTranslation();
   const selectedSet = new Set(selected);
-  const selectedVisible = targets.filter((target) => selectedSet.has(target.key));
-  const allVisibleSelected =
-    targets.length > 0 && selectedVisible.length === targets.length;
-  const headerChecked = allVisibleSelected
-    ? true
-    : selectedVisible.length > 0
-      ? "indeterminate"
-      : false;
-
-  const setVisibleSelection = (checked: boolean) => {
-    const visibleKeys = new Set(targets.map((target) => target.key));
-    if (checked) {
-      onSelectionChange(Array.from(new Set([...selected, ...visibleKeys])));
-    } else {
-      onSelectionChange(selected.filter((key) => !visibleKeys.has(key)));
-    }
-  };
-
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(targets);
   return (
-    <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-lg">
-      <Table className="min-w-[1120px]">
+    <div className="admin-responsive-table-wrap w-full min-w-0 max-w-full overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+      <div className="overflow-x-auto">
+      <Table className="admin-responsive-table admin-selection-table min-w-[1120px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-10">
-              <Checkbox
-                checked={headerChecked}
-                aria-label={t("common.select_all")}
-                onCheckedChange={(checked) => setVisibleSelection(checked === true)}
-              />
+            <TableHead className="w-12 px-3 text-center">
+              <span className="sr-only">{t("common.select")}</span>
             </TableHead>
             <TableHead>
               {view === "task" ? t("ping.task") : t("common.server")}
@@ -407,7 +443,7 @@ const AlertTable = ({
             <TableHead>{t("notification.ping_loss.minimum_samples")}</TableHead>
             <TableHead>{t("notification.ping_loss.cooldown")}</TableHead>
             <TableHead>{t("notification.ping_loss.last_notified")}</TableHead>
-            <TableHead>{t("common.action")}</TableHead>
+            <TableHead className="text-center">{t("common.action")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -418,7 +454,7 @@ const AlertTable = ({
               </TableCell>
             </TableRow>
           ) : (
-            targets.map((target) => (
+            pageItems.map((target) => (
               <AlertRow
                 key={target.key}
                 view={view}
@@ -437,6 +473,15 @@ const AlertTable = ({
           )}
         </TableBody>
       </Table>
+      </div>
+      <AdminPagination
+        page={page}
+        total={targets.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        summary={paginationSummary}
+      />
     </div>
   );
 };
@@ -462,17 +507,19 @@ const AlertRow = ({
 
   return (
     <TableRow data-state={selected ? "selected" : undefined}>
-      <TableCell>
-        <Checkbox
-          checked={selected}
-          aria-label={`${primary} - ${secondary}`}
-          onCheckedChange={(checked) => onSelectedChange(checked === true)}
-        />
+      <TableCell className="w-12 px-3" data-label={t("common.select")}>
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={selected}
+            aria-label={`${primary} - ${secondary}`}
+            onCheckedChange={(checked) => onSelectedChange(checked === true)}
+          />
+        </div>
       </TableCell>
-      <TableCell>{primary}</TableCell>
-      <TableCell>{secondary}</TableCell>
-      <TableCell>{target.task.target || "-"}</TableCell>
-      <TableCell>
+      <TableCell data-label={view === "task" ? t("ping.task") : t("common.server")}>{primary}</TableCell>
+      <TableCell data-label={view === "task" ? t("common.server") : t("ping.task")}>{secondary}</TableCell>
+      <TableCell data-label={t("ping.target")}>{target.task.target || "-"}</TableCell>
+      <TableCell data-label={t("common.status")}>
         {rule ? (
           <Badge color={rule.enable ? "green" : "gray"}>
             {rule.enable ? t("common.enabled") : t("common.disabled")}
@@ -481,36 +528,36 @@ const AlertRow = ({
           <Badge color="orange">{t("notification.ping_loss.not_configured")}</Badge>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell data-label={t("notification.ping_loss.window")}>
         {rule
           ? t("notification.ping_loss.minutes", {
               count: rule.window_seconds / 60,
             })
           : "-"}
       </TableCell>
-      <TableCell>{rule ? `${rule.loss_threshold.toFixed(1)}%` : "-"}</TableCell>
-      <TableCell>{rule?.minimum_samples ?? "-"}</TableCell>
-      <TableCell>
+      <TableCell data-label={t("notification.ping_loss.threshold")}>{rule ? `${rule.loss_threshold.toFixed(1)}%` : "-"}</TableCell>
+      <TableCell data-label={t("notification.ping_loss.minimum_samples")}>{rule?.minimum_samples ?? "-"}</TableCell>
+      <TableCell data-label={t("notification.ping_loss.cooldown")}>
         {rule
           ? t("notification.ping_loss.minutes", {
               count: rule.cooldown_seconds / 60,
             })
           : "-"}
       </TableCell>
-      <TableCell>
+      <TableCell data-label={t("notification.ping_loss.last_notified")}>
         {rule?.last_notified
           ? new Date(rule.last_notified).toLocaleString()
           : t("notification.ping_loss.never")}
       </TableCell>
-      <TableCell>
-        <Flex gap="2" align="center">
+      <TableCell className="text-center" data-label={t("common.action")}>
+        <Flex gap="3" align="center" className="admin-card-actions admin-ping-loss-actions w-full">
           <ConfigurationDialog targets={[target]} onSaved={onSaved}>
             <IconButton
               variant="ghost"
               title={rule ? t("common.edit") : t("notification.ping_loss.add")}
               aria-label={rule ? t("common.edit") : t("notification.ping_loss.add")}
             >
-              {rule ? <Pencil size={16} /> : <SlidersHorizontal size={16} />}
+              <Pencil size={16} />
             </IconButton>
           </ConfigurationDialog>
           {rule ? <DeleteRuleButton rule={rule} onDeleted={onSaved} /> : null}

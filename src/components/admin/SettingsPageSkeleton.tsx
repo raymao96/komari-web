@@ -12,7 +12,7 @@ const SettingsPageSkeleton = () => (
     {[0, 1, 2].map((item) => (
       <Box
         key={item}
-        className="min-h-20 rounded-md border p-4"
+        className="min-h-20 rounded-md border bg-[var(--color-panel-solid)] p-4"
         style={{ borderColor: "var(--gray-a5)" }}
       >
         <Flex direction="column" gap="2">

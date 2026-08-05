@@ -7,7 +7,6 @@ import {
     Card,
     Flex,
     Text,
-    Separator,
     Badge,
     TextField
 } from "@radix-ui/themes";
@@ -16,6 +15,10 @@ import { toast } from "sonner";
 import NodeSelector from "@/components/NodeSelector";
 import { SettingCardCollapse } from "@/components/admin/SettingCard";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import {
+    AdminPagination,
+    useAdminPagination,
+} from "@/components/admin/AdminPagination";
 
 interface TaskResult {
     task_id: string;
@@ -102,6 +105,13 @@ const ExecContent = () => {
     const [commandEditorHeight, setCommandEditorHeight] = useState(COMMAND_EDITOR_COLLAPSED_HEIGHT);
     const [twoFaEnabled, setTwoFaEnabled] = useState(false);
     const [twoFaCode, setTwoFaCode] = useState("");
+    const {
+        page: resultPage,
+        setPage: setResultPage,
+        pageItems: pagedResults,
+        pageSize: resultPageSize,
+        setPageSize: setResultPageSize,
+    } = useAdminPagination(results);
 
     // 使用 useRef 来保存轮询相关的引用
     const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -374,27 +384,21 @@ const ExecContent = () => {
     };
 
     return (
-        <div className="p-0 md:p-4 flex flex-col gap-3">
-            {/* 页面标题 */}
-            <div>
-                <AdminPageTitle>{t("exec.title")}</AdminPageTitle>
-                <Text size="2" color="gray" className="mt-1">
-                    {t("exec.description")}
-                </Text>
-            </div>
-
-            <Separator size="4" />
+        <div className="flex flex-col gap-4 p-0 md:p-4">
+            <AdminPageTitle description={t("exec.description")}>
+                {t("exec.title")}
+            </AdminPageTitle>
 
             {/* 命令输入区域 */}
-            <Card className="p-6">
+            <Card className="p-4 sm:p-5">
                 <Flex direction="column" gap="4">
 
-                    <label htmlFor={COMMAND_EDITOR_ID} className="text-xl font-bold">
+                    <label htmlFor={COMMAND_EDITOR_ID} className="text-base font-semibold leading-6">
                         {t("exec.command")}
                     </label>
                     <div
                         ref={commandEditorRef}
-                        className="grid grid-cols-[3.75rem_minmax(0,1fr)] overflow-hidden rounded-md border border-[var(--gray-a7)] bg-[var(--color-surface)] transition-[height,border-color,box-shadow] duration-200 focus-within:border-[var(--accent-8)] focus-within:shadow-[0_0_0_1px_var(--accent-8)]"
+                        className="grid grid-cols-[3.75rem_minmax(0,1fr)] overflow-hidden rounded-md border border-[var(--gray-a7)] bg-[var(--color-panel-solid)] transition-[height,border-color,box-shadow] duration-200 focus-within:border-[var(--accent-8)] focus-within:shadow-[0_0_0_1px_var(--accent-8)]"
                         style={commandEditorStyle}
                     >
                         <div
@@ -454,10 +458,10 @@ const ExecContent = () => {
                         )}
                     </div>
 
-                    <Flex justify="end" gap="2">
+                    <Flex justify="end" gap="2" className="flex-col sm:flex-row">
                         {twoFaEnabled ? (
                             <TextField.Root
-                                className="w-32"
+                                className="w-full sm:w-32"
                                 type="number"
                                 placeholder="2FA"
                                 value={twoFaCode}
@@ -465,6 +469,7 @@ const ExecContent = () => {
                             />
                         ) : null}
                         <Button
+                            className="w-full sm:w-auto"
                             onClick={executeCommand}
                             disabled={executing || !command.trim() || selectedNodes.length === 0 || (twoFaEnabled && !twoFaCode.trim())}
                         >
@@ -486,12 +491,12 @@ const ExecContent = () => {
 
             {/* 执行结果区域 */}
             {results.length > 0 && (
-                <Card className="p-6">
+                <section className="space-y-4">
                     <Flex direction="column" gap="4">
-                        <Flex justify="between" align="center">
-                            <Text size="4" weight="medium">
+                        <Flex justify="between" align="start" gap="2" wrap="wrap">
+                            <h2 className="text-base font-semibold leading-6 text-foreground">
                                 {t("exec.results", "执行结果")}
-                            </Text>
+                            </h2>
                             {taskId && (
                                 <Text size="2" color="gray">
                                     Task ID: {taskId}
@@ -500,13 +505,13 @@ const ExecContent = () => {
                         </Flex>
 
                         <div className="space-y-4">
-                            {results.map((result) => {
+                            {pagedResults.map((result) => {
                                 const status = getTaskStatus(result);
                                 return (
                                     <Card key={result.client} className="p-4">
                                         <Flex direction="column" gap="3">
                                             {/* 节点信息和状态 */}
-                                            <label className="text-xl font-medium">
+                                            <label className="text-base font-semibold leading-6">
                                                 {nodeDetail.find(n => n.uuid === result.client)?.name || result.client}
                                             </label>
                                             <Flex justify="between" align="center">
@@ -580,6 +585,14 @@ const ExecContent = () => {
                             })}
                         </div>
 
+                        <AdminPagination
+                            page={resultPage}
+                            total={results.length}
+                            pageSize={resultPageSize}
+                            onPageChange={setResultPage}
+                            onPageSizeChange={setResultPageSize}
+                        />
+
                         {/* 轮询状态提示 */}
                         {polling && (
                             <Flex align="center" justify="between" className="text-sm text-gray-500">
@@ -599,7 +612,7 @@ const ExecContent = () => {
                             </Flex>
                         )}
                     </Flex>
-                </Card>
+                </section>
             )}
         </div>
     );

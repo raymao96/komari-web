@@ -31,6 +31,20 @@
     "recent_month": "直近1か月",
     "region_unknown": "地域未設定",
     "retention_period": "保存期間",
+    "return_route_abnormal": "プローブ異常",
+    "return_route_abnormal_tasks": "{{count}} 件のタスクでプローブ異常があります",
+    "return_route_all_normal": "実行中の経路はすべて正常です",
+    "return_route_changed": "経路変更",
+    "return_route_changed_tasks": "{{count}} 件のタスクで経路変更を検出しました",
+    "return_route_current": "現在",
+    "return_route_expected": "期待値",
+    "return_route_healthy": "経路正常",
+    "return_route_latest_change": "最新の変更",
+    "return_route_none": "実行中の復路監視タスクはありません",
+    "return_route_normal": "正常",
+    "return_route_recent_events": "24時間のイベント",
+    "return_route_status": "復路経路の状態",
+    "return_route_status_hint": "監視タスクの状態と最近の経路変更",
     "server_status": "サーバー状態",
     "server_status_hint": "サーバーの稼働状況とオフラインノードの概要",
     "servers": "サーバー状態",
@@ -157,6 +171,25 @@
     },
     "nodeTable": {
       "addNode": "ノードを追加",
+      "allNodes": "すべてのノード",
+      "clearFilterToReorder": "検索とフィルターを解除すると並べ替えできます",
+      "groupAndRemark": "グループと備考",
+      "ipv4Only": "IPv4 のみ",
+      "lastReportRecent": "最新報告：たった今",
+      "lastReportUnavailable": "最新報告：取得不可",
+      "lastReportWaiting": "最新報告：待機中",
+      "liveTraffic": "通信量",
+      "livePreparing": "リアルタイム状態を読み込み中",
+      "liveRefresh": "リアルタイム状態更新",
+      "liveRefreshInterval": "5 秒",
+      "liveUnavailable": "リアルタイム状態を取得できません",
+      "liveUpdatedAt": "リアルタイム状態は {{time}} に更新",
+      "networkAndAgent": "ネットワークと Agent",
+      "network": "ネットワーク",
+      "agent": "Agent",
+      "resourceStatus": "リソース状態",
+      "trafficQuotaShort": "上限",
+      "trafficUsedShort": "使用済",
       "autoDiscovery": {
         "disabledDescription": "自動検出を有効にすると、ノードを1台ずつ手動で追加する必要がなくなります。対象サーバーでコマンドを1つ実行するだけで、Agent がキーを使って自動的に登録・オンライン化されます。多数のサーバーを一括展開する場合に最適です。",
         "enabledDescription": "対象サーバーで以下のコマンドを実行すると、Agent が自動的に登録・オンライン化されます。手動でのノード作成は不要です。",
@@ -214,7 +247,10 @@
       "namePlaceholder": "名前",
       "noData": "データがありません",
       "nodeList": "ノードリスト",
+      "nextPage": "次のページ",
       "noResults": "結果がありません",
+      "pageSummary": "{{total}} 台中 {{start}}-{{end}} 台を表示",
+      "previousPage": "前のページ",
       "price": "価格",
       "priceTips": "0は表示しない、-1は無料を示す",
       "searchByName": "サーバーを検索",
@@ -244,7 +280,17 @@
         "invalidValue": "10 GB や 1.5 TB のような有効な通信量を入力してください",
         "invalidResponse": "サーバーから校正結果が返されませんでした",
         "resetDayRequired": "先にサーバー編集でトラフィックのリセット日を設定してください"
-      }
+      },
+      "description": "ノードの接続、ネットワーク、グループ、備考、請求情報をまとめて確認し、ドラッグで全体の表示順を変更できます。",
+      "installCommandSaveFailed": "インストールコマンド設定の保存に失敗しました",
+      "installCommandSaved": "インストールコマンド設定を保存しました",
+      "invalidMonthRotate": "ネットワーク統計の月次リセット日は 0～31 で指定してください",
+      "confirmRotateToken": "リセットを確認",
+      "rotateToken": "Token をリセット",
+      "rotateTokenDescription": "新しい Token の発行後も古い Token は最大 24 時間有効です。新しい Token で初めて接続すると古い Token は直ちに無効になります。",
+      "rotateTokenInstructions": "リセット後、ノードで更新済みのインストールコマンドを再実行してください。手動アンインストールは不要です。自動更新はプログラムファイルのみを置き換え、Token は変更しません。",
+      "token": "ノード Token",
+      "twoFactorCode": "ワンタイムコード（2FA が無効なら空欄可）"
     },
     "notification": {
       "expire_enable": "期限切れ通知を有効にしますか",
@@ -255,7 +301,8 @@
       "login": "ログイン通知",
       "login_description": "新しいセッションがKomari Liteにログインしたときに通知を送信します。",
       "traffic": "トラフィック使用量",
-      "traffic_description": "Komari Lite は、サーバーのトラフィック使用量が設定した割合に達すると通知し、その後は 5% ごとに通知します。使用率は、当該請求期間に追加されたリセットトラフィック枠を含む、現在の請求期間の有効上限を基準に計算されます。上限が未設定の場合は通知されず、0 に設定すると通知を無効にできます。"
+      "traffic_description": "Komari Lite は、サーバーのトラフィック使用量が設定した割合に達すると通知し、その後は 5% ごとに通知します。使用率は、当該請求期間に追加されたリセットトラフィック枠を含む、現在の請求期間の有効上限を基準に計算されます。上限が未設定の場合は通知されず、0 に設定すると通知を無効にできます。",
+      "page_description": "有効期限、ログイン、通信量などの共通通知ルールを設定します。"
     }
   },
   "cancel": "キャンセル",
@@ -377,6 +424,7 @@
     "documentation": "ドキュメント",
     "done": "完了",
     "edit": "編集",
+    "modify": "変更",
     "export": "エクスポート",
     "empty_error": "空にできません",
     "enabled": "有効",
@@ -427,7 +475,18 @@
     "update": "更新",
     "update_available": "新しいバージョンがあります",
     "updated_successfully": "更新されました",
-    "weight": "重み"
+    "weight": "重み",
+    "loading": "読み込み中...",
+    "version": "バージョン",
+    "self_update_failed": "更新に失敗しました。現在のバージョンは保持されています",
+    "self_update_metadata_missing": "更新情報が不完全です。後でもう一度お試しください",
+    "self_update_preparing": "更新を準備しています...",
+    "self_update_restarting": "更新が完了し、Komari Lite を再起動しています。サービス復旧後にページを自動更新します。",
+    "self_update_restarting_short": "更新完了。再起動しています...",
+    "self_update_rolled_back": "新しいバージョンを起動できなかったため、前のバージョンに戻しました",
+    "self_update_succeeded": "更新が完了しました",
+    "self_update_timeout": "再起動の待機がタイムアウトしました。サービス状態を確認してください",
+    "update_now": "今すぐ更新"
   },
   "copy": "コピー",
   "copy_success": "クリップボードにコピーされました",
@@ -489,7 +548,8 @@
     "username": "ユーザー名"
   },
   "logs": {
-    "title": "ログ"
+    "title": "ログ",
+    "description": "システム動作、リクエスト、エラーの記録を確認します。"
   },
   "network_speed": "ネットワーク速度",
   "nodeCard": {
@@ -549,7 +609,8 @@
   },
   "notification": {
     "load": {
-      "title": "負荷通知"
+      "title": "負荷通知",
+      "description": "CPU、メモリ、負荷などのリソース警告ルールと対象ノードを設定します。"
     },
     "offline": {
       "batch_edit": "バッチ編集",
@@ -560,7 +621,8 @@
       "last_notified": "最後の通知",
       "never_triggered": "一度もトリガーされていません",
       "tips": "頻繁な通知を避けるために、猶予期間を設定しました：</br> <b>猶予期間</b>：クライアントがオフラインになった後、この期間内に再度オンラインにならなければ、オフライン通知が送信されます。",
-      "title": "オフライン通知"
+      "title": "オフライン通知",
+      "description": "ノードごとにオフライン猶予時間と通知クールダウンを設定し、一時的な切断による重複通知を抑えます。"
     },
     "ping_loss": {
       "add": "遅延監視アラートを追加",
@@ -581,7 +643,8 @@
       "threshold": "パケットロスしきい値",
       "title": "遅延監視",
       "window": "集計期間",
-      "window_minutes": "集計期間（分）"
+      "window_minutes": "集計期間（分）",
+      "description": "遅延監視の結果に基づいて、パケット損失しきい値、集計期間、クールダウンを設定します。"
     },
     "title": "通知",
     "traffic_report": {
@@ -610,7 +673,8 @@
       "sent_success": "{{count}} 台のサーバーの本日レポートを送信しました",
       "title": "トラフィックレポート",
       "traffic_content": "アップロード/ダウンロード",
-      "weekly": "週次レポート"
+      "weekly": "週次レポート",
+      "description": "ノードごとに日次、週次、月次の通信量レポートを設定します。"
     }
   },
   "page_not_found": "残念ながら、ページは小鞠に食べられてしまいました。",
@@ -627,10 +691,14 @@
     "task": "タスク",
     "task_view": "タスクビュー",
     "title": "遅延監視",
-    "type": "タイプ"
+    "type": "タイプ",
+    "default_task_count": "既定で有効なタスク",
+    "linked_server_count": "関連サーバー",
+    "task_count": "監視タスク"
   },
   "return_route": {
-    "title": "リターンルート監視"
+    "title": "リターンルート監視",
+    "description": "中国移動・電信・聯通の復路回線を識別し、確定した切り替えと復旧を通知します。"
   },
   "pwa": {
     "browser": "ブラウザモード",
@@ -791,7 +859,11 @@
       "auto_discovery": "自動検出",
       "auto_discovery_key": "自動検出キー",
       "auto_discovery_key_description": "自動検出を使用すると、クライアントを一括登録できます。空白の場合、自動検出は無効になります。",
-      "title": "一般"
+      "title": "一般",
+      "page_description": "自動検出、GeoIP、その他の全体動作を設定します。",
+      "admin_default_page_size": "リストの既定ページ件数",
+      "admin_default_page_size_description": "ページ分けされたすべてのリストで、1ページに表示する既定件数を設定します。リストを開き直したときに反映されます。",
+      "admin_default_page_size_invalid": "{{min}} から {{max}} までの整数を入力してください"
     },
     "geoip": {
       "enable_description": "ノードの地理位置情報を表示します",
@@ -872,7 +944,16 @@
       "stop_dialog_title": "cloudflared を停止",
       "stop_success": "cloudflared を停止しました",
       "stopped": "停止中",
-      "title": "リバースプロキシ"
+      "title": "リバースプロキシ",
+      "cloudflare_overview": "稼働概要",
+      "cloudflare_overview_description": "cloudflared、Tunnel、トークンの状態を確認し、接続を管理します。",
+      "page_description": "内蔵 HTTPS と Cloudflare Tunnel 接続を管理します。",
+      "runtime_records": "稼働記録",
+      "runtime_records_description": "最近の状態、エラー、cloudflared の出力を確認します。",
+      "token_guide": "トークン取得ガイドを見る",
+      "token_missing": "未設定",
+      "token_ready": "設定済み",
+      "token_status": "接続トークン"
     },
     "storage": {
       "main_description": "設定、サーバー、タスクのデータ",
@@ -882,7 +963,8 @@
       "overview": "ストレージ概要",
       "storage_usage": "ストレージ使用量",
       "title": "データとストレージ",
-      "total_description": "データベースファイルと一時実行ファイル"
+      "total_description": "データベースファイルと一時実行ファイル",
+      "page_description": "データベース使用量を確認し、監視データ、移行、メンテナンスを管理します。"
     },
     "metrics": {
       "advanced_title": "詳細オプション",
@@ -1130,7 +1212,8 @@
       "template_description": "Komari Liteはメッセージ通知テンプレートに従って通知を送信します",
       "test_description": "テストメッセージを送信",
       "test_title": "テストメッセージを送信",
-      "title": "通知"
+      "title": "通知",
+      "page_description": "通知チャネル、接続情報、メッセージテンプレートを設定します。"
     },
     "settings_save_failed": "設定の保存に失敗しました",
     "settings_saved": "設定が保存されました",
@@ -1173,7 +1256,8 @@
       "ws_allowed_origins": "WebSocket オリジン許可リスト",
       "ws_allowed_origins_description": "各行またはカンマで区切って1つのオリジンを指定します。例: https://example.com",
       "ws_origin_check_enabled": "WebSocket オリジンチェック",
-      "ws_origin_check_enabled_description": "有効にすると、WebSocket リクエストは同一オリジンまたは許可リストにあるオリジンのみを許可します"
+      "ws_origin_check_enabled_description": "有効にすると、WebSocket リクエストは同一オリジンまたは許可リストにあるオリジンのみを許可します",
+      "page_description": "サイト情報、アクセス制御、バックアップ、カスタム内容を設定します。"
     },
     "sso": {
       "callback_url_tips": "コールバックURL：{{url}}",
@@ -1307,8 +1391,10 @@
       "title": "XtermJS",
       "transparent_background": "透明背景",
       "transparent_hint": "コンテナ背景も透明な場合にのみ透明化を有効にしてください。",
-      "transparent_theme_hint": "テーマ背景はまだ不透明です。rgba(...) または hsla(...) を使用してください。"
-    }
+      "transparent_theme_hint": "テーマ背景はまだ不透明です。rgba(...) または hsla(...) を使用してください。",
+      "page_description": "リモート端末のフォント、配色、スクロールバック、表示動作を調整します。"
+    },
+    "account_security_page_description": "ログイン情報、二要素認証、セッション、API アクセスを管理します。"
   },
   "status_settings": "ステータス表示設定",
   "terminal": {
@@ -1427,7 +1513,9 @@
     "uploading": "テーマをアップロード中...",
     "uploda_413_content_too_large": "ファイルのアップロードに失敗しました (413)。Nginx/CDNなどのリバースプロキシサーバーの設定でファイルサイズ制限（client_max_body_size）を確認し、ターゲットファイルサイズよりも大きい値に増やしてください。",
     "version": "バージョン",
-    "zip_files_only": ".zip形式のみサポート"
+    "zip_files_only": ".zip形式のみサポート",
+    "manage_description": "現在のテーマが提供する表示と機能の設定を調整します。",
+    "page_description": "インストール済みテーマの管理、切り替え、設定の保守を行います。"
   },
   "time": {
     "ago": "前",

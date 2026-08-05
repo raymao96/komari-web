@@ -17,10 +17,15 @@ import React from "react";
 import { toast } from "sonner";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import {
+  ADMIN_LIST_PAGE_SIZE_MAX,
+  ADMIN_LIST_PAGE_SIZE_MIN,
+  isValidAdminPageSize,
+} from "@/utils/adminPagination";
 
 export default function GeneralSettings() {
   const { t } = useTranslation();
-  const { settings, loading, error } = useSettings();
+  const { settings, loading, error, refetch } = useSettings();
   const [geoip_testResult, setGeoipTestResult] = React.useState<string | null>(
     null
   );
@@ -34,12 +39,47 @@ export default function GeneralSettings() {
 
   return (
     <>
-      <AdminPageTitle>{t("settings.general.title")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.general.page_description",
+          "配置自动发现、GeoIP 与其他全局行为。",
+        )}
+      >
+        {t("settings.general.title")}
+      </AdminPageTitle>
+      <SettingCardLabel>
+        {t("settings.general.admin_default_page_size")}
+      </SettingCardLabel>
+      <SettingCardShortTextInput
+        description={t("settings.general.admin_default_page_size_description")}
+        defaultValue={settings.admin_default_page_size || 10}
+        type="number"
+        min={ADMIN_LIST_PAGE_SIZE_MIN}
+        max={ADMIN_LIST_PAGE_SIZE_MAX}
+        step={1}
+        OnSave={async (data) => {
+          const pageSize = Number(data);
+          if (!isValidAdminPageSize(pageSize)) {
+            toast.error(
+              t("settings.general.admin_default_page_size_invalid", {
+                min: ADMIN_LIST_PAGE_SIZE_MIN,
+                max: ADMIN_LIST_PAGE_SIZE_MAX,
+              }),
+            );
+            throw new Error("Invalid admin default page size");
+          }
+          await updateSettingsWithToast(
+            { admin_default_page_size: pageSize },
+            t,
+          );
+          await refetch();
+        }}
+      />
       <SettingCardLabel>
         {t("settings.general.auto_discovery")}
       </SettingCardLabel>
       <ApiCard settings={settings} />
-      <label className="text-xl font-bold">{t("settings.geoip.title")}</label>
+      <SettingCardLabel>{t("settings.geoip.title")}</SettingCardLabel>
       <SettingCardSwitch
         title={t("settings.geoip.enable_title")}
         description={t("settings.geoip.enable_description")}
@@ -181,7 +221,7 @@ const ApiCard = ({ settings }: { settings: SettingsResponse }) => {
           color="mint"
           onClick={() => {
             window.open(
-              "https://nuomiiiii.github.io/komari-document/install/agent-ad.html",
+              "https://nuomiiiii.github.io/komari-document/install/agent-ad",
               "_blank"
             );
           }}

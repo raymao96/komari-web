@@ -32,6 +32,28 @@ export interface DashboardDatabaseStatus {
   error?: string;
 }
 
+export interface DashboardReturnRouteEvent {
+  id: number;
+  task_name: string;
+  node_name: string;
+  expected_line: string;
+  from_line: string;
+  to_line: string;
+  kind: string;
+  occurred_at: string;
+}
+
+export interface DashboardReturnRouteStatus {
+  tasks: number;
+  active: number;
+  healthy: number;
+  switched: number;
+  abnormal: number;
+  recent_events: number;
+  latest_event?: DashboardReturnRouteEvent;
+  error?: string;
+}
+
 export interface DashboardData {
   servers: {
     total: number;
@@ -61,6 +83,7 @@ export interface DashboardData {
     retention_days: number;
     last_compacted_at: string | null;
   };
+  return_route: DashboardReturnRouteStatus;
   generated_at: string;
 }
 

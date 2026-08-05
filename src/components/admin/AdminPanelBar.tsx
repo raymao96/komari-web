@@ -139,13 +139,11 @@ function formatVersion(version?: string | null, hash?: string | null) {
 function SidebarVersionLabel({
   version,
   hash,
-  isMobile,
 }: {
   version: string;
   hash?: string | null;
-  isMobile: boolean;
 }) {
-  const snapshot = !isMobile ? version.match(/^snapshot-(.+)$/i) : null;
+  const snapshot = version.match(/^snapshot-(.+)$/i);
   const normalizedHash = hash?.trim();
   const visibleHash =
     normalizedHash && normalizedHash !== "unknown" ? normalizedHash : null;
@@ -237,7 +235,7 @@ function ReleaseMarkdown({ body }: { body?: string | null }) {
           ),
           hr: () => <hr className="my-5 border-[var(--gray-a5)]" />,
           table: ({ children }) => (
-            <div className="my-4 overflow-x-auto rounded-md border border-[var(--gray-a5)]">
+            <div className="my-4 overflow-x-auto rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
               <table className="w-full min-w-max border-collapse text-left text-sm">
                 {children}
               </table>
@@ -1053,7 +1051,6 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                         <SidebarVersionLabel
                           version={currentVersion}
                           hash={versionInfo?.hash}
-                          isMobile={isMobile}
                         />
                       </a>
                     )}

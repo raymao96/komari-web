@@ -31,6 +31,20 @@
     "recent_month": "Last month",
     "region_unknown": "Region not set",
     "retention_period": "Retention period",
+    "return_route_abnormal": "Probe errors",
+    "return_route_abnormal_tasks": "{{count}} tasks have probe errors",
+    "return_route_all_normal": "All active routes are healthy",
+    "return_route_changed": "Route changes",
+    "return_route_changed_tasks": "Route changes detected for {{count}} tasks",
+    "return_route_current": "Current",
+    "return_route_expected": "Expected",
+    "return_route_healthy": "Healthy routes",
+    "return_route_latest_change": "Latest change",
+    "return_route_none": "No return-route monitoring tasks are currently running",
+    "return_route_normal": "Healthy",
+    "return_route_recent_events": "24-hour events",
+    "return_route_status": "Return-route status",
+    "return_route_status_hint": "Task health and recent route changes",
     "server_status": "Server status",
     "server_status_hint": "Overview of server availability and offline nodes",
     "servers": "Server status",
@@ -157,6 +171,25 @@
     },
     "nodeTable": {
       "addNode": "Add",
+      "allNodes": "All servers",
+      "clearFilterToReorder": "Clear search and filters to reorder",
+      "groupAndRemark": "Group & note",
+      "ipv4Only": "IPv4 only",
+      "lastReportRecent": "Latest report: just now",
+      "lastReportUnavailable": "Latest report: unavailable",
+      "lastReportWaiting": "Latest report: waiting",
+      "liveTraffic": "Traffic",
+      "livePreparing": "Loading live status",
+      "liveRefresh": "Live status refresh",
+      "liveRefreshInterval": "5 sec",
+      "liveUnavailable": "Live status unavailable",
+      "liveUpdatedAt": "Live status updated at {{time}}",
+      "networkAndAgent": "Network & Agent",
+      "network": "Network",
+      "agent": "Agent",
+      "resourceStatus": "Resources",
+      "trafficQuotaShort": "Quota",
+      "trafficUsedShort": "Used",
       "autoDiscovery": {
         "disabledDescription": "With auto discovery enabled, you no longer need to add nodes one by one. Just run a single command on the target server and the Agent will register and come online automatically using the key. Ideal for deploying many servers at once.",
         "enabledDescription": "Run the command below on the target server. The Agent will register and come online automatically, no manual node creation needed.",
@@ -220,7 +253,10 @@
       "namePlaceholder": "Name",
       "noData": "No data",
       "nodeList": "Node list",
+      "nextPage": "Next page",
       "noResults": "No results",
+      "pageSummary": "Showing {{start}}-{{end}} of {{total}}",
+      "previousPage": "Previous page",
       "price": "Price",
       "priceTips": "0 is not displayed, -1 means free",
       "searchByName": "Find the server",
@@ -250,7 +286,11 @@
         "invalidValue": "Enter valid traffic, such as 10 GB or 1.5 TB",
         "invalidResponse": "The server did not return a calibration result",
         "resetDayRequired": "Set a traffic reset day in the server editor first"
-      }
+      },
+      "description": "Review node connectivity, network details, groups, notes, and billing in one place. Drag rows to set the global display order.",
+      "installCommandSaveFailed": "Failed to save installation command settings",
+      "installCommandSaved": "Installation command settings saved",
+      "invalidMonthRotate": "The monthly network reset day must be between 0 and 31"
     },
     "notification": {
       "expire_enable": "Enable Expiration Reminder",
@@ -261,7 +301,8 @@
       "login": "Login Notification",
       "login_description": "Send a notification when a new session logs into Komari Lite.",
       "traffic": "Traffic Usage",
-      "traffic_description": "Komari Lite sends a notification when server traffic reaches the configured percentage, followed by reminders at 5% increments. Usage is calculated against the effective quota for the current billing cycle, including any reset traffic allowance added for that cycle. No notification is sent without a traffic limit; set this value to 0 to disable reminders."
+      "traffic_description": "Komari Lite sends a notification when server traffic reaches the configured percentage, followed by reminders at 5% increments. Usage is calculated against the effective quota for the current billing cycle, including any reset traffic allowance added for that cycle. No notification is sent without a traffic limit; set this value to 0 to disable reminders.",
+      "page_description": "Configure general expiration, login, and traffic usage notifications."
     }
   },
   "cancel": "Cancel",
@@ -383,6 +424,7 @@
     "documentation": "Documentation",
     "done": "Done",
     "edit": "Edit",
+    "modify": "Modify",
     "export": "Export",
     "empty_error": "Can not be empty",
     "enabled": "Enabled",
@@ -442,7 +484,9 @@
     "self_update_succeeded": "Update succeeded; refreshing the page",
     "self_update_timeout": "Timed out while confirming the update; refresh the page later to check the current version",
     "updated_successfully": "Updated successfully",
-    "weight": "Weight"
+    "weight": "Weight",
+    "loading": "Loading...",
+    "version": "Version"
   },
   "copy": "Copy",
   "copy_success": "Copied!",
@@ -504,7 +548,8 @@
     "username": "Username"
   },
   "logs": {
-    "title": "Logs"
+    "title": "Logs",
+    "description": "Review system activity, requests, and error records."
   },
   "network_speed": "Network Speed",
   "nodeCard": {
@@ -564,7 +609,8 @@
   },
   "notification": {
     "load": {
-      "title": "Load"
+      "title": "Load",
+      "description": "Configure CPU, memory, load, and other resource alert rules for selected nodes."
     },
     "offline": {
       "batch_edit": "Batch Edit",
@@ -575,7 +621,8 @@
       "last_notified": "Last notified",
       "never_triggered": "Never triggered",
       "tips": "To prevent frequent notifications, we use a grace period:</br> <b>Grace Period</b>: If a client goes offline and doesn't reconnect within this time, an offline notification will be sent.",
-      "title": "Offline"
+      "title": "Offline",
+      "description": "Set offline grace periods and notification cooldowns per node to reduce alerts caused by brief disconnects."
     },
     "ping_loss": {
       "add": "Add latency monitoring alert",
@@ -596,7 +643,8 @@
       "threshold": "Packet loss threshold",
       "title": "Latency Monitoring",
       "window": "Window",
-      "window_minutes": "Window (minutes)"
+      "window_minutes": "Window (minutes)",
+      "description": "Set packet-loss thresholds, evaluation windows, and cooldowns based on latency monitor results."
     },
     "title": "Notification",
     "traffic_report": {
@@ -625,7 +673,8 @@
       "sent_success": "Today's report was sent for {{count}} servers",
       "title": "Traffic Report",
       "traffic_content": "Upload/download traffic",
-      "weekly": "Weekly"
+      "weekly": "Weekly",
+      "description": "Configure daily, weekly, and monthly traffic reports for each node."
     }
   },
   "page_not_found": "The server cannot find the specific page you're trying to access.",
@@ -642,10 +691,14 @@
     "task": "Task",
     "task_view": "Task View",
     "title": "Latency",
-    "type": "Type"
+    "type": "Type",
+    "default_task_count": "Default-on tasks",
+    "linked_server_count": "Linked servers",
+    "task_count": "Monitor tasks"
   },
   "return_route": {
-    "title": "Return Route Monitoring"
+    "title": "Return Route Monitoring",
+    "description": "Identify return routes for China Mobile, Telecom, and Unicom, then notify on confirmed route changes and recovery."
   },
   "pwa": {
     "browser": "Browser Mode",
@@ -806,7 +859,11 @@
       "auto_discovery": "Auto discovery",
       "auto_discovery_key": "Auto discovery key",
       "auto_discovery_key_description": "Use automatic discovery to register clients in bulk. Leave blank to disable automatic discovery.",
-      "title": "General"
+      "title": "General",
+      "page_description": "Configure auto discovery, GeoIP, and other global behavior.",
+      "admin_default_page_size": "Default list pagination",
+      "admin_default_page_size_description": "Set the default number of items shown per page across all paginated lists. The value is applied when a list page is opened again.",
+      "admin_default_page_size_invalid": "Enter an integer between {{min}} and {{max}}"
     },
     "geoip": {
       "enable_description": "Display node geographic locations",
@@ -887,7 +944,16 @@
       "stop_dialog_title": "Stop cloudflared",
       "stop_success": "cloudflared stopped",
       "stopped": "stopped",
-      "title": "Reverse Proxy"
+      "title": "Reverse Proxy",
+      "cloudflare_overview": "Runtime overview",
+      "cloudflare_overview_description": "Review cloudflared, Tunnel, and token status and manage the connection.",
+      "page_description": "Manage built-in HTTPS and Cloudflare Tunnel access.",
+      "runtime_records": "Runtime records",
+      "runtime_records_description": "Review recent status, errors, and cloudflared output.",
+      "token_guide": "View token setup guide",
+      "token_missing": "Not configured",
+      "token_ready": "Configured",
+      "token_status": "Connection token"
     },
     "storage": {
       "main_description": "Configuration, servers, and task data",
@@ -897,7 +963,8 @@
       "overview": "Storage Overview",
       "storage_usage": "Storage Usage",
       "title": "Data & Storage",
-      "total_description": "Database files and temporary runtime files"
+      "total_description": "Database files and temporary runtime files",
+      "page_description": "Review database usage and manage monitoring data, migrations, and maintenance."
     },
     "metrics": {
       "advanced_title": "Advanced Options",
@@ -1145,7 +1212,8 @@
       "template_description": "Komari Lite will send notifications according to the notification template",
       "test_description": "Send a test message",
       "test_title": "Send test message",
-      "title": "Notifications"
+      "title": "Notifications",
+      "page_description": "Configure notification channels, connection parameters, and message templates."
     },
     "settings_save_failed": "Failed to Save Settings",
     "settings_saved": "Settings Saved",
@@ -1188,7 +1256,8 @@
       "ws_allowed_origins": "WebSocket allowed origins",
       "ws_allowed_origins_description": "One origin per line or separated by commas, e.g., https://example.com",
       "ws_origin_check_enabled": "WebSocket origin check",
-      "ws_origin_check_enabled_description": "When enabled, WebSocket requests are only allowed from the same origin or origins in the allowed list"
+      "ws_origin_check_enabled_description": "When enabled, WebSocket requests are only allowed from the same origin or origins in the allowed list",
+      "page_description": "Configure site information, access controls, backups, and custom content."
     },
     "sso": {
       "callback_url_tips": "Configure your SSO provider with this callback URL: {{url}}",
@@ -1322,8 +1391,10 @@
       "title": "XtermJS",
       "transparent_background": "Transparent Background",
       "transparent_hint": "Enable transparency only if the container background is also transparent.",
-      "transparent_theme_hint": "Theme background is still opaque. Use rgba(...) or hsla(...)."
-    }
+      "transparent_theme_hint": "Theme background is still opaque. Use rgba(...) or hsla(...).",
+      "page_description": "Adjust remote terminal fonts, colors, scrollback, and display behavior."
+    },
+    "account_security_page_description": "Manage login credentials, two-factor authentication, sessions, and API access."
   },
   "status_settings": "Status Settings",
   "terminal": {
@@ -1442,7 +1513,9 @@
     "uploading": "Uploading theme...",
     "uploda_413_content_too_large": "File upload failed (413). Please check and increase the file size limit in your reverse proxy server (such as Nginx/CDN) configuration (client_max_body_size) to ensure that this value is greater than your target file size.",
     "version": "Version",
-    "zip_files_only": "Only .zip files are supported"
+    "zip_files_only": "Only .zip files are supported",
+    "manage_description": "Adjust the display and feature options provided by the current theme.",
+    "page_description": "Manage installed themes, switch the active theme, and maintain theme settings."
   },
   "time": {
     "ago": "Ago",

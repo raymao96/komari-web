@@ -161,7 +161,7 @@ const ThemeManaged: React.FC = () => {
   return (
     <Flex direction="column" gap="4" className="p-0 md:p-4">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
-        <AdminPageTitle>
+        <AdminPageTitle description={t("theme.manage_description", "调整当前主题提供的显示和功能选项。")}> 
           {theme
             ? t("theme.manage_with_name", {
                 name: themeDisplayName,

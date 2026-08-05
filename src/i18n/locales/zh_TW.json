@@ -31,6 +31,20 @@
     "recent_month": "最近一個月",
     "region_unknown": "未設定地區",
     "retention_period": "保留週期",
+    "return_route_abnormal": "探測異常",
+    "return_route_abnormal_tasks": "{{count}} 個任務探測異常",
+    "return_route_all_normal": "目前任務鏈路均正常",
+    "return_route_changed": "線路變化",
+    "return_route_changed_tasks": "{{count}} 個任務偵測到線路變化",
+    "return_route_current": "目前",
+    "return_route_expected": "預期",
+    "return_route_healthy": "鏈路正常",
+    "return_route_latest_change": "最近變化",
+    "return_route_none": "暫無正在執行的回程線路監測任務",
+    "return_route_normal": "正常",
+    "return_route_recent_events": "24 小時事件",
+    "return_route_status": "回程鏈路狀態",
+    "return_route_status_hint": "監測任務健康度與最近線路變化",
     "server_status": "伺服器狀態",
     "server_status_hint": "伺服器在線狀態與離線節點概覽",
     "servers": "伺服器狀態",
@@ -157,6 +171,25 @@
     },
     "nodeTable": {
       "addNode": "添加節點",
+      "allNodes": "全部節點",
+      "clearFilterToReorder": "清除搜尋與篩選後可調整順序",
+      "groupAndRemark": "群組與備註",
+      "ipv4Only": "僅 IPv4",
+      "lastReportRecent": "最近上報：剛剛",
+      "lastReportUnavailable": "最近上報：暫時無法使用",
+      "lastReportWaiting": "最近上報：等待中",
+      "liveTraffic": "流量",
+      "livePreparing": "正在讀取即時狀態",
+      "liveRefresh": "即時狀態重新整理",
+      "liveRefreshInterval": "5 秒",
+      "liveUnavailable": "即時狀態暫時無法使用",
+      "liveUpdatedAt": "即時狀態於 {{time}} 更新",
+      "networkAndAgent": "網路與 Agent",
+      "network": "網路",
+      "agent": "Agent",
+      "resourceStatus": "資源狀態",
+      "trafficQuotaShort": "總額",
+      "trafficUsedShort": "已用",
       "autoDiscovery": {
         "disabledDescription": "開啟自動發現後，無需逐台手動添加節點。只要在目標伺服器上執行一條命令，Agent 就會攜帶金鑰自動註冊並上線，非常適合批次部署多台伺服器。",
         "enabledDescription": "在目標伺服器上執行下面的命令，Agent 將自動註冊並上線，無需手動添加節點。",
@@ -214,7 +247,10 @@
       "namePlaceholder": "名稱",
       "noData": "沒有數據",
       "nodeList": "節點列表",
+      "nextPage": "下一頁",
       "noResults": "沒有結果",
+      "pageSummary": "顯示 {{start}}-{{end}}，共 {{total}} 台",
+      "previousPage": "上一頁",
       "price": "價格",
       "priceTips": "0不顯示，-1表示免費",
       "searchByName": "查找伺服器",
@@ -244,7 +280,17 @@
         "invalidValue": "請輸入有效流量，例如 10 GB 或 1.5 TB",
         "invalidResponse": "伺服器未回傳校準結果",
         "resetDayRequired": "請先在伺服器編輯中設定流量重置日"
-      }
+      },
+      "description": "集中查看節點連線、網路、群組、備註與帳單資訊，拖曳可調整全域顯示順序。",
+      "installCommandSaveFailed": "一鍵部署設定儲存失敗",
+      "installCommandSaved": "一鍵部署設定已儲存",
+      "invalidMonthRotate": "網路統計月重設日必須為 0-31",
+      "confirmRotateToken": "確認重設",
+      "rotateToken": "重設 Token",
+      "rotateTokenDescription": "產生新 Token 後，舊 Token 最多保留 24 小時；新 Token 首次成功連線後，舊 Token 會立即失效。",
+      "rotateTokenInstructions": "重設後在節點重新執行更新後的部署指令即可，無需手動解除安裝；自動更新只會替換程式檔案，不會修改 Token。",
+      "token": "節點 Token",
+      "twoFactorCode": "動態口令（未啟用 2FA 可留空）"
     },
     "notification": {
       "expire_enable": "是否啟用過期提醒",
@@ -255,7 +301,8 @@
       "login": "登入通知",
       "login_description": "當有新的會話登入到Komari Lite時，向您傳送通知",
       "traffic": "流量用量",
-      "traffic_description": "Komari Lite 將在伺服器流量達到設定比例時傳送通知，並按 5% 梯度持續提醒。使用比例按目前計費週期的有效額度計算，包含本週期設定的重設流量額度。伺服器未設定流量閾值時不傳送通知；設定為 0 可關閉流量提醒。"
+      "traffic_description": "Komari Lite 將在伺服器流量達到設定比例時傳送通知，並按 5% 梯度持續提醒。使用比例按目前計費週期的有效額度計算，包含本週期設定的重設流量額度。伺服器未設定流量閾值時不傳送通知；設定為 0 可關閉流量提醒。",
+      "page_description": "設定到期、登入與流量用量等一般通知規則。"
     }
   },
   "cancel": "取消",
@@ -377,6 +424,7 @@
     "documentation": "文檔",
     "done": "完畢",
     "edit": "編輯",
+    "modify": "修改",
     "export": "匯出",
     "empty_error": "不能為空",
     "enabled": "啟用",
@@ -427,7 +475,18 @@
     "update": "更新",
     "update_available": "有新版本",
     "updated_successfully": "成功更新",
-    "weight": "權重"
+    "weight": "權重",
+    "loading": "載入中...",
+    "version": "版本",
+    "self_update_failed": "更新失敗，已保留目前版本",
+    "self_update_metadata_missing": "更新資訊不完整，請稍後重試",
+    "self_update_preparing": "正在準備更新...",
+    "self_update_restarting": "更新已完成，Komari Lite 正在重新啟動。服務恢復後頁面會自動重新整理。",
+    "self_update_restarting_short": "更新已完成，正在重新啟動...",
+    "self_update_rolled_back": "新版本啟動失敗，已回復上一版本",
+    "self_update_succeeded": "更新完成",
+    "self_update_timeout": "等待重新啟動逾時，請檢查服務狀態",
+    "update_now": "立即更新"
   },
   "copy": "複製",
   "copy_success": "已複製到剪貼板",
@@ -489,7 +548,8 @@
     "username": "用戶名"
   },
   "logs": {
-    "title": "日誌"
+    "title": "日誌",
+    "description": "查看系統執行、請求與錯誤記錄。"
   },
   "network_speed": "網路速率",
   "nodeCard": {
@@ -549,7 +609,8 @@
   },
   "notification": {
     "load": {
-      "title": "負載通知"
+      "title": "負載通知",
+      "description": "設定 CPU、記憶體、負載等資源告警規則，並指定適用節點。"
     },
     "offline": {
       "batch_edit": "批量修改",
@@ -560,7 +621,8 @@
       "last_notified": "最後通知",
       "never_triggered": "從未觸發",
       "tips": "為了避免頻繁發送通知，我們設定了寬限期：</br> <b>寬限期</b>：客戶端離線後，如果在這段時間內沒有重新上線，就會發送離線通知",
-      "title": "離線通知"
+      "title": "離線通知",
+      "description": "按節點設定離線寬限期與通知冷卻時間，減少短暫斷線造成的重複通知。"
     },
     "ping_loss": {
       "add": "新增延遲監測警示",
@@ -581,7 +643,8 @@
       "threshold": "丟包閾值",
       "title": "延遲監測警示",
       "window": "統計視窗",
-      "window_minutes": "統計視窗（分鐘）"
+      "window_minutes": "統計視窗（分鐘）",
+      "description": "依延遲監測結果設定封包遺失門檻、統計視窗與冷卻時間。"
     },
     "title": "通知",
     "traffic_report": {
@@ -610,7 +673,8 @@
       "sent_success": "已傳送 {{count}} 台伺服器的今日日報",
       "title": "流量定時報告",
       "traffic_content": "上行/下行流量",
-      "weekly": "週報"
+      "weekly": "週報",
+      "description": "按節點設定日報、週報與月報的推送週期和內容。"
     }
   },
   "page_not_found": "真不巧，網頁被小鞠吃掉了。",
@@ -627,10 +691,14 @@
     "task": "任務",
     "task_view": "任務視圖",
     "title": "延遲監測",
-    "type": "類型"
+    "type": "類型",
+    "default_task_count": "預設啟用任務",
+    "linked_server_count": "關聯伺服器",
+    "task_count": "監測任務"
   },
   "return_route": {
-    "title": "回程線路監測"
+    "title": "回程線路監測",
+    "description": "辨識移動、電信、聯通回程線路，確認切線後告警，恢復後自動通知。"
   },
   "pwa": {
     "browser": "瀏覽器模式",
@@ -791,7 +859,11 @@
       "auto_discovery": "自動發現",
       "auto_discovery_key": "自動發現密鑰",
       "auto_discovery_key_description": "使用自動發現可以批量註冊客戶端，留空表示禁用自動發現。",
-      "title": "通用"
+      "title": "通用",
+      "page_description": "設定自動探索、GeoIP 與其他全域行為。",
+      "admin_default_page_size": "列表預設分頁",
+      "admin_default_page_size_description": "設定所有分頁列表每頁預設顯示數量，重新進入列表頁面後生效。",
+      "admin_default_page_size_invalid": "請輸入 {{min}} 到 {{max}} 之間的整數"
     },
     "geoip": {
       "enable_description": "顯示節點的地理位置信息",
@@ -872,7 +944,16 @@
       "stop_dialog_title": "停止 cloudflared",
       "stop_success": "cloudflared 已停止",
       "stopped": "已停止",
-      "title": "反向代理"
+      "title": "反向代理",
+      "cloudflare_overview": "執行概覽",
+      "cloudflare_overview_description": "集中查看 cloudflared、Tunnel 與權杖狀態，並管理連線。",
+      "page_description": "管理內建 HTTPS 與 Cloudflare Tunnel 存取。",
+      "runtime_records": "執行記錄",
+      "runtime_records_description": "查看最近狀態、錯誤與 cloudflared 輸出。",
+      "token_guide": "查看權杖取得說明",
+      "token_missing": "未設定",
+      "token_ready": "已設定",
+      "token_status": "連線權杖"
     },
     "storage": {
       "main_description": "設定、伺服器與任務資料",
@@ -882,7 +963,8 @@
       "overview": "儲存概覽",
       "storage_usage": "儲存使用",
       "title": "資料與儲存",
-      "total_description": "資料庫檔案和執行階段暫存檔案"
+      "total_description": "資料庫檔案和執行階段暫存檔案",
+      "page_description": "查看資料庫占用並管理監測資料、遷移與維護。"
     },
     "metrics": {
       "advanced_title": "進階選項",
@@ -1130,7 +1212,8 @@
       "template_description": "Komari Lite 將按照消息通知模板發送通知",
       "test_description": "發送測試消息",
       "test_title": "發送測試消息",
-      "title": "通知"
+      "title": "通知",
+      "page_description": "設定通知管道、連線參數與訊息範本。"
     },
     "settings_save_failed": "保存設置失敗",
     "settings_saved": "設置已保存",
@@ -1173,7 +1256,8 @@
       "ws_allowed_origins": "WebSocket Origin 允許列表",
       "ws_allowed_origins_description": "每行或用逗號分隔一個 Origin，例如 https://example.com",
       "ws_origin_check_enabled": "WebSocket Origin 校驗",
-      "ws_origin_check_enabled_description": "開啟後 WebSocket 請求只允許同源或允許列表中的 Origin"
+      "ws_origin_check_enabled_description": "開啟後 WebSocket 請求只允許同源或允許列表中的 Origin",
+      "page_description": "設定站點資訊、存取控制、備份與自訂內容。"
     },
     "sso": {
       "callback_url_tips": "回調地址：{{url}}",
@@ -1307,8 +1391,10 @@
       "title": "XtermJS",
       "transparent_background": "透明背景",
       "transparent_hint": "僅在容器背景也透明時啟用透明效果。",
-      "transparent_theme_hint": "主題背景仍然不透明，請改用 rgba(...) 或 hsla(...)。"
-    }
+      "transparent_theme_hint": "主題背景仍然不透明，請改用 rgba(...) 或 hsla(...)。",
+      "page_description": "調整遠端終端機的字型、配色、回捲與顯示行為。"
+    },
+    "account_security_page_description": "管理登入憑證、雙因素驗證、工作階段與 API 存取。"
   },
   "status_settings": "狀態顯示設置",
   "terminal": {
@@ -1427,7 +1513,9 @@
     "uploading": "正在上傳主題...",
     "uploda_413_content_too_large": "檔案上傳失敗 (413)。請檢查並增大您的反向代理伺服器（如 Nginx/CDN）配置中的檔案大小限制（client_max_body_size），確保該值大於您的目標檔案大小。",
     "version": "版本",
-    "zip_files_only": "僅支持 .zip 格式"
+    "zip_files_only": "僅支持 .zip 格式",
+    "manage_description": "調整目前主題提供的顯示與功能選項。",
+    "page_description": "管理已安裝主題、切換目前主題並維護主題設定。"
   },
   "time": {
     "ago": "前",

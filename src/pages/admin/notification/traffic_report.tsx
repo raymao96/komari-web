@@ -18,6 +18,11 @@ import {
 } from "@/contexts/TrafficReportContext";
 import React from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSelectionCount } from "@/components/admin/AdminSelectionCount";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 import { Clock3, Pencil, Save, Search, Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,7 +30,6 @@ import {
   Button,
   Dialog,
   Flex,
-  IconButton,
   Switch,
   TextField,
 } from "@radix-ui/themes";
@@ -293,6 +297,28 @@ const InnerLayout = () => {
     include_traffic: true,
     include_billing: false,
   });
+  const filteredNodeIds = React.useMemo(
+    () => nodeDetail
+      .filter((node) => node.name.toLowerCase().includes(search.toLowerCase()))
+      .map((node) => node.uuid),
+    [nodeDetail, search],
+  );
+  const selectedFilteredIds = React.useMemo(() => {
+    const selectedSet = new Set(selected);
+    return filteredNodeIds.filter((id) => selectedSet.has(id));
+  }, [filteredNodeIds, selected]);
+  const selectedFilteredCount = selectedFilteredIds.length;
+  const allFilteredSelected = filteredNodeIds.length > 0
+    && selectedFilteredCount === filteredNodeIds.length;
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const filteredSet = new Set(filteredNodeIds);
+      setSelected((current) => current.filter((id) => !filteredSet.has(id)));
+      return;
+    }
+    setSelected((current) => Array.from(new Set([...current, ...filteredNodeIds])));
+  };
 
   const savedReportTime = settings.traffic_report_time || "00:00";
   const reportTimeValid = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(reportTime);
@@ -350,7 +376,7 @@ const InnerLayout = () => {
     }
 
     setBatchLoading(true);
-    const payload = selected.map((id) => ({
+    const payload = selectedFilteredIds.map((id) => ({
       client: id,
       ...values,
     }));
@@ -389,25 +415,17 @@ const InnerLayout = () => {
   return (
     <div className="flex flex-col gap-5 p-0 md:p-4">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
-        <AdminPageTitle>
+        <AdminPageTitle
+          description={t(
+            "notification.traffic_report.description",
+            "按节点设置日报、周报与月报的推送周期和内容。",
+          )}
+        >
           {t("notification.traffic_report.full_title")}
         </AdminPageTitle>
-        <TextField.Root
-          type="text"
-          className="w-full sm:w-64"
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setSearch(e.target.value)
-          }
-        >
-          <TextField.Slot>
-            <Search size={16} />
-          </TextField.Slot>
-        </TextField.Root>
       </Flex>
 
-      <div className="grid overflow-hidden rounded-md border border-[var(--gray-a5)] lg:grid-cols-2">
+      <div className="grid overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] lg:grid-cols-2">
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <Clock3
@@ -423,11 +441,11 @@ const InnerLayout = () => {
               </div>
             </div>
           </div>
-          <Flex gap="2" align="center" className="shrink-0">
+          <Flex gap="2" align="center" className="w-full shrink-0 sm:w-auto">
             <TextField.Root
               type="time"
               aria-label={t("notification.traffic_report.report_time")}
-              className="w-32"
+              className="min-w-0 flex-1 sm:w-32 sm:flex-none"
               value={reportTime}
               onChange={(event) => setReportTime(event.target.value)}
               disabled={reportTimeSaving}
@@ -465,7 +483,7 @@ const InnerLayout = () => {
           </div>
           <Button
             type="button"
-            className="shrink-0"
+            className="w-full shrink-0 sm:w-auto"
             onClick={sendDailyReport}
             disabled={dailySending}
           >
@@ -475,54 +493,83 @@ const InnerLayout = () => {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-[var(--gray-a5)]">
-        <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--gray-a5)] bg-[var(--gray-a2)] px-3 py-2">
-          <span className="text-sm text-muted-foreground">
-            {t("common.selected_total", {
-              count: selected.length,
-              total: nodeDetail.length,
-            })}
-          </span>
-          <Dialog.Root open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
-            <Dialog.Trigger>
-              <Button
-                variant="soft"
-                onClick={() => {
-                  const first = trafficReportNotification.find(
-                    (n) => n.client === selected[0]
-                  );
-                  setBatchForm({
-                    enable: first?.enable ?? true,
-                    daily: first?.daily ?? false,
-                    weekly: first?.weekly ?? false,
-                    monthly: first?.monthly ?? false,
-                    include_traffic: first?.include_traffic ?? true,
-                    include_billing: first?.include_billing ?? false,
-                  });
-                }}
-                disabled={batchLoading || selected.length === 0}
-              >
-                {t("notification.traffic_report.batch_edit")}
-              </Button>
-            </Dialog.Trigger>
-            <Dialog.Content>
-              <Dialog.Title>
-                {t("notification.traffic_report.batch_edit")}
-              </Dialog.Title>
-              <TrafficReportEditForm
-                initialValues={batchForm}
-                loading={batchLoading}
-                onSubmit={handleBatchEdit}
-                onCancel={() => setBatchDialogOpen(false)}
-              />
-            </Dialog.Content>
-          </Dialog.Root>
-        </div>
+      <div className="flex flex-col gap-3">
         <TrafficReportTable
           search={search}
           selected={selected}
           onSelectionChange={setSelected}
+          paginationSummary={
+            <AdminSelectionCount
+              count={selectedFilteredCount}
+              total={filteredNodeIds.length}
+              className="hidden md:inline-flex"
+            />
+          }
         />
+        <div className="order-first flex min-h-10 items-center justify-between gap-3 px-1 md:justify-end">
+          <AdminSelectionCount
+            count={selectedFilteredCount}
+            total={filteredNodeIds.length}
+            className="shrink-0 text-sm text-muted-foreground md:hidden"
+          />
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="soft"
+              disabled={filteredNodeIds.length === 0}
+              onClick={toggleSelectAll}
+            >
+              {t(allFilteredSelected ? "common.deselect_all" : "common.select_all")}
+            </Button>
+            <Dialog.Root open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+              <Dialog.Trigger>
+                <Button
+                  variant="soft"
+                  onClick={() => {
+                    const first = trafficReportNotification.find(
+                      (n) => n.client === selectedFilteredIds[0]
+                    );
+                    setBatchForm({
+                      enable: first?.enable ?? true,
+                      daily: first?.daily ?? false,
+                      weekly: first?.weekly ?? false,
+                      monthly: first?.monthly ?? false,
+                      include_traffic: first?.include_traffic ?? true,
+                      include_billing: first?.include_billing ?? false,
+                    });
+                  }}
+                  disabled={batchLoading || selectedFilteredCount === 0}
+                >
+                  {t("notification.traffic_report.batch_edit")}
+                </Button>
+              </Dialog.Trigger>
+              <Dialog.Content>
+                <Dialog.Title>
+                  {t("notification.traffic_report.batch_edit")}
+                </Dialog.Title>
+                <TrafficReportEditForm
+                  initialValues={batchForm}
+                  loading={batchLoading}
+                  onSubmit={handleBatchEdit}
+                  onCancel={() => setBatchDialogOpen(false)}
+                />
+              </Dialog.Content>
+            </Dialog.Root>
+            <TextField.Root
+              type="text"
+              className="min-w-0 flex-1 md:w-64 md:flex-none"
+              placeholder={t("common.search")}
+              value={search}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setSearch(e.target.value)
+              }
+            >
+              <TextField.Slot>
+                <Search size={16} />
+              </TextField.Slot>
+            </TextField.Root>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -532,10 +579,12 @@ const TrafficReportTable = ({
   search,
   selected,
   onSelectionChange,
+  paginationSummary,
 }: {
   search: string;
   selected: string[];
   onSelectionChange: (ids: string[]) => void;
+  paginationSummary?: React.ReactNode;
 }) => {
   const { trafficReportNotification } = useTrafficReportNotification();
   const { nodeDetail } = useNodeDetails();
@@ -544,63 +593,59 @@ const TrafficReportTable = ({
   const filtered = nodeDetail.filter((node) =>
     node.name.toLowerCase().includes(search.toLowerCase())
   );
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(filtered);
+  React.useEffect(() => setPage(1), [search, setPage]);
 
   return (
-    <div className="overflow-x-auto">
-      <Table className="min-w-[720px]">
+    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+      <div className="overflow-x-auto">
+      <Table className="admin-responsive-table admin-selection-table min-w-[640px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-6">
-              <Checkbox
-                checked={
-                  selected.length === filtered.length
-                    ? true
-                    : selected.length > 0
-                    ? "indeterminate"
-                    : false
-                }
-                onCheckedChange={(checked) =>
-                  onSelectionChange(checked ? filtered.map((n) => n.uuid) : [])
-                }
-              />
+            <TableHead className="w-12 px-3 text-center">
+              <span className="sr-only">{t("common.select")}</span>
             </TableHead>
             <TableHead>{t("common.server")}</TableHead>
             <TableHead>{t("common.status")}</TableHead>
             <TableHead>{t("notification.traffic_report.report_type")}</TableHead>
             <TableHead>{t("notification.traffic_report.report_content")}</TableHead>
-            <TableHead>{t("common.action")}</TableHead>
+            <TableHead className="text-center">{t("common.action")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.map((node) => {
+          {pageItems.map((node) => {
             const n = trafficReportNotification.find(
               (item) => item.client === node.uuid
             );
             return (
               <TableRow key={node.uuid}>
-                <TableCell>
-                  <Checkbox
-                    checked={selected.includes(node.uuid)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        onSelectionChange([...selected, node.uuid]);
-                      } else {
-                        onSelectionChange(
-                          selected.filter((id) => id !== node.uuid)
-                        );
-                      }
-                    }}
-                  />
+                <TableCell className="w-12 px-3" data-label={t("common.select", "选择")}>
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={selected.includes(node.uuid)}
+                      aria-label={t("common.select", "选择")}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          onSelectionChange([...selected, node.uuid]);
+                        } else {
+                          onSelectionChange(
+                            selected.filter((id) => id !== node.uuid)
+                          );
+                        }
+                      }}
+                    />
+                  </div>
                 </TableCell>
-                <TableCell>{node.name}</TableCell>
-                <TableCell>
+                <TableCell data-label={t("common.server")}>{node.name}</TableCell>
+                <TableCell data-label={t("common.status")}>
                   <Badge color={n?.enable ? "green" : "red"}>
                     {n?.enable ? t("common.enabled") : t("common.disabled")}
                   </Badge>
                 </TableCell>
-                <TableCell>{reportTypeLabel(n, t)}</TableCell>
-                <TableCell>{reportContentLabel(n, t)}</TableCell>
-                <TableCell>
+                <TableCell data-label={t("notification.traffic_report.report_type")}>{reportTypeLabel(n, t)}</TableCell>
+                <TableCell data-label={t("notification.traffic_report.report_content")}>{reportContentLabel(n, t)}</TableCell>
+                <TableCell className="text-center" data-label={t("common.action")}>
                   <ActionButtons
                     nodeUUID={node.uuid}
                     trafficReport={n}
@@ -611,6 +656,15 @@ const TrafficReportTable = ({
           })}
         </TableBody>
       </Table>
+      </div>
+      <AdminPagination
+        page={page}
+        total={filtered.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        summary={paginationSummary}
+      />
     </div>
   );
 };
@@ -628,16 +682,20 @@ const ActionButtons = ({
   const [editSaving, setEditSaving] = React.useState(false);
 
   return (
-    <Flex gap="2" align="center">
+    <Flex gap="2" align="center" className="admin-card-actions admin-single-text-action w-full">
       <Dialog.Root open={editOpen} onOpenChange={setEditOpen}>
         <Dialog.Trigger>
-          <IconButton
+          <Button
             variant="ghost"
-            aria-label={t("common.edit")}
-            title={t("common.edit")}
+            className="admin-single-action-button"
+            aria-label={t("common.modify", "修改")}
+            title={t("common.modify", "修改")}
           >
             <Pencil size={16} />
-          </IconButton>
+            <span className="admin-single-action-label">
+              {t("common.modify", "修改")}
+            </span>
+          </Button>
         </Dialog.Trigger>
         <Dialog.Content>
           <Dialog.Title>{t("common.edit")}</Dialog.Title>

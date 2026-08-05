@@ -58,13 +58,10 @@ export default function AdminRemoteTerminal() {
   if (isLoading || (!statusReady && nodes.length > 0)) return <Loading />;
 
   return (
-    <div className="flex w-full flex-col gap-3 p-0 md:p-4">
-      <div>
-        <AdminPageTitle>{t("terminal.remote_title")}</AdminPageTitle>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("terminal.portal_subtitle")}
-        </p>
-      </div>
+    <div className="flex w-full flex-col gap-4 p-0 md:p-4">
+      <AdminPageTitle description={t("terminal.portal_subtitle")}>
+        {t("terminal.remote_title")}
+      </AdminPageTitle>
 
       {error ? (
         <Callout.Root color="red" role="alert">

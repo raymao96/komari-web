@@ -29,7 +29,7 @@ import {
   CornerRightUp,
   Download,
   Gauge,
-  MenuIcon,
+  GripVertical,
   Pencil,
   Plus,
   Radar,
@@ -66,16 +66,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
 import { formatBytes, stringToBytes } from "@/utils/unitHelper";
 import PriceTags from "@/components/PriceTags";
 import Loading from "@/components/loading";
@@ -96,6 +86,14 @@ import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { localizeTokenRotationError } from "@/utils/tokenRotation";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AdminNodeStatusSummary, {
+  type AdminNodeStatusFilter,
+} from "@/components/admin/AdminNodeStatusSummary";
+import {
+  AdminPagination,
+} from "@/components/admin/AdminPagination";
+import { useAdminDefaultPageSize } from "@/hooks/useAdminDefaultPageSize";
+import { useAdminNodeLiveData } from "@/hooks/use-admin-node-live-data";
 import {
   getRegionCode,
   getRegionDisplayName,
@@ -111,21 +109,42 @@ const NodeDetailsPage = () => {
   );
 };
 
+const PREVIOUS_PAGE_DROP_ID = "admin-node-previous-page";
+const NEXT_PAGE_DROP_ID = "admin-node-next-page";
+
 const Layout = () => {
   const { nodeDetail, isLoading, error, refresh } = useNodeDetails();
   const { settings, loading: settingsLoading } = useSettings();
+  const { liveData, available } = useAdminNodeLiveData();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
-  const filteredNodes = Array.isArray(nodeDetail)
-    ? nodeDetail.filter((node) =>
-        node.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : [];
+  const [statusFilter, setStatusFilter] = useState<AdminNodeStatusFilter>("all");
+  const onlineSet = React.useMemo(
+    () => new Set(liveData?.data.online ?? []),
+    [liveData?.data.online],
+  );
+  const filteredNodes = React.useMemo(
+    () => (Array.isArray(nodeDetail)
+      ? nodeDetail.filter((node) => {
+        const matchesSearch = node.name
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+        const isOnline = onlineSet.has(node.uuid);
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "online" && isOnline) ||
+          (statusFilter === "offline" && !isOnline);
+          return matchesSearch && matchesStatus;
+        })
+      : []),
+    [nodeDetail, onlineSet, searchTerm, statusFilter],
+  );
 
   useEffect(() => {
-    const interval = setInterval(() => { refresh() }, 5000);
+    const interval = setInterval(() => {
+      refresh();
+    }, 15000);
     return () => clearInterval(interval);
-  }, [nodeDetail]);
+  }, [refresh]);
 
   if (isLoading) return <Loading text="" />;
   if (error) return <div>{error}</div>;
@@ -137,20 +156,27 @@ const Layout = () => {
       <Header
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
-        selectedNodes={selectedNodes}
         settings={settings}
         settingsLoading={settingsLoading}
+        showStatusSummary={!isEmpty}
+        total={nodeDetail.length}
+        online={onlineSet.size}
+        available={available}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
       />
 
       {isEmpty ? (
         <EmptyNodesGuide />
       ) : (
-        <NodeTable
-          nodes={filteredNodes}
-          selectedNodes={selectedNodes}
-          setSelectedNodes={setSelectedNodes}
-          settings={settings}
-        />
+        <>
+          <NodeTable
+            nodes={filteredNodes}
+            settings={settings}
+            onlineSet={onlineSet}
+            reorderEnabled={!searchTerm.trim() && statusFilter === "all"}
+          />
+        </>
       )}
     </Flex>
   );
@@ -460,6 +486,7 @@ const AutoDiscoverySection = ({
       </Flex>
 
       <SegmentedControl.Root
+        className="admin-install-platforms"
         value={selectedPlatform}
         onValueChange={(value) => setSelectedPlatform(value as Platform)}
       >
@@ -484,7 +511,7 @@ const AutoDiscoverySection = ({
 
       {showOptions && (
         <Flex direction="column" gap="2">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="admin-install-options-grid grid grid-cols-2 gap-2">
             <Flex gap="2" align="center">
               <Checkbox
                 checked={installOptions.disableWebSsh}
@@ -973,15 +1000,25 @@ const AutoDiscoverySection = ({
 const Header = ({
   searchTerm,
   setSearchTerm,
-  selectedNodes,
   settings,
   settingsLoading,
+  showStatusSummary,
+  total,
+  online,
+  available,
+  statusFilter,
+  setStatusFilter,
 }: {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  selectedNodes: string[];
   settings: any;
   settingsLoading: boolean;
+  showStatusSummary: boolean;
+  total: number;
+  online: number;
+  available: boolean;
+  statusFilter: AdminNodeStatusFilter;
+  setStatusFilter: (filter: AdminNodeStatusFilter) => void;
 }) => {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
@@ -1010,22 +1047,36 @@ const Header = ({
     }
   };
   return (
-    <Flex justify="between" align="start" gap="4" wrap="wrap">
-      <Flex gap="2" align="center">
-        <AdminPageTitle>{t("admin.nodeTable.nodeList")}</AdminPageTitle>
-        {selectedNodes.length > 0 && (
-          <Text size="2">({selectedNodes.length} selected)</Text>
+    <Flex direction="column" gap="3">
+      <AdminPageTitle
+        description={t(
+          "admin.nodeTable.description",
+          "集中查看节点连接、网络、分组、备注与账单信息，拖动可调整全局显示顺序。",
         )}
-      </Flex>
-      <Flex gap="2">
+      >
+        {t("admin.nodeTable.nodeList")}
+      </AdminPageTitle>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        {showStatusSummary ? (
+          <AdminNodeStatusSummary
+            total={total}
+            online={online}
+            available={available}
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+          />
+        ) : null}
+        <Flex gap="2" className="w-full md:ml-auto md:w-auto">
         <TextField.Root
+          size="2"
+          className="min-w-0 flex-1 text-sm md:w-56"
           placeholder={t("admin.nodeTable.searchByName")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Trigger>
-            <Button onClick={() => setDialogOpen(true)}>
+            <Button size="2" className="px-3 text-sm" onClick={() => setDialogOpen(true)}>
               <Plus size={16} />
               {t("admin.nodeTable.addNode")}
             </Button>
@@ -1050,134 +1101,130 @@ const Header = ({
             />
           </Dialog.Content>
         </Dialog.Root>
-      </Flex>
+        </Flex>
+      </div>
     </Flex>
   );
 };
 
-const SortableRow = ({
+const compactIPv6 = (value: string) => {
+  if (value.length <= 22) return value;
+  const segments = value.split(":");
+  return segments.length > 3
+    ? `${segments.slice(0, 2).join(":")}:...${segments[segments.length - 1]}`
+    : value;
+};
+
+const SortableRow = React.memo(({
   node,
-  selectedNodes,
-  handleSelectNode,
-  settings
+  settings,
+  online,
+  reorderEnabled,
 }: {
   node: NodeDetail;
-  selectedNodes: string[];
-  handleSelectNode: (uuid: string, checked: boolean) => void;
   settings: any;
+  online: boolean;
+  reorderEnabled: boolean;
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: node.uuid });
+    useSortable({ id: node.uuid, disabled: !reorderEnabled });
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    borderColor: "var(--gray-a5)",
   };
   function copy(text: string) {
     navigator.clipboard.writeText(text);
     toast.success(t("copy_success"));
   }
   return (
-    <TableRow ref={setNodeRef} style={style} className="hover:bg-accent-a2">
-      <TableCell>
-        <div
-          {...attributes}
-          {...listeners}
-          className={`cursor-move p-2 rounded hover:bg-accent-a3 transition-colors ${
-            isMobile ? "touch-manipulation select-none" : ""
-          }`}
-          style={{
-            touchAction: "none", // 禁用移动端的默认手势
-            WebkitUserSelect: "none",
-            userSelect: "none",
-          }}
-          title={
-            isMobile
-              ? t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")
-              : undefined
-          }
-        >
-          <MenuIcon size={isMobile ? 18 : 16} color={"var(--gray-8)"} />
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      className="text-sm hover:bg-[var(--accent-a2)] [&>td]:align-middle [&>td]:py-1.5"
+      data-node-status={online ? "online" : "offline"}
+    >
+      <TableCell className="w-16 !align-middle" data-label={t("common.sort", "排序")}>
+        <div className="flex items-center">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            disabled={!reorderEnabled}
+            className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--gray-9)] transition-colors ${
+              reorderEnabled
+                ? "cursor-grab hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)] active:cursor-grabbing"
+                : "cursor-not-allowed opacity-40"
+            } ${isMobile ? "touch-manipulation select-none" : ""}`}
+            style={{ touchAction: "none" }}
+            title={
+              reorderEnabled
+                ? t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")
+                : t("admin.nodeTable.clearFilterToReorder", "清除搜索和筛选后可调整顺序")
+            }
+            aria-label={t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")}
+          >
+            <GripVertical size={isMobile ? 18 : 16} />
+          </button>
         </div>
       </TableCell>
-      <TableCell>
-        <Checkbox
-          checked={selectedNodes.includes(node.uuid)}
-          onCheckedChange={(checked) => handleSelectNode(node.uuid, !!checked)}
-        />
+      <TableCell className="overflow-hidden !align-middle" data-label={t("admin.nodeTable.name")}>
+        <DetailView node={node} online={online} />
       </TableCell>
-      <TableCell>
-        <DetailView node={node} />
-      </TableCell>
-      <TableCell>
-        <Flex direction="column">
-          {node.ipv4 && (
-            <Text size="2" className="flex items-center gap-1">
-              {node.ipv4}
-              <IconButton variant="ghost" onClick={() => copy(node.ipv4)}>
-                <Copy size="16" />
-              </IconButton>
-            </Text>
-          )}
+      <TableCell className="!align-middle" data-label={t("admin.nodeTable.network", "网络")}>
+        <div className="flex min-w-0 flex-col text-sm leading-[1.125rem] text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate tabular-nums">IPv4 {node.ipv4 || "--"}</span>
+            {node.ipv4 && (
+              <button
+                type="button"
+                className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)]"
+                onClick={() => copy(node.ipv4)}
+                aria-label={t("copy", "复制")}
+                title={t("copy", "复制")}
+              >
+                <Copy size={13} />
+              </button>
+            )}
+          </div>
           {node.ipv6 && (
-            <Text
-              size="2"
-              className="flex items-center gap-1"
-              title={node.ipv6}
-            >
-              {node.ipv6.length > 20
-                ? (() => {
-                    const segments = node.ipv6.split(":");
-                    return segments.length > 3
-                      ? `${segments.slice(0, 2).join(":")}:...${
-                          segments[segments.length - 1]
-                        }`
-                      : node.ipv6;
-                  })()
-                : node.ipv6}
-              <IconButton variant="ghost" onClick={() => copy(node.ipv6)}>
-                <Copy size="16" />
-              </IconButton>
-            </Text>
+          <div className="flex min-w-0 items-center gap-1" title={node.ipv6}>
+            <span className="truncate tabular-nums">
+              IPv6 {node.ipv6 ? compactIPv6(node.ipv6) : "--"}
+            </span>
+              <button
+                type="button"
+                className="inline-flex size-5 shrink-0 items-center justify-center rounded hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)]"
+                onClick={() => copy(node.ipv6)}
+                aria-label={t("copy", "复制")}
+                title={t("copy", "复制")}
+              >
+                <Copy size={13} />
+              </button>
+          </div>
           )}
-        </Flex>
+        </div>
       </TableCell>
-      <TableCell>{publicVersion(node.version)}</TableCell>
-      <TableCell>
-        <Text
-          size="2"
-          title={node.group}
-          style={{
-            maxWidth: "150px",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {node.group && node.group.length > 10
-            ? `${node.group.slice(0, 10)}...`
-            : node.group}
-        </Text>
+      <TableCell className="!align-middle" data-label={t("admin.nodeTable.agent", "Agent")}>
+        <span className="block truncate text-sm leading-5 text-muted-foreground" title={publicVersion(node.version) || "--"}>
+          {publicVersion(node.version) || "--"}
+        </span>
       </TableCell>
-      <TableCell>
-        <Text
-          size="2"
-          title={node.remark}
-          style={{
-            maxWidth: "150px",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {node.remark && node.remark.length > 10
-            ? `${node.remark.slice(0, 10)}...`
-            : node.remark}
-        </Text>
+      <TableCell className="!align-middle" data-label={t("common.group", "分组")}>
+        <span className="block truncate text-sm font-normal text-muted-foreground" title={node.group || ""}>
+          {node.group || "--"}
+        </span>
       </TableCell>
-      <TableCell>
+      <TableCell className="!align-middle" data-label={t("common.remark", "备注")}>
+        <span className="block whitespace-normal break-words text-sm text-muted-foreground" title={node.remark || ""}>
+          {node.remark || "--"}
+        </span>
+      </TableCell>
+      <TableCell className="!align-middle" data-label={t("admin.nodeTable.billing")}>
         <PriceTags
+          className="[&_label]:!text-xs"
           price={node.price}
           billing_cycle={node.billing_cycle}
           expired_at={node.expired_at}
@@ -1185,23 +1232,24 @@ const SortableRow = ({
           tags={node.tags || ""}
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="!align-middle" data-label={t("common.action", "操作")}>
         <ActionButtons node={node} settings={settings} />
       </TableCell>
     </TableRow>
   );
-};
+});
+SortableRow.displayName = "SortableRow";
 
 const NodeTable = ({
   nodes,
-  selectedNodes,
-  setSelectedNodes,
   settings,
+  onlineSet,
+  reorderEnabled,
 }: {
   nodes: NodeDetail[];
-  selectedNodes: string[];
-  setSelectedNodes: (nodes: string[]) => void;
   settings: any;
+  onlineSet: ReadonlySet<string>;
+  reorderEnabled: boolean;
 }) => {
   const { t } = useTranslation();
   const sensors = useSensors(
@@ -1223,10 +1271,34 @@ const NodeTable = ({
   // 添加 localNodes 状态，实现即时 UI 更新
   const [localNodes, setLocalNodes] = useState<NodeDetail[]>(nodes);
   const [isDragging, setIsDragging] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const defaultPageSize = useAdminDefaultPageSize();
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const pageSizeCustomized = React.useRef(false);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(localNodes.length / pageSize),
+  );
+  const visiblePage = Math.min(currentPage, totalPages);
+  const pageStart = (visiblePage - 1) * pageSize;
+  const visibleNodes = localNodes.slice(
+    pageStart,
+    pageStart + pageSize,
+  );
+
   React.useEffect(() => {
     setLocalNodes(nodes);
   }, [nodes]);
+  React.useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+  React.useEffect(() => {
+    if (pageSizeCustomized.current) return;
+    setPageSize(defaultPageSize);
+    setCurrentPage(1);
+  }, [defaultPageSize]);
   const handleDragStart = () => {
+    if (!reorderEnabled) return;
     setIsDragging(true);
     if ("vibrate" in navigator) {
       navigator.vibrate(50);
@@ -1235,17 +1307,31 @@ const NodeTable = ({
 
   const handleDragEnd = async (event: any) => {
     setIsDragging(false);
+    if (!reorderEnabled) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const oldIndex = localNodes.findIndex((node) => node.uuid === active.id);
-    const newIndex = localNodes.findIndex((node) => node.uuid === over.id);
+    if (oldIndex < 0) return;
+
+    let newIndex = localNodes.findIndex((node) => node.uuid === over.id);
+    let destinationPage = visiblePage;
+    if (over.id === PREVIOUS_PAGE_DROP_ID && visiblePage > 1) {
+      destinationPage = visiblePage - 1;
+      newIndex = destinationPage * pageSize - 1;
+    } else if (over.id === NEXT_PAGE_DROP_ID && visiblePage < totalPages) {
+      destinationPage = visiblePage + 1;
+      newIndex = (destinationPage - 1) * pageSize;
+    }
+    if (newIndex < 0) return;
+
     const reorderedNodes = Array.from(localNodes);
     const [reorderedItem] = reorderedNodes.splice(oldIndex, 1);
-    reorderedNodes.splice(newIndex, 0, reorderedItem);
+    reorderedNodes.splice(Math.min(newIndex, reorderedNodes.length), 0, reorderedItem);
 
     // 立即更新 UI
     setLocalNodes(reorderedNodes);
+    setCurrentPage(destinationPage);
 
     if ("vibrate" in navigator) {
       navigator.vibrate([30, 10, 30]);
@@ -1268,21 +1354,9 @@ const NodeTable = ({
     }
   };
 
-  // 更新全选逻辑，使用 localNodes
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedNodes(checked ? localNodes.map((node) => node.uuid) : []);
-  };
-
-  const handleSelectNode = (uuid: string, checked: boolean) => {
-    setSelectedNodes(
-      checked
-        ? [...selectedNodes, uuid]
-        : selectedNodes.filter((id) => id !== uuid)
-    );
-  };
   return (
     <div
-      className={`rounded-md overflow-hidden ${
+      className={`admin-responsive-table-wrap overflow-x-auto overflow-y-hidden rounded-md border border-[var(--gray-a5)] ${
         isDragging ? "select-none" : ""
       }`}
     >
@@ -1291,46 +1365,63 @@ const NodeTable = ({
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => setIsDragging(false)}
       >
-        <Table>
-          <TableHeader style={{ backgroundColor: "var(--accent-4)" }}>
+        <Table className="admin-responsive-table admin-node-table min-w-[1280px] table-fixed text-sm">
+          <TableHeader>
             <TableRow>
-              <TableHead></TableHead>
-              <TableHead>
-                <Checkbox
-                  checked={
-                    selectedNodes.length === localNodes.length &&
-                    localNodes.length > 0
-                  }
-                  onCheckedChange={handleSelectAll}
-                />
+              <TableHead className="w-[4%]">
+                <span className="sr-only">{t("common.sort", "排序")}</span>
               </TableHead>
-              <TableHead>{t("admin.nodeTable.name")}</TableHead>
-              <TableHead>{t("admin.nodeTable.ipAddress")}</TableHead>
-              <TableHead>{t("admin.nodeTable.clientVersion")}</TableHead>
-              <TableHead>{t("common.group")}</TableHead>
-              <TableHead>{t("admin.nodeEdit.remark")}</TableHead>
-              <TableHead>{t("admin.nodeTable.billing")}</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="w-[15%]">{t("admin.nodeTable.name")}</TableHead>
+              <TableHead className="w-[16%]">
+                {t("admin.nodeTable.network", "网络")}
+              </TableHead>
+              <TableHead className="w-[6%]">
+                {t("admin.nodeTable.agent", "Agent")}
+              </TableHead>
+              <TableHead className="w-[7%]">
+                {t("common.group", "分组")}
+              </TableHead>
+              <TableHead className="w-[11%]">
+                {t("common.remark", "备注")}
+              </TableHead>
+              <TableHead className="w-[19%]">{t("admin.nodeTable.billing")}</TableHead>
+              <TableHead className="w-[23%]">{t("common.action", "操作")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <SortableContext
-              items={localNodes.map((node) => node.uuid)}
+              items={visibleNodes.map((node) => node.uuid)}
               strategy={verticalListSortingStrategy}
             >
-              {localNodes.map((node) => (
+              {visibleNodes.map((node) => (
                 <SortableRow
                   key={node.uuid}
                   node={node}
-                  selectedNodes={selectedNodes}
-                  handleSelectNode={handleSelectNode}
                   settings={settings}
+                  online={onlineSet.has(node.uuid)}
+                  reorderEnabled={reorderEnabled}
                 />
               ))}
             </SortableContext>
           </TableBody>
         </Table>
+      <AdminPagination
+        page={visiblePage}
+        total={localNodes.length}
+        onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={(value) => {
+          pageSizeCustomized.current = true;
+          setPageSize(value);
+          setCurrentPage(1);
+        }}
+        previousDropId={PREVIOUS_PAGE_DROP_ID}
+        nextDropId={NEXT_PAGE_DROP_ID}
+        dragging={isDragging}
+        showSummary={false}
+      />
       </DndContext>
     </div>
   );
@@ -1386,7 +1477,7 @@ function formatTrafficCycleRange(snapshot: TrafficCalibrationSnapshot, language:
 const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) => {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex h-10 items-center justify-start gap-1.5 max-md:h-auto max-md:flex-wrap admin-node-actions max-md:w-full">
       <RotateTokenButton node={node} />
       <GenerateCommandButton node={node} settings={settings} />
       <IconButton
@@ -1417,46 +1508,53 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
   const [snapshot, setSnapshot] = useState<TrafficCalibrationSnapshot | null>(null);
   const [targetUp, setTargetUp] = useState("");
   const [targetDown, setTargetDown] = useState("");
+  const requestRef = React.useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
+    return () => requestRef.current?.abort();
+  }, []);
+
+  const prepareCalibration = async () => {
+    if (requestRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError("");
     setReason("");
+    setAvailable(true);
     setSnapshot(null);
-    fetch(`/api/admin/client/${node.uuid}/traffic-calibration`, { cache: "no-store" })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(payload?.message || `HTTP ${response.status}`);
-        }
-        return payload?.data;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const nextAvailable = data?.available !== false;
-        setAvailable(nextAvailable);
-        setReason(data?.reason || "");
-        if (nextAvailable && data?.snapshot) {
-          const next = data.snapshot as TrafficCalibrationSnapshot;
-          setSnapshot(next);
-          setTargetUp(formatBytes(next.effective.up));
-          setTargetDown(formatBytes(next.effective.down));
-        }
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+    try {
+      const response = await fetch(`/api/admin/client/${node.uuid}/traffic-calibration`, {
+        cache: "no-store",
+        signal: controller.signal,
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, node.uuid]);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.message || `HTTP ${response.status}`);
+      }
+      const data = payload?.data;
+      const nextAvailable = data?.available !== false;
+      setAvailable(nextAvailable);
+      setReason(data?.reason || "");
+      if (nextAvailable && data?.snapshot) {
+        const next = data.snapshot as TrafficCalibrationSnapshot;
+        setSnapshot(next);
+        setTargetUp(formatBytes(next.effective.up));
+        setTargetDown(formatBytes(next.effective.down));
+      }
+      setOpen(true);
+    } catch (cause: unknown) {
+      if (!controller.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+        setOpen(true);
+      }
+    } finally {
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setLoading(false);
+      }
+    }
+  };
 
   const saveCalibration = async () => {
     const up = parseTrafficInput(targetUp);
@@ -1502,13 +1600,20 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
     : [];
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) void prepareCalibration();
+        else setOpen(false);
+      }}
+    >
       <Dialog.Trigger>
         <IconButton
           variant="ghost"
+          disabled={loading}
           title={t("admin.nodeTable.trafficCalibration.title")}
         >
-          <Gauge size="18" />
+          <Gauge size="18" className={loading ? "animate-pulse" : undefined} />
         </IconButton>
       </Dialog.Trigger>
       <Dialog.Content maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
@@ -1587,7 +1692,7 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
                   {snapshot.history?.length ? (
                     <div className="overflow-x-auto rounded border">
                       <table className="w-full min-w-[560px] text-left text-sm">
-                        <thead className="bg-muted/60 text-muted-foreground">
+                        <thead className="admin-table-header">
                           <tr>
                             <th className="px-3 py-2 font-medium">{t("admin.nodeTable.trafficCalibration.time")}</th>
                             <th className="px-3 py-2 font-medium">{t("admin.nodeTable.trafficCalibration.targetUp")}</th>
@@ -1678,14 +1783,13 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <IconButton
         type="button"
-        size="1"
-        variant="soft"
-        color="orange"
+        size="2"
+        variant="ghost"
         title={t("admin.nodeTable.rotateToken", "重置 Token")}
         aria-label={t("admin.nodeTable.rotateToken", "重置 Token")}
         onClick={() => setOpen(true)}
       >
-        <RotateCw size={14} />
+        <RotateCw size={18} />
       </IconButton>
       <Dialog.Content maxWidth="440px">
         <Dialog.Title>
@@ -1771,7 +1875,7 @@ function DeleteButton({ node }: { node: NodeDetail }) {
           <Trash2Icon size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <Dialog.Content className="admin-install-dialog">
         <Dialog.Title>{t("delete")}</Dialog.Title>
         <Dialog.Description>
           {t("admin.nodeTable.confirmDelete")}
@@ -2056,6 +2160,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         </Dialog.Title>
         <div className="flex flex-col gap-4">
           <SegmentedControl.Root
+            className="admin-install-platforms"
             value={selectedPlatform}
             onValueChange={(value) => setSelectedPlatform(value as Platform)}
           >
@@ -2071,7 +2176,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
             <label className="text-base font-bold">
               {t("admin.nodeTable.installOptions", "安装选项")}
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="admin-install-options-grid grid grid-cols-2 gap-2">
               <Flex gap="2" align="center">
                 <Checkbox
                   checked={installOptions.disableWebSsh}
@@ -2954,238 +3059,166 @@ function EditButton({ node }: { node: NodeDetail }) {
   );
 }
 
-function DetailView({ node }: { node: NodeDetail }) {
+function ReadOnlyDetailField({
+  label,
+  value,
+  copyable = false,
+  mono = false,
+}: {
+  label: React.ReactNode;
+  value?: string | number | null;
+  copyable?: boolean;
+  mono?: boolean;
+}) {
   const { t } = useTranslation();
-  const isMobile = useIsMobile();
+  const displayValue = value === undefined || value === null || value === "" ? "-" : String(value);
+  return (
+    <div className="min-w-0">
+      <label className="mb-1.5 block text-sm font-medium">{label}</label>
+      <TextField.Root
+        value={displayValue}
+        readOnly
+        title={displayValue}
+        className={`w-full bg-[var(--color-panel-solid)] ${mono ? "[&_input]:font-mono [&_input]:text-[13px]" : ""}`}
+      >
+        {copyable && displayValue !== "-" ? (
+          <TextField.Slot side="right">
+            <IconButton
+              type="button"
+              size="1"
+              variant="ghost"
+              color="gray"
+              title={t("copy", "复制")}
+              aria-label={t("copy", "复制")}
+              onClick={() => {
+                navigator.clipboard.writeText(displayValue);
+                toast.success(t("copy_success"));
+              }}
+            >
+              <Copy size={14} />
+            </IconButton>
+          </TextField.Slot>
+        ) : null}
+      </TextField.Root>
+    </div>
+  );
+}
+
+function DetailView({ node, online }: { node: NodeDetail; online: boolean }) {
+  const { t } = useTranslation();
+  const dialogContentRef = React.useRef<HTMLDivElement>(null);
+  const statusLabel = online
+    ? t("nodeCard.online", "在线")
+    : t("nodeCard.offline", "离线");
+  const formatDateTime = (value?: string) =>
+    value ? new Date(value).toLocaleString() : "-";
 
   return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <div className="h-8 flex items-center hover:underline cursor-pointer font-bold text-base">
-          <Flag flag={node.region} size="6" />
-          {node.name.length > 25 ? node.name.slice(0, 25) + "..." : node.name}
-        </div>
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{node.name}</DrawerTitle>
-          <DrawerDescription>
-            {t("admin.nodeDetail.machineDetail", "机器详细信息")}
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          <form className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-ip">
-                  {t("admin.nodeDetail.ipAddress", "IP 地址")}
-                </label>
-                <div className="flex flex-col gap-1">
-                  {node.ipv4 && (
-                    <div className="flex items-center gap-1">
-                      <span
-                        id="detail-ipv4"
-                        className="bg-muted px-3 py-2 rounded border flex-1 min-w-0 select-text"
-                      >
-                        {node.ipv4}
-                      </span>
-                      <IconButton
-                        variant="ghost"
-                        className="size-5"
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(node.ipv4!);
-                        }}
-                      >
-                        <Copy size={16} />
-                      </IconButton>
-                    </div>
-                  )}
-                  {node.ipv6 && (
-                    <div className="flex items-center gap-1">
-                      <span
-                        id="detail-ipv6"
-                        className="bg-muted px-3 py-2 rounded border flex-1 min-w-0 select-text"
-                      >
-                        {node.ipv6}
-                      </span>
-                      <IconButton
-                        variant="ghost"
-                        className="size-5"
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(node.ipv6!);
-                        }}
-                      >
-                        <Copy size={16} />
-                      </IconButton>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-version">
-                  {t("admin.nodeDetail.clientVersion", "客户端版本")}
-                </label>
-                <span
-                  id="detail-version"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {publicVersion(node.version) || (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-os">
-                  {t("admin.nodeDetail.os", "操作系统")}
-                </label>
-                <span
-                  id="detail-os"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {node.os || <span className="text-muted-foreground">-</span>}
-                </span>
-              </div>
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-arch">
-                  {t("admin.nodeDetail.arch", "架构")}
-                </label>
-                <span
-                  id="detail-arch"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {node.arch || (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-cpu_name">
-                  {t("admin.nodeDetail.cpu", "CPU")}
-                </label>
-                <span
-                  id="detail-cpu_name"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {node.cpu_name || (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </span>
-              </div>
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-cpu_cores">
-                  {t("admin.nodeDetail.cpuCores", "CPU 核心数")}
-                </label>
-                <span
-                  id="detail-cpu_cores"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {node.cpu_cores?.toString() || (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-mem_total">
-                  {t("admin.nodeDetail.memTotal", "总内存 (Bytes)")}
-                </label>
-                <span
-                  id="detail-mem_total"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                  title={
-                    node.mem_total ? String(node.mem_total) + " Bytes" : "-"
-                  }
-                >
-                  {formatBytes(node.mem_total)}
-                </span>
-              </div>
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-disk_total">
-                  {t("admin.nodeDetail.diskTotal", "总磁盘空间 (Bytes)")}
-                </label>
-                <span
-                  id="detail-disk_total"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                  title={
-                    node.disk_total ? String(node.disk_total) + " Bytes" : "-"
-                  }
-                >
-                  {formatBytes(node.disk_total)}
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <label htmlFor="detail-gpu_name">
-                {t("admin.nodeDetail.gpu", "GPU")}
-              </label>
+    <Dialog.Root>
+      <Dialog.Trigger>
+        <button
+          type="button"
+          className="flex w-full min-w-0 items-start gap-2 text-left"
+        >
+          <span className="admin-node-country-flag">
+            <Flag flag={node.region} compact />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="block max-w-full truncate text-sm font-semibold leading-6 hover:underline">
+              {node.name}
+            </span>
+            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span
-                id="detail-gpu_name"
-                className="bg-muted px-3 py-2 rounded border select-text"
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: online ? "var(--green-9)" : "var(--red-9)" }}
+              />
+              {statusLabel}
+            </span>
+          </span>
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Content
+        ref={dialogContentRef}
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          dialogContentRef.current?.focus({ preventScroll: true });
+        }}
+        maxWidth="720px"
+        className="max-h-[88vh] overflow-y-auto bg-[var(--color-panel-solid)] max-sm:w-[calc(100%-1rem)]"
+        style={{ maxHeight: "88vh" }}
+      >
+        <div className="flex items-start gap-3">
+          <span className="admin-node-detail-country-flag mt-0.5 inline-flex shrink-0 items-center justify-center">
+            <Flag flag={node.region} compact />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Dialog.Title className="mb-0 truncate">{node.name}</Dialog.Title>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+                style={{
+                  color: online ? "var(--green-11)" : "var(--red-11)",
+                  backgroundColor: online ? "var(--green-a3)" : "var(--red-a3)",
+                }}
               >
-                {node.gpu_name || (
-                  <span className="text-muted-foreground">-</span>
-                )}
+                <span className="size-1.5 rounded-full" style={{ backgroundColor: online ? "var(--green-9)" : "var(--red-9)" }} />
+                {statusLabel}
               </span>
             </div>
-            <div className="flex flex-col gap-3">
-              <label htmlFor="detail-uuid">
-                {t("admin.nodeDetail.uuid", "UUID")}
-              </label>
-              <span
-                id="detail-uuid"
-                className="bg-muted px-3 py-2 rounded border select-text"
-              >
-                {node.uuid || <span className="text-muted-foreground">-</span>}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-createdAt">
-                  {t("admin.nodeDetail.createdAt", "创建时间")}
-                </label>
-                <span
-                  id="detail-createdAt"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {node.created_at ? (
-                    new Date(node.created_at).toLocaleString()
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </span>
-              </div>
-              <div className="flex flex-col gap-3">
-                <label htmlFor="detail-updatedAt">
-                  {t("admin.nodeDetail.updatedAt", "更新时间")}
-                </label>
-                <span
-                  id="detail-updatedAt"
-                  className="bg-muted px-3 py-2 rounded border select-text"
-                >
-                  {node.updated_at ? (
-                    new Date(node.updated_at).toLocaleString()
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </span>
-              </div>
-            </div>
-          </form>
+            <Dialog.Description size="2" color="gray" className="mt-1">
+              {t("admin.nodeDetail.machineDetail", "机器详细信息")}
+            </Dialog.Description>
+          </div>
         </div>
-        <DrawerFooter>
-          <DrawerClose asChild>
-            <Button>{t("admin.nodeDetail.done", "完成")}</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="border-b border-[var(--gray-a5)] pb-2 text-sm font-semibold sm:col-span-2">
+            {t("admin.nodeDetail.network", "网络与客户端")}
+          </div>
+          <ReadOnlyDetailField label="IPv4" value={node.ipv4} copyable mono />
+          <ReadOnlyDetailField label="IPv6" value={node.ipv6} copyable mono />
+          <ReadOnlyDetailField label={t("admin.nodeDetail.clientVersion", "客户端版本")} value={publicVersion(node.version)} />
+          <ReadOnlyDetailField label={t("admin.nodeTable.region", "国家 / 地区")} value={getRegionDisplayName(node.region)} />
+
+          <div className="border-b border-[var(--gray-a5)] pb-2 pt-1 text-sm font-semibold sm:col-span-2">
+            {t("admin.nodeDetail.system", "系统信息")}
+          </div>
+          <ReadOnlyDetailField label={t("admin.nodeDetail.os", "操作系统")} value={node.os} />
+          <ReadOnlyDetailField label={t("admin.nodeDetail.arch", "系统架构")} value={node.arch} />
+          <div className="sm:col-span-2">
+            <ReadOnlyDetailField label={t("admin.nodeDetail.cpu", "处理器")} value={node.cpu_name} />
+          </div>
+          <ReadOnlyDetailField label={t("admin.nodeDetail.cpuCores", "CPU 核心")} value={node.cpu_cores ? `${node.cpu_cores} 核` : ""} />
+          <ReadOnlyDetailField label={t("admin.nodeDetail.virtualization", "虚拟化")} value={node.virtualization} />
+          <div className="sm:col-span-2">
+            <ReadOnlyDetailField label={t("admin.nodeDetail.gpu", "显卡")} value={node.gpu_name} />
+          </div>
+
+          <div className="border-b border-[var(--gray-a5)] pb-2 pt-1 text-sm font-semibold sm:col-span-2">
+            {t("admin.nodeDetail.resources", "硬件资源")}
+          </div>
+          <ReadOnlyDetailField label={t("admin.nodeDetail.memTotal", "内存")} value={formatBytes(node.mem_total)} />
+          <ReadOnlyDetailField label={t("admin.nodeDetail.swapTotal", "Swap")} value={formatBytes(node.swap_total)} />
+          <ReadOnlyDetailField label={t("admin.nodeDetail.diskTotal", "磁盘")} value={formatBytes(node.disk_total)} />
+
+          <div className="border-b border-[var(--gray-a5)] pb-2 pt-1 text-sm font-semibold sm:col-span-2">
+            {t("admin.nodeDetail.identity", "标识与时间")}
+          </div>
+          <div className="sm:col-span-2">
+            <ReadOnlyDetailField label={t("admin.nodeDetail.uuid", "UUID")} value={node.uuid} copyable mono />
+          </div>
+          <ReadOnlyDetailField label={t("admin.nodeDetail.createdAt", "创建时间")} value={formatDateTime(node.created_at)} />
+          <ReadOnlyDetailField label={t("admin.nodeDetail.updatedAt", "更新时间")} value={formatDateTime(node.updated_at)} />
+        </div>
+
+        <Flex justify="end" className="mt-5">
+          <Dialog.Close>
+            <Button variant="soft">{t("admin.nodeDetail.done", "完成")}</Button>
+          </Dialog.Close>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

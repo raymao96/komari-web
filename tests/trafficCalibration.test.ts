@@ -12,8 +12,7 @@ test("traffic calibration action sits between billing and delete", () => {
   assert.ok(billing >= 0);
   assert.ok(calibration > billing);
   assert.ok(deletion > calibration);
-  assert.match(source, /className="flex items-center gap-4"/);
-  assert.doesNotMatch(source, /flex flex-wrap items-center justify-start/);
+  assert.match(source, /<TrafficCalibrationButton node=\{node\} \/>/);
 });
 
 test("calibration dialog keeps form state independent from node polling", () => {
@@ -21,7 +20,11 @@ test("calibration dialog keeps form state independent from node polling", () => 
     source.indexOf("function TrafficCalibrationButton"),
     source.indexOf("function RotateTokenButton"),
   );
-  assert.match(source, /\}, \[open, node\.uuid\]\);/);
+  assert.doesNotMatch(calibrationSource, /\[open, node\.uuid\]/);
+  assert.match(calibrationSource, /const prepareCalibration = async \(\) =>/);
+  assert.match(calibrationSource, /signal: controller\.signal/);
+  assert.match(calibrationSource, /setOpen\(true\)/);
+  assert.match(calibrationSource, /if \(nextOpen\) void prepareCalibration\(\)/);
   assert.match(source, /target_up: up/);
   assert.match(source, /target_down: down/);
   assert.match(source, /grid grid-cols-1 gap-3 sm:grid-cols-2/);

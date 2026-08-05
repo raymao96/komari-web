@@ -19,7 +19,7 @@
   align-items: center;
   gap: 8px;
   border: 1px solid var(--gray-a6);
-  border-radius: var(--radius-2);
+  border-radius: calc(var(--radius) - 2px);
   background: var(--color-panel-solid);
   padding: 0 10px;
   color: var(--gray-10);
@@ -67,39 +67,7 @@
 }
 
 .remote-node-picker-filter {
-  display: flex;
   flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-}
-
-.remote-node-picker-filter button {
-  min-height: 34px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-2);
-  background: transparent;
-  padding: 6px 11px;
-  color: var(--gray-10);
-  cursor: pointer;
-  font: inherit;
-  white-space: nowrap;
-}
-
-.remote-node-picker-filter button.is-selected {
-  border-color: var(--accent-a5);
-  background: var(--accent-a3);
-  color: var(--accent-11);
-  font-weight: 500;
-}
-
-.remote-node-picker-filter button:hover:not(.is-selected) {
-  background: var(--gray-a3);
-  color: var(--gray-12);
-}
-
-.remote-node-picker-filter button span {
-  color: inherit;
-  opacity: 0.72;
 }
 
 .remote-node-picker-grid {
@@ -119,7 +87,7 @@
   flex-direction: column;
   gap: 8px;
   border: 1px solid var(--gray-a6);
-  border-radius: var(--radius-3);
+  border-radius: calc(var(--radius) - 2px);
   background: var(--color-panel-solid);
   padding: 12px 14px 6px;
   color: var(--gray-12);
@@ -205,7 +173,7 @@
   flex: 1;
   flex-direction: column;
   gap: 10px;
-  border-radius: var(--radius-2);
+  border-radius: calc(var(--radius) - 3px);
   background: var(--gray-a2);
   padding: 13px 14px;
 }
@@ -401,10 +369,6 @@
 
   .remote-node-picker-filter {
     width: 100%;
-  }
-
-  .remote-node-picker-filter button {
-    flex: 1;
   }
 
   .remote-node-picker-grid {

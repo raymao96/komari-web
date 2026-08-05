@@ -33,6 +33,14 @@ const sample = {
     retention_days: 30,
     last_compacted_at: null,
   },
+  return_route: {
+    tasks: 3,
+    active: 2,
+    healthy: 1,
+    switched: 1,
+    abnormal: 0,
+    recent_events: 1,
+  },
   generated_at: "2026-07-31T08:00:00Z",
 } satisfies DashboardData;
 

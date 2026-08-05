@@ -30,11 +30,11 @@ import {
   Switch,
   Tabs,
   Text,
-  TextArea,
   TextField,
 } from "@radix-ui/themes";
 import {
   Cloud,
+  ExternalLink,
   Eye,
   EyeOff,
   LockKeyhole,
@@ -42,6 +42,7 @@ import {
   RefreshCw,
   Save,
   Square,
+  Trash2,
 } from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -55,7 +56,12 @@ export default function ReverseProxySettings() {
 
   return (
     <Flex direction="column" gap="3">
-      <AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.reverse_proxy.page_description",
+          "管理内置 HTTPS 与 Cloudflare Tunnel 接入。",
+        )}
+      >
         {t("settings.reverse_proxy.title", "Reverse Proxy")}
       </AdminPageTitle>
       <Tabs.Root
@@ -165,7 +171,7 @@ function HTTPSPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   React.useEffect(() => {
     void refresh(false, true);
@@ -594,22 +600,25 @@ function CloudflareTunnelPanel() {
   const stopConfirmSatisfied = disablePasswordDoubleCheck
     ? confirmText.trim() === CLOUDFLARED_STOP_CONFIRM_TEXT
     : currentPassword.trim().length > 0;
+  const localizedStatusMessage =
+    status.message === "cloudflared is not running"
+      ? t("settings.reverse_proxy.stopped", "stopped")
+      : status.message === "cloudflared is running"
+        ? t("settings.reverse_proxy.running", "running")
+        : status.message;
 
   return (
     <Flex direction="column" gap="4">
       <SettingCard
-        title={t(
-          "settings.reverse_proxy.cloudflare_title",
-          "Cloudflare Tunnel"
-        )}
+        title={t("settings.reverse_proxy.cloudflare_overview", "运行概览")}
         description={t(
-          "settings.reverse_proxy.cloudflare_description",
-          "Start and manage cloudflared directly from the Komari Lite settings panel."
+          "settings.reverse_proxy.cloudflare_overview_description",
+          "集中查看 cloudflared、Tunnel 与令牌状态，并管理连接。"
         )}
         direction="column"
       >
-        <Flex direction="column" gap="3" className="w-full pt-3">
-          <Flex gap="3" wrap="wrap">
+        <Flex direction="column" gap="4" className="w-full pt-3">
+          <div className="grid grid-cols-1 divide-y divide-[var(--gray-a5)] border-y border-[var(--gray-a5)] bg-[var(--color-panel-solid)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             <StatusLine
               label={t(
                 "settings.reverse_proxy.cloudflared_label",
@@ -631,18 +640,24 @@ function CloudflareTunnelPanel() {
               okText={t("settings.reverse_proxy.running", "running")}
               failText={t("settings.reverse_proxy.stopped", "stopped")}
             />
-            {status.pid ? (
-              <Badge variant="soft" color="gray">
-                PID: {status.pid}
-              </Badge>
-            ) : null}
-          </Flex>
+            <StatusLine
+              label={t("settings.reverse_proxy.token_status", "连接令牌")}
+              ok={status.tokenStored || status.envTokenPresent}
+              okText={t("settings.reverse_proxy.token_ready", "已配置")}
+              failText={t("settings.reverse_proxy.token_missing", "未配置")}
+            />
+          </div>
 
-          {status.binaryPath ? (
-            <Text size="2" color="gray">
-              {t("settings.reverse_proxy.binary_label", "Binary")}:{" "}
-              <code>{status.binaryPath}</code>
-            </Text>
+          {status.binaryPath || status.pid ? (
+            <div className="min-w-0 space-y-1 px-1 text-sm leading-6 text-muted-foreground">
+              {status.binaryPath ? (
+                <p>
+                  {t("settings.reverse_proxy.binary_label", "Binary")}:{" "}
+                  <code className="break-all text-foreground">{status.binaryPath}</code>
+                </p>
+              ) : null}
+              {status.pid ? <p>PID: {status.pid}</p> : null}
+            </div>
           ) : null}
 
           {status.envTokenPresent ? (
@@ -654,9 +669,9 @@ function CloudflareTunnelPanel() {
             </Text>
           ) : null}
 
-          <div>
+          <div className="border-t border-[var(--gray-a5)] pt-4">
             <label
-              className="mb-2 block text-sm font-medium"
+              className="mb-2 block text-base font-semibold leading-6"
               htmlFor="cloudflareTunnelToken"
             >
               {t(
@@ -695,53 +710,32 @@ function CloudflareTunnelPanel() {
                 </IconButton>
               </TextField.Slot>
             </TextField.Root>
-            <Text size="2" color="gray" className="mt-2 block">
-              {t(
-                "settings.reverse_proxy.cloudflare_token_help",
-                "The saved token is encrypted on the server side. The frontend only receives whether a token is stored, never the raw token."
-              )}
-            </Text>
-            {status.tokenStored && !status.running ? (
-              <Text size="2" color="gray" className="mt-1 block">
-                <button
-                  type="button"
-                  className="cursor-pointer underline"
-                  onClick={() =>
-                    void withSubmit(
-                      () => removeCloudflaredToken(),
-                      t(
-                        "settings.reverse_proxy.remove_token_success",
-                        "Cloudflare Tunnel token removed"
-                      )
-                    )
-                  }
-                >
-                  {t(
-                    "settings.reverse_proxy.remove_token",
-                    "Remove the stored token"
-                  )}
-                </button>
+            <div className="mt-3 flex flex-col gap-2">
+              <Text size="2" color="gray" className="block leading-6">
+                {t(
+                  "settings.reverse_proxy.cloudflare_token_help",
+                  "The saved token is encrypted on the server side. The frontend only receives whether a token is stored, never the raw token."
+                )}
               </Text>
-            ) : null}
-            <Text size="2" color="gray" className="mt-1 block">
-              {t(
-                "settings.reverse_proxy.guide_prefix",
-                "Need help finding the token? Read the Uptime Kuma guide:"
-              )}{" "}
-              <a
-                href="https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy-with-Cloudflare-Tunnel"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy-with-Cloudflare-Tunnel
-              </a>
-            </Text>
+              <Text size="2" color="gray" className="block leading-6">
+                <a
+                  href="https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy-with-Cloudflare-Tunnel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-[var(--accent-11)] underline underline-offset-2"
+                >
+                  {t("settings.reverse_proxy.token_guide", "查看令牌获取说明")}
+                  <ExternalLink size={14} aria-hidden="true" />
+                </a>
+              </Text>
+            </div>
           </div>
 
           <Flex gap="2" wrap="wrap">
             {!status.running ? (
               <Button
                 disabled={submitting || !canStart}
+                className="w-full sm:w-auto"
                 onClick={() =>
                   void withSubmit(
                     () => startCloudflared(token.trim()),
@@ -762,6 +756,7 @@ function CloudflareTunnelPanel() {
               <Button
                 color="red"
                 disabled={submitting}
+                className="w-full sm:w-auto"
                 onClick={() => setStopDialogOpen(true)}
               >
                 <Square size={16} />
@@ -773,19 +768,58 @@ function CloudflareTunnelPanel() {
             )}
 
             <Button
-              variant="ghost"
+              variant="soft"
+              color="gray"
               disabled={refreshing}
+              className="w-full sm:w-auto"
               onClick={() => void refreshStatus()}
             >
               <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
               {t("common.refresh", "Refresh")}
             </Button>
+            {status.tokenStored && !status.running ? (
+              <Button
+                variant="soft"
+                color="red"
+                disabled={submitting}
+                className="w-full sm:w-auto"
+                onClick={() =>
+                  void withSubmit(
+                    () => removeCloudflaredToken(),
+                    t(
+                      "settings.reverse_proxy.remove_token_success",
+                      "Cloudflare Tunnel token removed"
+                    )
+                  )
+                }
+              >
+                <Trash2 size={16} />
+                {t(
+                  "settings.reverse_proxy.remove_token",
+                  "Remove the stored token"
+                )}
+              </Button>
+            ) : null}
           </Flex>
+
+          {status.message || status.errorMessage || status.logs.length > 0 ? (
+            <div className="border-t border-[var(--gray-a5)] pt-4">
+              <h3 className="text-base font-semibold leading-6 text-foreground">
+                {t("settings.reverse_proxy.runtime_records", "运行记录")}
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {t(
+                  "settings.reverse_proxy.runtime_records_description",
+                  "查看最近状态、错误与 cloudflared 输出。"
+                )}
+              </p>
+            </div>
+          ) : null}
 
           {status.message ? (
             <Text size="2" color="gray">
               {t("settings.reverse_proxy.latest_status", "Latest status")}:{" "}
-              {status.message}
+              {localizedStatusMessage}
             </Text>
           ) : null}
 
@@ -797,7 +831,9 @@ function CloudflareTunnelPanel() {
                   "Error message"
                 )}
               </label>
-              <TextArea value={status.errorMessage} readOnly rows={4} />
+              <Callout.Root color="red" role="alert">
+                <Callout.Text>{status.errorMessage}</Callout.Text>
+              </Callout.Root>
             </div>
           ) : null}
 
@@ -806,7 +842,9 @@ function CloudflareTunnelPanel() {
               <label className="mb-2 block text-sm font-medium">
                 {t("settings.reverse_proxy.recent_logs", "Recent logs")}
               </label>
-              <TextArea value={status.logs.join("\n")} readOnly rows={10} />
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[var(--gray-a5)] bg-[var(--gray-a2)] p-3 font-mono text-xs leading-5 text-foreground">
+                {status.logs.join("\n")}
+              </pre>
             </div>
           ) : null}
 
@@ -933,8 +971,18 @@ function StatusLine({
   failText: string;
 }) {
   return (
-    <Badge variant="soft" color={ok ? "green" : "gray"}>
-      {label}: {ok ? okText : failText}
-    </Badge>
+    <div className="min-w-0 px-4 py-3">
+      <div className="text-xs leading-5 text-muted-foreground">{label}</div>
+      <div className="mt-0.5 flex min-w-0 items-center gap-2">
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: ok ? "var(--green-9)" : "var(--gray-8)" }}
+          aria-hidden="true"
+        />
+        <strong className="truncate text-sm font-semibold leading-6 text-foreground">
+          {ok ? okText : failText}
+        </strong>
+      </div>
+    </div>
   );
 }

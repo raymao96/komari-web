@@ -8,6 +8,7 @@ import { toast } from "sonner";
 export interface SettingsResponse {
   sitename: string;
   description: string;
+  admin_default_page_size: number;
   cors_origin_check_enabled: boolean;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
@@ -22,6 +23,7 @@ export interface SettingsResponse {
 const createDefaultSettings = (): SettingsResponse => ({
   sitename: "",
   description: "",
+  admin_default_page_size: 10,
   cors_origin_check_enabled: true,
   geo_ip_enabled: false,
   geo_ip_provider: "",

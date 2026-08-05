@@ -6,8 +6,6 @@ import test from "node:test";
 const adminPages = [
   "src/pages/admin/dashboard.tsx",
   "src/pages/admin/index.tsx",
-  "src/pages/admin/account.tsx",
-  "src/pages/admin/sessions.tsx",
   "src/pages/admin/pingTask.tsx",
   "src/pages/admin/returnRoute.tsx",
   "src/pages/admin/exec.tsx",
@@ -32,7 +30,7 @@ const adminPages = [
 test("all primary admin pages use the shared page title", () => {
   for (const file of adminPages) {
     const source = readFileSync(path.resolve(file), "utf8");
-    assert.match(source, /<AdminPageTitle>/, file);
+    assert.match(source, /<AdminPageTitle(?:\s[^>]*)?>/, file);
   }
 });
 
@@ -56,4 +54,27 @@ test("server and settings pages share the standard page spacing", () => {
 
   assert.match(serverPage, /direction="column" gap="4" className="p-0 md:p-4"/);
   assert.match(settingsLayout, /direction="column" gap="4" className="p-0 md:p-4"/);
+});
+
+test("drawer theme receives only the drawer content element", () => {
+  const source = readFileSync(
+    path.resolve("src/components/ui/drawer.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /<DrawerOverlay \/>\s*<Theme/);
+  assert.doesNotMatch(source, /<Theme[^>]*>\s*<DrawerOverlay/);
+});
+
+test("traffic report selection uses an aligned column and mobile row cards", () => {
+  const source = readFileSync(
+    path.resolve("src/pages/admin/notification/traffic_report.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /TableHead className="w-12 px-3 text-center"/);
+  assert.match(source, /admin-responsive-table[^"\n]*admin-selection-table[^"\n]*min-w-\[640px\]/);
+  assert.match(source, /data-label=\{t\("common\.server"\)\}/);
+  assert.match(source, /common\.deselect_all[\s\S]*common\.select_all/);
+  assert.match(source, /admin-single-text-action/);
 });

@@ -42,12 +42,12 @@ test("the version link is shared by the desktop and mobile sidebar", () => {
   assert.doesNotMatch(source, /data-testid="sidebar-version"[\s\S]{0,120}border-t/);
 });
 
-test("only desktop snapshot versions use the compact wrapped layout", () => {
-  assert.match(source, /const snapshot = !isMobile \? version\.match\(\/\^snapshot-/);
+test("snapshot versions use the compact wrapped layout on desktop and mobile", () => {
+  assert.match(source, /const snapshot = version\.match\(\/\^snapshot-/);
   assert.match(source, /text-sm font-normal leading-5/);
   assert.match(source, /<span className="block">Snapshot<\/span>/);
   assert.match(source, /whitespace-nowrap text-base font-normal leading-5/);
-  assert.match(source, /isMobile=\{isMobile\}/);
+  assert.doesNotMatch(source, /<SidebarVersionLabel[\s\S]{0,160}isMobile=\{isMobile\}/);
 });
 
 test("mobile navigation uses a partial overlay without hiding the page", () => {

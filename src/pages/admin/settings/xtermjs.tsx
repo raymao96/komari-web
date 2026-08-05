@@ -152,7 +152,14 @@ export default function XtermjsSettingsPage() {
 
   return (
     <Flex direction="column" gap="3">
-      <AdminPageTitle>{t("settings.xtermjs.title")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.xtermjs.page_description",
+          "统一设置远程终端字体、交互和配色。",
+        )}
+      >
+        {t("settings.xtermjs.title")}
+      </AdminPageTitle>
       <SettingCardButton
         title={t("settings.xtermjs.title")}
         description={t("settings.xtermjs.reset_defaults")}

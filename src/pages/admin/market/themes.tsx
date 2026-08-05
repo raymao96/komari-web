@@ -32,6 +32,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 
 interface MarketSource {
   id: string;
@@ -166,6 +170,9 @@ export default function ThemeMarketPage() {
         .includes(term),
     );
   }, [displayText, search, themes]);
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(filteredThemes);
+  useEffect(() => setPage(1), [search, setPage]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -300,12 +307,14 @@ export default function ThemeMarketPage() {
   return (
     <Box className="space-y-5 p-0 md:p-4">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
-        <Box>
-          <AdminPageTitle>{t("market.themes", "Theme Market")}</AdminPageTitle>
-          <Text as="div" size="2" color="gray" mt="1">
-            {t("market.description", "Find and install themes from the internet.")}
-          </Text>
-        </Box>
+        <AdminPageTitle
+          description={t(
+            "market.description",
+            "Find and install themes from the internet.",
+          )}
+        >
+          {t("market.themes", "Theme Market")}
+        </AdminPageTitle>
         <Flex gap="2">
           <Button variant="soft" onClick={() => setSourcesOpen(true)}>
             <Settings2 size={16} />
@@ -339,8 +348,9 @@ export default function ThemeMarketPage() {
           <Text color="gray">{t("market.no_themes", "No themes found")}</Text>
         </Flex>
       ) : (
+        <div className="space-y-3">
         <Grid columns={{ initial: "1", sm: "2", lg: "3", xl: "4" }} gap="4">
-          {filteredThemes.map((theme) => {
+          {pageItems.map((theme) => {
             const key = `${theme.source_id}:${theme.short}`;
             const installedVersion = installed.get(theme.short);
             const isInstalled = Boolean(installedVersion);
@@ -426,6 +436,14 @@ export default function ThemeMarketPage() {
             );
           })}
         </Grid>
+        <AdminPagination
+          page={page}
+          total={filteredThemes.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+        </div>
       )}
 
       <Dialog.Root open={Boolean(selectedTheme)} onOpenChange={(open) => { if (!open) setSelectedTheme(null); }}>

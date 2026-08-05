@@ -101,6 +101,11 @@ export default function TerminalWorkspace() {
     useSensor(KeyboardSensor, {}),
   );
 
+  useEffect(() => {
+    document.documentElement.classList.add("remote-terminal-open");
+    return () => document.documentElement.classList.remove("remote-terminal-open");
+  }, []);
+
   const addTab = useCallback((uuid: string) => {
     if (!uuid) return;
     if (tabs.length >= maxTabs) {

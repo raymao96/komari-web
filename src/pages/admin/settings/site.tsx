@@ -160,7 +160,14 @@ export default function SiteSettings() {
 
   return (
     <>
-      <AdminPageTitle>{t("settings.site.title")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.site.page_description",
+          "管理站点信息、访问策略、备份与接口安全设置。",
+        )}
+      >
+        {t("settings.site.title")}
+      </AdminPageTitle>
       <SettingCardShortTextInput
         title={t("settings.site.name")}
         description={t("settings.site.name_description")}

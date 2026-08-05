@@ -1,5 +1,9 @@
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
 import {
   Table,
@@ -47,6 +51,12 @@ const InnerLayout = () => {
   const { isLoading: nodeDetailLoading, error: nodeDetailError } =
     useNodeDetails();
   const { t } = useTranslation();
+  const sortedAlerts = React.useMemo(
+    () => (loadAlerts || []).slice().sort((a, b) => (b.id ?? 0) - (a.id ?? 0)),
+    [loadAlerts],
+  );
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(sortedAlerts);
   if (isLoading || nodeDetailLoading) {
     return <Loading />;
   }
@@ -55,15 +65,21 @@ const InnerLayout = () => {
   }
   return (
     <Flex direction="column" gap="4" className="p-0 md:p-4">
-      <div className="flex flex-wrap justify-between items-center gap-3">
-        <AdminPageTitle>
+      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-end">
+        <AdminPageTitle
+          description={t(
+            "notification.load.description",
+            "配置 CPU、内存、负载等资源告警规则，并指定适用节点。",
+          )}
+        >
           {t("notification.load.title")}
         </AdminPageTitle>
         <AddButton />
       </div>
 
-      <div className="rounded-xl overflow-hidden">
-        <Table>
+      <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+        <div className="overflow-x-auto">
+        <Table className="admin-responsive-table admin-primary-first-table min-w-[840px]">
           <TableHeader>
             <TableHead>{t("common.name")}</TableHead>
             <TableHead>{t("common.server")}</TableHead>
@@ -74,14 +90,20 @@ const InnerLayout = () => {
             <TableHead>{t("common.action")}</TableHead>
           </TableHeader>
           <TableBody>
-            {loadAlerts
-              ?.slice()
-              .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
-              .map((alert) => (
+            {pageItems.map((alert) => (
                 <Row key={alert.id} alert={alert} />
               ))}
           </TableBody>
         </Table>
+        </div>
+        <AdminPagination
+          page={page}
+          total={sortedAlerts.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          showSummary={false}
+        />
       </div>
     </Flex>
   );
@@ -177,22 +199,19 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
 
   return (
     <TableRow key={alert.id}>
-      <TableCell>{alert.name}</TableCell>
-      <TableCell>
-        <Flex gap="2" align="center">
-          {alert.clients && alert.clients.length > 0
-            ? (() => {
-                const names = alert.clients.map((uuid) => {
-                  const name =
-                    nodeDetail.find((node) => node.uuid === uuid)?.name || uuid;
-                  return name;
-                });
-                const joined = names.join(", ");
-                return joined.length > 40
-                  ? joined.slice(0, 40) + "..."
-                  : joined;
-              })()
-            : t("common.none")}
+      <TableCell data-label={t("common.name")}>{alert.name}</TableCell>
+      <TableCell data-label={t("common.server")}>
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="min-w-0 flex-1 whitespace-normal break-words">
+            {alert.clients && alert.clients.length > 0
+              ? alert.clients
+                  .map(
+                    (uuid) =>
+                      nodeDetail.find((node) => node.uuid === uuid)?.name || uuid,
+                  )
+                  .join(", ")
+              : t("common.none")}
+          </span>
           <NodeSelectorDialog
             value={form.clients ?? []}
             hiddenUuidOnlyClient
@@ -201,19 +220,20 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
               submitEdit({ ...form, clients: uuids });
             }}
           >
-            <IconButton variant="ghost">
+            <IconButton variant="ghost" className="shrink-0">
               <MoreHorizontal size="16" />
             </IconButton>
           </NodeSelectorDialog>
-        </Flex>
+        </div>
       </TableCell>
-      <TableCell>{alert.metric?.toUpperCase()}</TableCell>
-      <TableCell>{alert.threshold}%</TableCell>
-      <TableCell>{alert.ratio}</TableCell>
-      <TableCell>
+      <TableCell data-label={t("loadAlert.metric")}>{alert.metric?.toUpperCase()}</TableCell>
+      <TableCell data-label={t("common.threshold")}>{alert.threshold}%</TableCell>
+      <TableCell data-label={t("loadAlert.ratio")}>{alert.ratio}</TableCell>
+      <TableCell data-label={t("ping.interval")}>
         {alert.interval} {t("time.minute")}
       </TableCell>
-      <TableCell className="flex items-center gap-2">
+      <TableCell data-label={t("common.action")}>
+        <div className="admin-card-actions admin-dual-actions flex items-center gap-3">
         {/* 编辑按钮 */}
         <Dialog.Root open={editOpen} onOpenChange={setEditOpen}>
           <Dialog.Trigger>
@@ -337,6 +357,7 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
             </Flex>
           </Dialog.Content>
         </Dialog.Root>
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -398,7 +419,7 @@ const AddButton: React.FC = () => {
   return (
     <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
       <Dialog.Trigger>
-        <Button>{t("common.add")}</Button>
+        <Button className="w-full sm:w-auto">{t("common.add")}</Button>
       </Dialog.Trigger>
       <Dialog.Content>
         <Dialog.Title>{t("common.add")}</Dialog.Title>

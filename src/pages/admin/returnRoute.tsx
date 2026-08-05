@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
+  AdminPagination,
+} from "@/components/admin/AdminPagination";
+import { useAdminDefaultPageSize } from "@/hooks/useAdminDefaultPageSize";
+import {
   Badge,
   Box,
   Button,
@@ -18,8 +22,6 @@ import {
   Activity,
   AlertTriangle,
   BookOpen,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   Download,
   History,
@@ -33,6 +35,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import Loading from "@/components/loading";
 import {
   NodeDetailsProvider,
@@ -379,13 +382,15 @@ function FormSection({ title, children }: { title: string; children: React.React
 }
 
 function ReturnRouteContent() {
+  const { t } = useTranslation();
+  const defaultPageSize = useAdminDefaultPageSize();
   const { nodeDetail, isLoading: nodesLoading } = useNodeDetails();
   const nodes = Array.isArray(nodeDetail) ? nodeDetail.map((node) => ({ uuid: node.uuid, name: node.name })) : [];
   const [activeTab, setActiveTab] = useState<"tasks" | "records" | "rules">("tasks");
-  const [taskQuery, setTaskQuery] = useState({ page: 1, page_size: 10, keyword: "", carrier: "", state: "" });
-  const [recordQuery, setRecordQuery] = useState({ page: 1, page_size: 10, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" });
-  const [taskData, setTaskData] = useState<TaskPage>({ tasks: [], statuses: [], probing_task_ids: [], total: 0, page: 1, page_size: 10 });
-  const [recordData, setRecordData] = useState<RecordPage>({ events: [], total: 0, page: 1, page_size: 10 });
+  const [taskQuery, setTaskQuery] = useState({ page: 1, page_size: defaultPageSize, keyword: "", carrier: "", state: "" });
+  const [recordQuery, setRecordQuery] = useState({ page: 1, page_size: defaultPageSize, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" });
+  const [taskData, setTaskData] = useState<TaskPage>({ tasks: [], statuses: [], probing_task_ids: [], total: 0, page: 1, page_size: defaultPageSize });
+  const [recordData, setRecordData] = useState<RecordPage>({ events: [], total: 0, page: 1, page_size: defaultPageSize });
   const [summary, setSummary] = useState<SummaryData>({ tasks: 0, healthy: 0, switched: 0, recent_events: 0 });
   const [taskLoading, setTaskLoading] = useState(true);
   const [recordLoading, setRecordLoading] = useState(false);
@@ -445,6 +450,11 @@ function ReturnRouteContent() {
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  useEffect(() => {
+    setTaskQuery((current) => ({ ...current, page: 1, page_size: defaultPageSize }));
+    setRecordQuery((current) => ({ ...current, page: 1, page_size: defaultPageSize }));
+  }, [defaultPageSize]);
 
   useEffect(() => {
     if (activeTab !== "tasks") return;
@@ -569,10 +579,14 @@ function ReturnRouteContent() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-4 p-0 md:p-4">
-      <div>
-        <AdminPageTitle>回程线路监测</AdminPageTitle>
-        <Text as="p" size="2" color="gray" className="mt-1">识别移动、电信、联通回程线路，确认切线后告警，恢复后自动通知。</Text>
-      </div>
+      <AdminPageTitle
+        description={t(
+          "return_route.description",
+          "识别移动、电信、联通回程线路，确认切线后告警，恢复后自动通知。",
+        )}
+      >
+        {t("return_route.title", "回程线路监测")}
+      </AdminPageTitle>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Summary label="监测任务" value={summary.tasks} icon={<Route size={20} />} />
@@ -610,9 +624,9 @@ function ReturnRouteContent() {
                       <Select.Content><Select.Item value="all">全部</Select.Item><Select.Item value="healthy">线路正常</Select.Item><Select.Item value="probing">探测中</Select.Item><Select.Item value="observing">确认中</Select.Item><Select.Item value="switched">已切线</Select.Item><Select.Item value="unknown">无法识别</Select.Item><Select.Item value="pending">等待探测</Select.Item><Select.Item value="disabled">已暂停</Select.Item></Select.Content>
                     </Select.Root>
                   </Field>
-                  <Button variant="soft" color="gray" disabled={!taskQuery.keyword && !taskQuery.carrier && !taskQuery.state} onClick={() => setTaskQuery((current) => ({ ...current, page: 1, keyword: "", carrier: "", state: "" }))}>重置</Button>
                 </div>
-                <div className="shrink-0">
+                <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
+                  <Button variant="soft" color="gray" disabled={!taskQuery.keyword && !taskQuery.carrier && !taskQuery.state} onClick={() => setTaskQuery((current) => ({ ...current, page: 1, keyword: "", carrier: "", state: "" }))}>重置</Button>
                   <RouteTaskDialog nodes={nodes} onSaved={refreshTasksAfterChange}><Button><Plus size={16} />新建任务</Button></RouteTaskDialog>
                 </div>
               </div>
@@ -620,31 +634,38 @@ function ReturnRouteContent() {
               {taskLoading ? <Loading text="" /> : taskData.tasks.length === 0 ? (
                 <Callout.Root color="gray"><Callout.Icon><Activity size={16} /></Callout.Icon><Callout.Text>{taskData.total === 0 && !taskQuery.keyword && !taskQuery.carrier && !taskQuery.state ? "暂无任务" : "没有符合条件的任务"}</Callout.Text></Callout.Root>
               ) : (
-                <section className="overflow-hidden border border-gray-200 dark:border-gray-800">
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1080px] text-left text-sm">
-                      <thead className="bg-gray-50 text-sm text-gray-500 dark:bg-gray-900"><tr><th className="p-3">任务 / 节点</th><th className="p-3">运营商 / 地区</th><th className="p-3">线路</th><th className="p-3">状态</th><th className="p-3">关键 ASN</th><th className="p-3">最后探测</th><th className="p-3 text-right">操作</th></tr></thead>
+                <section className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
+                  <div className="admin-responsive-table-scroll overflow-x-auto">
+                    <table className="admin-responsive-table w-full min-w-[1080px] text-left text-sm">
+                      <thead className="admin-table-header text-sm"><tr><th className="p-3">任务 / 节点</th><th className="p-3">运营商 / 地区</th><th className="p-3">线路</th><th className="p-3">状态</th><th className="p-3">关键 ASN</th><th className="p-3">最后探测</th><th className="py-3 pl-6 pr-3">操作</th></tr></thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                         {taskData.tasks.map((task) => {
                           const status = statuses.get(task.id || 0);
                           const needed = status?.candidate_line === task.expected_line ? task.recovery_confirm : task.switch_confirm;
                           const probing = probingTasks.has(task.id || 0);
                           return <tr key={task.id} className="align-top hover:bg-gray-50/60 dark:hover:bg-gray-900/50">
-                            <td className="p-3"><div className="font-medium">{task.name}</div><div className="mt-1 text-xs text-gray-500">{task.client_info?.name || task.client}</div></td>
-                            <td className="p-3"><div>{carrierNames[task.carrier]}</div><div className="mt-1 text-xs text-gray-500">{task.region || "未标记"} · IPv{task.ip_version}</div></td>
-                            <td className="p-3"><div><span className="text-gray-500">当前 </span><strong>{status?.current_line || "-"}</strong></div><div className="mt-1 text-xs text-gray-500">预期 {task.expected_line}</div></td>
-                            <td className="p-3">{!task.enabled ? <Badge color="gray">已暂停</Badge> : probing ? <Badge color="blue"><RefreshCw size={12} className="mr-1 animate-spin" />探测中</Badge> : stateBadge(status)}{status?.candidate_line && <div className="mt-1 text-xs text-amber-600">{status.candidate_line} {status.candidate_count}/{needed}</div>}{(status?.confidence ?? 0) > 0 && <div className="mt-1 text-xs text-gray-500">置信度 {((status?.confidence ?? 0) * 100).toFixed(0)}%</div>}</td>
-                            <td className="max-w-[320px] p-3"><div className="flex flex-wrap gap-1">{status?.asn_path?.length ? status.asn_path.map((asn) => <Badge key={asn} color="gray" variant="soft">{asn}</Badge>) : <span className="text-gray-400">-</span>}</div>{status?.route_path?.length ? <details className="mt-2 text-xs text-gray-500"><summary className="cursor-pointer">查看完整路径</summary><div className="mt-2 max-h-48 overflow-auto whitespace-pre font-mono leading-5">{status.route_path.join("\n")}</div></details> : null}{status?.last_error && <div className="mt-2 max-w-xs text-xs text-red-600">{status.last_error}</div>}</td>
-                            <td className="p-3 text-gray-600">{formatTime(status?.last_checked_at)}<div className="mt-1 text-xs text-gray-400">每 {Math.round(task.interval / 60)} 分钟</div></td>
-                            <td className="p-3"><Flex justify="end" gap="1"><IconButton variant="ghost" title={probing ? "探测中" : "立即探测"} disabled={probing || !task.enabled} onClick={() => runNow(task.id)}>{probing ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}</IconButton><RouteTaskDialog task={task} nodes={nodes} onSaved={refreshTasksAfterChange}><IconButton variant="ghost" title="编辑"><Pencil size={16} /></IconButton></RouteTaskDialog><IconButton variant="ghost" color="red" title="删除" onClick={() => remove(task)}><Trash2 size={16} /></IconButton></Flex></td>
+                            <td data-label="任务 / 节点" className="p-3"><div className="return-route-cell-pair"><div className="font-medium">{task.name}</div><div className="mt-1 text-xs text-gray-500">{task.client_info?.name || task.client}</div></div></td>
+                            <td data-label="运营商 / 地区" className="p-3"><div className="return-route-cell-pair"><div>{carrierNames[task.carrier]}</div><div className="mt-1 text-xs text-gray-500">{task.region || "未标记"} · IPv{task.ip_version}</div></div></td>
+                            <td data-label="线路" className="p-3"><div className="return-route-cell-pair"><div><span className="text-gray-500">当前 </span><strong>{status?.current_line || "-"}</strong></div><div className="mt-1 text-xs text-gray-500">预期 {task.expected_line}</div></div></td>
+                            <td data-label="状态" className="p-3"><div className="return-route-cell-content">{!task.enabled ? <Badge color="gray">已暂停</Badge> : probing ? <Badge color="blue"><RefreshCw size={12} className="mr-1 animate-spin" />探测中</Badge> : stateBadge(status)}{status?.candidate_line && <div className="mt-1 text-xs text-amber-600">{status.candidate_line} {status.candidate_count}/{needed}</div>}{(status?.confidence ?? 0) > 0 && <div className="mt-1 text-xs text-gray-500">置信度 {((status?.confidence ?? 0) * 100).toFixed(0)}%</div>}</div></td>
+                            <td data-label="关键 ASN" className="max-w-[320px] p-3"><div className="return-route-cell-content"><div className="flex flex-wrap gap-1">{status?.asn_path?.length ? status.asn_path.map((asn) => <Badge key={asn} color="gray" variant="soft">{asn}</Badge>) : <span className="text-gray-400">-</span>}</div>{status?.route_path?.length ? <details className="mt-2 text-xs text-gray-500"><summary className="cursor-pointer">查看完整路径</summary><div className="mt-2 max-h-48 overflow-auto whitespace-pre font-mono leading-5">{status.route_path.join("\n")}</div></details> : null}{status?.last_error && <div className="mt-2 max-w-xs text-xs text-red-600">{status.last_error}</div>}</div></td>
+                            <td data-label="最后探测" className="p-3 text-gray-600"><div className="return-route-cell-pair"><span>{formatTime(status?.last_checked_at)}</span><div className="mt-1 text-xs text-gray-400">每 {Math.round(task.interval / 60)} 分钟</div></div></td>
+                            <td data-label="操作" className="p-3"><Flex justify="start" gap="1" className="admin-card-actions"><IconButton variant="ghost" title={probing ? "探测中" : "立即探测"} disabled={probing || !task.enabled} onClick={() => runNow(task.id)}>{probing ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}</IconButton><RouteTaskDialog task={task} nodes={nodes} onSaved={refreshTasksAfterChange}><IconButton variant="ghost" title="编辑"><Pencil size={16} /></IconButton></RouteTaskDialog><IconButton variant="ghost" color="red" title="删除" onClick={() => remove(task)}><Trash2 size={16} /></IconButton></Flex></td>
                           </tr>;
                         })}
                       </tbody>
                     </table>
                   </div>
+                  <AdminPagination
+                    page={taskQuery.page}
+                    pageSize={taskQuery.page_size}
+                    total={taskData.total}
+                    onPageChange={(page) => updateTaskQuery({ page })}
+                    onPageSizeChange={(page_size) => updateTaskQuery({ page_size })}
+                    showSummary={false}
+                  />
                 </section>
               )}
-              <PageControls page={taskQuery.page} pageSize={taskQuery.page_size} total={taskData.total} onPageChange={(page) => updateTaskQuery({ page })} onPageSizeChange={(page_size) => updateTaskQuery({ page_size })} />
             </div>
           </Tabs.Content>
 
@@ -675,28 +696,35 @@ function ReturnRouteContent() {
                 <div className="flex items-end"><Button variant="soft" color="gray" disabled={!recordQuery.keyword && recordQuery.range === "24h" && !recordQuery.kind && !recordQuery.carrier && !recordQuery.region && !recordQuery.expected_line && !recordQuery.actual_line} onClick={() => setRecordQuery((current) => ({ ...current, page: 1, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" }))}>重置筛选</Button></div>
               </div>
 
-              {recordLoading ? <Loading text="" /> : recordData.events.length === 0 ? <div className="border border-gray-200 p-10 text-center text-sm text-gray-500 dark:border-gray-800">暂无符合条件的监测记录</div> : (
-                <section className="overflow-hidden border border-gray-200 dark:border-gray-800">
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1120px] text-left text-sm">
-                      <thead className="bg-gray-50 text-sm text-gray-500 dark:bg-gray-900"><tr><th className="p-3">发生时间</th><th className="p-3">类型</th><th className="p-3">任务 / 节点</th><th className="p-3">目标</th><th className="p-3">预期线路</th><th className="p-3">线路变化</th><th className="p-3">关键 ASN</th><th className="p-3">路径</th></tr></thead>
+              {recordLoading ? <Loading text="" /> : recordData.events.length === 0 ? <div className="rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] p-10 text-center text-sm text-gray-500">暂无符合条件的监测记录</div> : (
+                <section className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
+                  <div className="admin-responsive-table-scroll overflow-x-auto">
+                    <table className="admin-responsive-table w-full min-w-[1120px] text-left text-sm">
+                      <thead className="admin-table-header text-sm"><tr><th className="p-3">发生时间</th><th className="p-3">类型</th><th className="p-3">任务 / 节点</th><th className="p-3">目标</th><th className="p-3">预期线路</th><th className="p-3">线路变化</th><th className="p-3">关键 ASN</th><th className="p-3">路径</th></tr></thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                         {recordData.events.map((event) => <tr key={event.id} className="align-top hover:bg-gray-50/60 dark:hover:bg-gray-900/50">
-                          <td className="p-3 whitespace-nowrap">{formatTime(event.occurred_at)}</td>
-                          <td className="p-3"><Badge color={event.kind === "recovery" ? "green" : "red"}>{event.kind === "recovery" ? "恢复" : "切线"}</Badge></td>
-                          <td className="p-3"><div className="font-medium">{event.task_name || `#${event.task_id}`}</div><div className="mt-1 text-xs text-gray-500">{event.node_name || event.client}</div></td>
-                          <td className="p-3"><div>{event.target || "-"}</div><div className="mt-1 text-xs text-gray-500">{event.carrier ? carrierNames[event.carrier] : "-"} · {event.region || "未标记"} · IPv{event.ip_version || 4}</div></td>
-                          <td className="p-3 font-medium">{event.expected_line || "-"}</td>
-                          <td className="p-3 whitespace-nowrap"><span>{event.from_line || "-"}</span><span className="px-2 text-gray-400">→</span><strong>{event.to_line}</strong></td>
-                          <td className="max-w-[260px] p-3"><div className="flex flex-wrap gap-1">{event.asn_path?.length ? event.asn_path.map((asn) => <Badge key={asn} color="gray" variant="soft">{asn}</Badge>) : <span className="text-gray-400">-</span>}</div></td>
-                          <td className="p-3">{event.route_path?.length ? <details className="text-xs text-gray-500"><summary className="cursor-pointer">查看完整路径</summary><div className="mt-2 max-h-48 overflow-auto whitespace-pre font-mono leading-5">{event.route_path.join("\n")}</div></details> : <span className="text-gray-400">-</span>}</td>
+                          <td data-label="发生时间" className="p-3 whitespace-nowrap">{formatTime(event.occurred_at)}</td>
+                          <td data-label="类型" className="p-3"><Badge color={event.kind === "recovery" ? "green" : "red"}>{event.kind === "recovery" ? "恢复" : "切线"}</Badge></td>
+                          <td data-label="任务 / 节点" className="p-3"><div className="font-medium">{event.task_name || `#${event.task_id}`}</div><div className="mt-1 text-xs text-gray-500">{event.node_name || event.client}</div></td>
+                          <td data-label="目标" className="p-3"><div>{event.target || "-"}</div><div className="mt-1 text-xs text-gray-500">{event.carrier ? carrierNames[event.carrier] : "-"} · {event.region || "未标记"} · IPv{event.ip_version || 4}</div></td>
+                          <td data-label="预期线路" className="p-3 font-medium">{event.expected_line || "-"}</td>
+                          <td data-label="线路变化" className="p-3 whitespace-nowrap"><span>{event.from_line || "-"}</span><span className="px-2 text-gray-400">→</span><strong>{event.to_line}</strong></td>
+                          <td data-label="关键 ASN" className="max-w-[260px] p-3"><div className="flex flex-wrap gap-1">{event.asn_path?.length ? event.asn_path.map((asn) => <Badge key={asn} color="gray" variant="soft">{asn}</Badge>) : <span className="text-gray-400">-</span>}</div></td>
+                          <td data-label="路径" className="p-3">{event.route_path?.length ? <details className="text-xs text-gray-500"><summary className="cursor-pointer">查看完整路径</summary><div className="mt-2 max-h-48 overflow-auto whitespace-pre font-mono leading-5">{event.route_path.join("\n")}</div></details> : <span className="text-gray-400">-</span>}</td>
                         </tr>)}
                       </tbody>
                     </table>
                   </div>
+                  <AdminPagination
+                    page={recordQuery.page}
+                    pageSize={recordQuery.page_size}
+                    total={recordData.total}
+                    onPageChange={(page) => updateRecordQuery({ page })}
+                    onPageSizeChange={(page_size) => updateRecordQuery({ page_size })}
+                    showSummary={false}
+                  />
                 </section>
               )}
-              <PageControls page={recordQuery.page} pageSize={recordQuery.page_size} total={recordData.total} onPageChange={(page) => updateRecordQuery({ page })} onPageSizeChange={(page_size) => updateRecordQuery({ page_size })} />
             </div>
           </Tabs.Content>
 
@@ -737,15 +765,15 @@ function ReturnRouteContent() {
                 {ruleView.status.last_error ? <Callout.Root color="red"><Callout.Icon><AlertTriangle size={16} /></Callout.Icon><Callout.Text>本地规则：{ruleView.status.last_error}</Callout.Text></Callout.Root> : null}
                 {ruleView.status.bgp_last_error ? <Callout.Root color="amber"><Callout.Icon><AlertTriangle size={16} /></Callout.Icon><Callout.Text>BGP 更新：{ruleView.status.bgp_last_error}</Callout.Text></Callout.Root> : null}
 
-                <section className="overflow-hidden border border-gray-200 dark:border-gray-800">
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-left text-sm">
-                      <thead className="bg-gray-50 text-sm text-gray-500 dark:bg-gray-900"><tr><th className="p-3">线路</th><th className="p-3">ASN</th><th className="p-3">人工网段特征</th></tr></thead>
+                <section className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
+                  <div className="admin-responsive-table-scroll overflow-x-auto">
+                    <table className="admin-responsive-table w-full min-w-[760px] text-left text-sm">
+                      <thead className="admin-table-header text-sm"><tr><th className="p-3">线路</th><th className="p-3">ASN</th><th className="p-3">人工网段特征</th></tr></thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                         {ruleGroupOrder.map((group) => <tr key={group} className="align-top">
-                          <td className="p-3 font-medium">{ruleGroupNames[group] || group}</td>
-                          <td className="p-3"><div className="flex flex-wrap gap-1">{ruleView.rules.asn_groups[group]?.length ? ruleView.rules.asn_groups[group].map((asn) => <Badge key={asn} color="gray" variant="soft">AS{asn}</Badge>) : <span className="text-gray-400">-</span>}</div></td>
-                          <td className="p-3"><div className="flex flex-wrap gap-1">{ruleView.rules.prefix_groups[group]?.length ? ruleView.rules.prefix_groups[group].map((prefix) => <Badge key={prefix} color="blue" variant="soft">{prefix}</Badge>) : <span className="text-gray-400">-</span>}</div></td>
+                          <td data-label="线路" className="p-3 font-medium">{ruleGroupNames[group] || group}</td>
+                          <td data-label="ASN" className="p-3"><div className="flex flex-wrap gap-1">{ruleView.rules.asn_groups[group]?.length ? ruleView.rules.asn_groups[group].map((asn) => <Badge key={asn} color="gray" variant="soft">AS{asn}</Badge>) : <span className="text-gray-400">-</span>}</div></td>
+                          <td data-label="人工网段特征" className="p-3"><div className="flex flex-wrap gap-1">{ruleView.rules.prefix_groups[group]?.length ? ruleView.rules.prefix_groups[group].map((prefix) => <Badge key={prefix} color="blue" variant="soft">{prefix}</Badge>) : <span className="text-gray-400">-</span>}</div></td>
                         </tr>)}
                       </tbody>
                     </table>
@@ -760,11 +788,6 @@ function ReturnRouteContent() {
   );
 }
 
-function PageControls({ page, pageSize, total, onPageChange, onPageSizeChange }: { page: number; pageSize: number; total: number; onPageChange: (page: number) => void; onPageSizeChange: (pageSize: number) => void }) {
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  return <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500"><span>共 {total} 条</span><Flex align="center" gap="2"><Select.Root value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}><Select.Trigger /><Select.Content><Select.Item value="10">10 条/页</Select.Item><Select.Item value="20">20 条/页</Select.Item><Select.Item value="50">50 条/页</Select.Item></Select.Content></Select.Root><IconButton variant="soft" color="gray" title="上一页" disabled={page <= 1} onClick={() => onPageChange(page - 1)}><ChevronLeft size={16} /></IconButton><span className="min-w-[76px] text-center">{page} / {pages}</span><IconButton variant="soft" color="gray" title="下一页" disabled={page >= pages} onClick={() => onPageChange(page + 1)}><ChevronRight size={16} /></IconButton></Flex></div>;
-}
-
 function recordRangeStart(range: string) {
   const hours = range === "24h" ? 24 : range === "7d" ? 24 * 7 : range === "30d" ? 24 * 30 : 0;
   return hours ? new Date(Date.now() - hours * 60 * 60 * 1000).toISOString() : undefined;
@@ -772,7 +795,7 @@ function recordRangeStart(range: string) {
 
 function Summary({ label, value, icon, tone = "gray" }: { label: string; value: number; icon: React.ReactNode; tone?: "gray" | "green" | "red" }) {
   const color = tone === "green" ? "text-green-600" : tone === "red" ? "text-red-600" : "text-gray-500";
-  return <div className="flex min-h-24 items-center justify-between border border-gray-200 px-5 py-4 dark:border-gray-800"><div><div className="text-sm text-gray-500">{label}</div><div className="mt-1 text-2xl font-semibold">{value}</div></div><span className={color}>{icon}</span></div>;
+  return <div className="flex min-h-24 items-center justify-between rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] px-5 py-4"><div><div className="text-sm text-gray-500">{label}</div><div className="mt-1 text-2xl font-semibold">{value}</div></div><span className={color}>{icon}</span></div>;
 }
 
 function RuleStat({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {

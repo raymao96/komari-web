@@ -475,8 +475,15 @@ const ThemePage = () => {
   return (
     <Box className="space-y-6">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
-        <AdminPageTitle>{t("theme.title")}</AdminPageTitle>
-        <Flex gap="2" wrap="wrap" className="w-full sm:w-auto">
+        <AdminPageTitle
+          description={t(
+            "theme.page_description",
+            "管理已安装主题、切换当前主题并维护主题配置。",
+          )}
+        >
+          {t("theme.title")}
+        </AdminPageTitle>
+        <Flex gap="2" wrap="wrap" className="w-full sm:w-auto [&>button]:min-w-[8rem] [&>button]:flex-1 sm:[&>button]:min-w-0 sm:[&>button]:flex-none">
           <Button
             variant="soft"
             className="gap-2"

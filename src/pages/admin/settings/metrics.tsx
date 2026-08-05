@@ -1,5 +1,9 @@
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 import { DatabaseMaintenanceCard } from "@/components/admin/DatabaseMaintenanceCard";
 import { Selector } from "@/components/Selector";
 import {
@@ -232,7 +236,14 @@ export default function MetricsSettings() {
 
   return (
     <Flex direction="column" gap="3">
-      <AdminPageTitle>{t("settings.storage.title")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.storage.page_description",
+          "查看数据库占用并管理监控数据、迁移和维护。",
+        )}
+      >
+        {t("settings.storage.title")}
+      </AdminPageTitle>
 
       <Tabs.Root
         value={activeTab}
@@ -400,6 +411,8 @@ function MetricRetentionTable({
     String(defaultRetentionDays),
   );
   const language = i18n.resolvedLanguage || i18n.language;
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(metrics);
 
   const fetchMetrics = React.useCallback(
     async (silent = false) => {
@@ -660,7 +673,8 @@ function MetricRetentionTable({
           </Callout.Root>
         )}
 
-        <div className="overflow-x-auto rounded-lg">
+        <div className="overflow-hidden rounded-md border border-[var(--gray-a5)]">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -688,7 +702,7 @@ function MetricRetentionTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                metrics.map((metric) => {
+                pageItems.map((metric) => {
                   const description = metricDescription(metric, language, t);
                   return (
                     <TableRow key={metric.name}>
@@ -736,6 +750,14 @@ function MetricRetentionTable({
               )}
             </TableBody>
           </Table>
+          </div>
+          <AdminPagination
+            page={page}
+            total={metrics.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
         <Flex justify="end">
           <Button

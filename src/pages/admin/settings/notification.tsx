@@ -109,7 +109,14 @@ const NotificationSettings = () => {
 
   return (
     <>
-      <AdminPageTitle>{t("settings.notification.title")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "settings.notification.page_description",
+          "配置通知渠道、连接参数与消息模板。",
+        )}
+      >
+        {t("settings.notification.title")}
+      </AdminPageTitle>
       <SettingCardSwitch
         title={t("settings.notification.enable")}
         description={t("settings.notification.enable_description")}
@@ -178,7 +185,7 @@ const NotificationSettings = () => {
           }
         }}
       >
-        GO
+        {t("settings.notification.test_title")}
       </SettingCardButton>
       <label className="text-muted-foreground text-sm flex flex-row items-center gap-1">
         {t("settings.notification.moved")}

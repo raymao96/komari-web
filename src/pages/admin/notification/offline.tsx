@@ -1,5 +1,10 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSelectionCount } from "@/components/admin/AdminSelectionCount";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 import {
   Table,
   TableBody,
@@ -25,7 +30,6 @@ import {
   Button,
   Dialog,
   Flex,
-  IconButton,
   Switch,
   TextField,
 } from "@radix-ui/themes";
@@ -126,7 +130,11 @@ const InnerLayout = () => {
     offlineNotification,
     refresh,
   } = useOfflineNotification();
-  const { isLoading: onNodeLoading, error: onNodeError } = useNodeDetails();
+  const {
+    nodeDetail,
+    isLoading: onNodeLoading,
+    error: onNodeError,
+  } = useNodeDetails();
   const { t } = useTranslation();
   const [batchLoading, setBatchLoading] = React.useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
@@ -135,6 +143,28 @@ const InnerLayout = () => {
     cooldown: 1800,
     grace_period: 300,
   });
+  const filteredNodeIds = React.useMemo(
+    () => nodeDetail
+      .filter((node) => node.name.toLowerCase().includes(search.toLowerCase()))
+      .map((node) => node.uuid),
+    [nodeDetail, search],
+  );
+  const selectedFilteredIds = React.useMemo(() => {
+    const selectedSet = new Set(selected);
+    return filteredNodeIds.filter((id) => selectedSet.has(id));
+  }, [filteredNodeIds, selected]);
+  const selectedFilteredCount = selectedFilteredIds.length;
+  const allFilteredSelected = filteredNodeIds.length > 0
+    && selectedFilteredCount === filteredNodeIds.length;
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const filteredSet = new Set(filteredNodeIds);
+      setSelected((current) => current.filter((id) => !filteredSet.has(id)));
+      return;
+    }
+    setSelected((current) => Array.from(new Set([...current, ...filteredNodeIds])));
+  };
 
   // 批量修改
   const handleBatchEdit = (values: {
@@ -143,7 +173,7 @@ const InnerLayout = () => {
     grace_period: number;
   }) => {
     setBatchLoading(true);
-    const payload = selected.map((id) => ({
+    const payload = selectedFilteredIds.map((id) => ({
       client: id,
       enable: values.enable,
       cooldown: values.cooldown,
@@ -184,71 +214,92 @@ const InnerLayout = () => {
   }
   return (
     <div className="flex flex-col gap-4 p-0 md:p-4">
-      <Flex justify="between" align="center" wrap="wrap">
-        <AdminPageTitle>
-          {t("notification.offline.full_title", "离线通知设置")}
-        </AdminPageTitle>
-        <TextField.Root
-          type="text"
-          className="max-w-64"
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setSearch(e.target.value)
-          }
-        >
-          <TextField.Slot>
-            <Search size={16} />
-          </TextField.Slot>
-        </TextField.Root>
-      </Flex>
-      <OfflineNotificationTable
-        search={search}
-        selected={selected}
-        onSelectionChange={setSelected}
-      />
-      <label className="text-sm text-muted-foreground">
-        {t("common.selected", {
-          count: selected.length,
-        })}
-      </label>
-      <Flex gap="2" align="center">
-        <Dialog.Root open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
-          <Dialog.Trigger>
-            <Button
-              variant="soft"
-              onClick={() => {
-                // 默认取第一个选中项的配置作为初始值
-                const first = offlineNotification.find(
-                  (n) => n.client === selected[0]
-                );
-                setBatchForm({
-                  enable: first?.enable ?? true,
-                  cooldown: first?.cooldown ?? 1800,
-                  grace_period: first?.grace_period ?? 300,
-                });
-              }}
-              disabled={batchLoading || selected.length === 0}
-            >
-              {t("notification.offline.batch_edit")}
-            </Button>
-          </Dialog.Trigger>
-          <Dialog.Content>
-            <Dialog.Title>{t("notification.offline.batch_edit")}</Dialog.Title>
-            <NotificationEditForm
-              initialValues={batchForm}
-              loading={batchLoading}
-              onSubmit={handleBatchEdit}
-              onCancel={() => setBatchDialogOpen(false)}
+      <AdminPageTitle
+        description={t(
+          "notification.offline.description",
+          "按节点设置离线宽限期与冷却时间，减少短暂断连造成的重复通知。",
+        )}
+      >
+        {t("notification.offline.full_title", "离线通知设置")}
+      </AdminPageTitle>
+      <div className="flex flex-col gap-3">
+        <OfflineNotificationTable
+          search={search}
+          selected={selected}
+          onSelectionChange={setSelected}
+          paginationSummary={
+            <AdminSelectionCount
+              count={selectedFilteredCount}
+              total={filteredNodeIds.length}
+              className="hidden md:inline-flex"
             />
-          </Dialog.Content>
-        </Dialog.Root>
-      </Flex>
-      <label className="text-sm text-muted-foreground">
+          }
+        />
+        <div className="order-first flex min-h-10 items-center justify-between gap-3 px-1 md:justify-end">
+          <AdminSelectionCount
+            count={selectedFilteredCount}
+            total={filteredNodeIds.length}
+            className="shrink-0 text-sm text-muted-foreground md:hidden"
+          />
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="soft"
+              disabled={filteredNodeIds.length === 0}
+              onClick={toggleSelectAll}
+            >
+              {t(allFilteredSelected ? "common.deselect_all" : "common.select_all")}
+            </Button>
+            <Dialog.Root open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+              <Dialog.Trigger>
+                <Button
+                  variant="soft"
+                  onClick={() => {
+                    const first = offlineNotification.find(
+                      (n) => n.client === selectedFilteredIds[0]
+                    );
+                    setBatchForm({
+                      enable: first?.enable ?? true,
+                      cooldown: first?.cooldown ?? 1800,
+                      grace_period: first?.grace_period ?? 300,
+                    });
+                  }}
+                  disabled={batchLoading || selectedFilteredCount === 0}
+                >
+                  {t("notification.offline.batch_edit")}
+                </Button>
+              </Dialog.Trigger>
+              <Dialog.Content>
+                <Dialog.Title>{t("notification.offline.batch_edit")}</Dialog.Title>
+                <NotificationEditForm
+                  initialValues={batchForm}
+                  loading={batchLoading}
+                  onSubmit={handleBatchEdit}
+                  onCancel={() => setBatchDialogOpen(false)}
+                />
+              </Dialog.Content>
+            </Dialog.Root>
+            <TextField.Root
+              type="text"
+              className="min-w-0 flex-1 md:w-64 md:flex-none"
+              placeholder={t("common.search")}
+              value={search}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setSearch(e.target.value)
+              }
+            >
+              <TextField.Slot>
+                <Search size={16} />
+              </TextField.Slot>
+            </TextField.Root>
+          </div>
+        </div>
+      </div>
+      <div className="border-l-2 border-[var(--accent-8)] pl-3 text-sm leading-6 text-muted-foreground">
         <span
           dangerouslySetInnerHTML={{ __html: t("notification.offline.tips") }}
         />
-      </label>
+      </div>
     </div>
   );
 };
@@ -257,10 +308,12 @@ const OfflineNotificationTable = ({
   search,
   selected,
   onSelectionChange,
+  paginationSummary,
 }: {
   search: string;
   selected: string[];
   onSelectionChange: (ids: string[]) => void;
+  paginationSummary?: React.ReactNode;
 }) => {
   const { offlineNotification } = useOfflineNotification();
   const { nodeDetail } = useNodeDetails();
@@ -268,52 +321,48 @@ const OfflineNotificationTable = ({
   const filtered = [...nodeDetail]
     .sort((a, b) => a.weight - b.weight)
     .filter((node) => node.name.toLowerCase().includes(search.toLowerCase()));
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(filtered);
+  React.useEffect(() => setPage(1), [search, setPage]);
   return (
-    <div className="rounded-lg overflow-hidden">
-      <Table>
+    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+      <div className="overflow-x-auto">
+      <Table className="admin-responsive-table admin-selection-table min-w-[720px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-6">
-              <Checkbox
-                checked={
-                  selected.length === filtered.length
-                    ? true
-                    : selected.length > 0
-                    ? "indeterminate"
-                    : false
-                }
-                onCheckedChange={(checked) =>
-                  onSelectionChange(checked ? filtered.map((n) => n.uuid) : [])
-                }
-              />
+            <TableHead className="w-12 px-3 text-center">
+              <span className="sr-only">{t("common.select")}</span>
             </TableHead>
             <TableHead>{t("common.server")}</TableHead>
             <TableHead>{t("common.status")}</TableHead>
             {/* <TableHead>{t("notification.offline.cooldown")}</TableHead> */}
             <TableHead>{t("notification.offline.grace_period")}</TableHead>
             <TableHead>{t("notification.offline.last_notified")}</TableHead>
-            <TableHead>{t("common.action")}</TableHead>
+            <TableHead className="text-center">{t("common.action")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.map((node) => (
+          {pageItems.map((node) => (
             <TableRow key={node.uuid}>
-              <TableCell>
-                <Checkbox
-                  checked={selected.includes(node.uuid)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      onSelectionChange([...selected, node.uuid]);
-                    } else {
-                      onSelectionChange(
-                        selected.filter((id) => id !== node.uuid)
-                      );
-                    }
-                  }}
-                />
+              <TableCell className="w-12 px-3" data-label={t("common.select")}>
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={selected.includes(node.uuid)}
+                    aria-label={`${t("common.select")} ${node.name}`}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onSelectionChange([...selected, node.uuid]);
+                      } else {
+                        onSelectionChange(
+                          selected.filter((id) => id !== node.uuid)
+                        );
+                      }
+                    }}
+                  />
+                </div>
               </TableCell>
-              <TableCell>{node.name}</TableCell>
-              <TableCell>
+              <TableCell data-label={t("common.server")}>{node.name}</TableCell>
+              <TableCell data-label={t("common.status")}>
                 <Badge
                   color={
                     offlineNotification.find((n) => n.client === node.uuid)
@@ -333,12 +382,12 @@ const OfflineNotificationTable = ({
                   ?.cooldown || 1800}{" "}
                 {t("nodeCard.time_second")}
               </TableCell> */}
-              <TableCell>
+              <TableCell data-label={t("notification.offline.grace_period")}>
                 {offlineNotification.find((n) => n.client === node.uuid)
                   ?.grace_period || 300}
                 {t("nodeCard.time_second")}
               </TableCell>
-              <TableCell>
+              <TableCell data-label={t("notification.offline.last_notified")}>
                 {(() => {
                   const lastNotified = offlineNotification.find(
                     (n) => n.client === node.uuid
@@ -350,7 +399,7 @@ const OfflineNotificationTable = ({
                   return date.toLocaleString();
                 })()}
               </TableCell>
-              <TableCell>
+              <TableCell className="text-center" data-label={t("common.action")}>
                 <ActionButtons
                   offlineNotifications={offlineNotification.find(
                     (n) => n.client === node.uuid
@@ -361,6 +410,15 @@ const OfflineNotificationTable = ({
           ))}
         </TableBody>
       </Table>
+      </div>
+      <AdminPagination
+        page={page}
+        total={filtered.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        summary={paginationSummary}
+      />
     </div>
   );
 };
@@ -376,12 +434,20 @@ const ActionButtons = ({
   const [editSaving, setEditSaving] = React.useState(false);
 
   return (
-    <Flex gap="2" align="center">
+    <Flex gap="3" align="center" className="admin-card-actions admin-single-text-action w-full">
       <Dialog.Root open={editOpen} onOpenChange={setEditOpen}>
         <Dialog.Trigger>
-          <IconButton variant="ghost">
+          <Button
+            variant="ghost"
+            className="admin-single-action-button"
+            aria-label={t("common.modify", "修改")}
+            title={t("common.modify", "修改")}
+          >
             <Pencil size={16} />
-          </IconButton>
+            <span className="admin-single-action-label">
+              {t("common.modify", "修改")}
+            </span>
+          </Button>
         </Dialog.Trigger>
         <Dialog.Content>
           <Dialog.Title>{t("common.edit")}</Dialog.Title>

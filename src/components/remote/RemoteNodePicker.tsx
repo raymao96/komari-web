@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import Flag from "@/components/Flag";
+import AdminNodeStatusSummary from "@/components/admin/AdminNodeStatusSummary";
 import {
   displayRemoteAddress,
   filterRemoteNodes,
@@ -58,7 +59,6 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
     () => nodes.filter((node) => onlineSet.has(node.uuid)).length,
     [nodes, onlineSet],
   );
-  const offlineCount = nodes.length - onlineCount;
   const noMatches = nodes.length > 0 && filteredNodes.length === 0;
   const hasResults = filteredNodes.length > 0;
   const effectivePageSize = rowsPerPage ? responsivePageSize : pageSize;
@@ -135,25 +135,16 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
           ) : null}
         </div>
 
-        <div className="remote-node-picker-filter" role="group" aria-label={t("terminal.status_filter")}>
-          {([
-            ["all", t("common.all"), nodes.length],
-            ["online", t("nodeCard.online"), onlineCount],
-            ["offline", t("nodeCard.offline"), offlineCount],
-          ] as const).map(([value, label, count]) => (
-            <button
-              key={value}
-              type="button"
-              className={status === value ? "is-selected" : undefined}
-              aria-pressed={status === value}
-              onClick={() => {
-                setStatus(value);
-                setPage(1);
-              }}
-            >
-              {label} <span>{count}</span>
-            </button>
-          ))}
+        <div className="remote-node-picker-filter">
+          <AdminNodeStatusSummary
+            total={nodes.length}
+            online={onlineCount}
+            value={status}
+            onValueChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
 

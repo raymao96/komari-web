@@ -31,6 +31,20 @@
     "recent_month": "Sebulan terakhir",
     "region_unknown": "Wilayah belum diatur",
     "retention_period": "Masa retensi",
+    "return_route_abnormal": "Probe bermasalah",
+    "return_route_abnormal_tasks": "{{count}} tugas mengalami masalah probe",
+    "return_route_all_normal": "Semua rute aktif sehat",
+    "return_route_changed": "Perubahan rute",
+    "return_route_changed_tasks": "Perubahan rute terdeteksi pada {{count}} tugas",
+    "return_route_current": "Saat ini",
+    "return_route_expected": "Diharapkan",
+    "return_route_healthy": "Rute sehat",
+    "return_route_latest_change": "Perubahan terbaru",
+    "return_route_none": "Tidak ada tugas pemantauan rute balik yang sedang berjalan",
+    "return_route_normal": "Sehat",
+    "return_route_recent_events": "Peristiwa 24 jam",
+    "return_route_status": "Status rute balik",
+    "return_route_status_hint": "Kesehatan tugas dan perubahan rute terbaru",
     "server_status": "Status server",
     "server_status_hint": "Ringkasan status server dan node offline",
     "servers": "Status server",
@@ -157,6 +171,25 @@
     },
     "nodeTable": {
       "addNode": "Tambah Node",
+      "allNodes": "Semua server",
+      "clearFilterToReorder": "Hapus pencarian dan filter untuk mengubah urutan",
+      "groupAndRemark": "Grup & catatan",
+      "ipv4Only": "Hanya IPv4",
+      "lastReportRecent": "Laporan terbaru: baru saja",
+      "lastReportUnavailable": "Laporan terbaru: tidak tersedia",
+      "lastReportWaiting": "Laporan terbaru: menunggu",
+      "liveTraffic": "Lalu lintas",
+      "livePreparing": "Memuat status langsung",
+      "liveRefresh": "Penyegaran status langsung",
+      "liveRefreshInterval": "5 dtk",
+      "liveUnavailable": "Status langsung tidak tersedia",
+      "liveUpdatedAt": "Status langsung diperbarui pukul {{time}}",
+      "networkAndAgent": "Jaringan & Agent",
+      "network": "Jaringan",
+      "agent": "Agent",
+      "resourceStatus": "Status sumber daya",
+      "trafficQuotaShort": "Kuota",
+      "trafficUsedShort": "Terpakai",
       "autoDiscovery": {
         "disabledDescription": "Dengan penemuan otomatis aktif, Anda tidak perlu menambahkan node satu per satu. Cukup jalankan satu perintah di server target dan Agent akan otomatis terdaftar dan online menggunakan kunci tersebut. Ideal untuk men-deploy banyak server sekaligus.",
         "enabledDescription": "Jalankan perintah di bawah ini pada server target. Agent akan otomatis terdaftar dan online tanpa perlu membuat node secara manual.",
@@ -214,7 +247,10 @@
       "namePlaceholder": "Nama",
       "noData": "Tidak ada data",
       "nodeList": "Daftar Node",
+      "nextPage": "Halaman berikutnya",
       "noResults": "Tidak ada hasil",
+      "pageSummary": "Menampilkan {{start}}-{{end}} dari {{total}}",
+      "previousPage": "Halaman sebelumnya",
       "price": "Harga",
       "priceTips": "0 tidak ditampilkan, -1 berarti gratis",
       "searchByName": "Cari server",
@@ -244,7 +280,17 @@
         "invalidValue": "Masukkan trafik yang valid, misalnya 10 GB atau 1.5 TB",
         "invalidResponse": "Server tidak mengembalikan hasil kalibrasi",
         "resetDayRequired": "Atur tanggal reset trafik di editor server terlebih dahulu"
-      }
+      },
+      "description": "Tinjau koneksi node, sumber daya, trafik, dan tagihan di satu tempat. Seret baris untuk mengatur urutan tampilan global.",
+      "installCommandSaveFailed": "Gagal menyimpan pengaturan perintah instalasi",
+      "installCommandSaved": "Pengaturan perintah instalasi disimpan",
+      "invalidMonthRotate": "Hari reset bulanan statistik jaringan harus antara 0 dan 31",
+      "confirmRotateToken": "Konfirmasi reset",
+      "rotateToken": "Reset Token",
+      "rotateTokenDescription": "Setelah Token baru dibuat, Token lama tetap berlaku hingga 24 jam. Token lama langsung dinonaktifkan saat Token baru berhasil terhubung pertama kali.",
+      "rotateTokenInstructions": "Setelah reset, jalankan kembali perintah instalasi terbaru pada node. Tidak perlu mencopot pemasangan secara manual; pembaruan otomatis hanya mengganti berkas program dan tidak mengubah Token.",
+      "token": "Token node",
+      "twoFactorCode": "Kode sekali pakai (boleh kosong jika 2FA tidak aktif)"
     },
     "notification": {
       "expire_enable": "Aktifkan Pengingat Kedaluwarsa",
@@ -255,7 +301,8 @@
       "login": "Notifikasi Masuk",
       "login_description": "Kirim notifikasi saat sesi baru masuk ke Komari Lite.",
       "traffic": "Penggunaan Trafik",
-      "traffic_description": "Komari Lite mengirim notifikasi saat trafik server mencapai persentase yang ditetapkan, lalu mengingatkan setiap kenaikan 5%. Persentase dihitung dari kuota efektif pada siklus tagihan berjalan, termasuk tambahan kuota trafik reset untuk siklus tersebut. Notifikasi tidak dikirim jika batas trafik belum ditetapkan; atur ke 0 untuk menonaktifkannya."
+      "traffic_description": "Komari Lite mengirim notifikasi saat trafik server mencapai persentase yang ditetapkan, lalu mengingatkan setiap kenaikan 5%. Persentase dihitung dari kuota efektif pada siklus tagihan berjalan, termasuk tambahan kuota trafik reset untuk siklus tersebut. Notifikasi tidak dikirim jika batas trafik belum ditetapkan; atur ke 0 untuk menonaktifkannya.",
+      "page_description": "Konfigurasikan notifikasi umum untuk kedaluwarsa, login, dan penggunaan trafik."
     }
   },
   "cancel": "Batal",
@@ -377,6 +424,7 @@
     "documentation": "Dokumentasi",
     "done": "Selesai",
     "edit": "Ubah",
+    "modify": "Ubah",
     "export": "Ekspor",
     "empty_error": "Tidak boleh kosong",
     "enabled": "Diaktifkan",
@@ -427,7 +475,18 @@
     "update": "Perbarui",
     "update_available": "Versi baru tersedia",
     "updated_successfully": "Berhasil diperbarui",
-    "weight": "Bobot"
+    "weight": "Bobot",
+    "loading": "Memuat...",
+    "version": "Versi",
+    "self_update_failed": "Pembaruan gagal; versi saat ini dipertahankan",
+    "self_update_metadata_missing": "Informasi pembaruan tidak lengkap. Coba lagi nanti",
+    "self_update_preparing": "Menyiapkan pembaruan...",
+    "self_update_restarting": "Pembaruan selesai dan Komari Lite sedang dimulai ulang. Halaman akan dimuat ulang setelah layanan kembali tersedia.",
+    "self_update_restarting_short": "Pembaruan selesai, memulai ulang...",
+    "self_update_rolled_back": "Versi baru gagal dimulai; versi sebelumnya telah dipulihkan",
+    "self_update_succeeded": "Pembaruan selesai",
+    "self_update_timeout": "Waktu tunggu mulai ulang habis. Periksa status layanan",
+    "update_now": "Perbarui sekarang"
   },
   "copy": "Salin",
   "copy_success": "Berhasil disalin!",
@@ -489,7 +548,8 @@
     "username": "Nama Pengguna"
   },
   "logs": {
-    "title": "Log"
+    "title": "Log",
+    "description": "Tinjau aktivitas sistem, permintaan, dan catatan kesalahan."
   },
   "network_speed": "Kecepatan Jaringan",
   "nodeCard": {
@@ -549,7 +609,8 @@
   },
   "notification": {
     "load": {
-      "title": "Beban"
+      "title": "Beban",
+      "description": "Konfigurasikan aturan peringatan CPU, memori, beban, dan sumber daya lain untuk node yang dipilih."
     },
     "offline": {
       "batch_edit": "Edit Massal",
@@ -560,7 +621,8 @@
       "last_notified": "Terakhir Diberitahu",
       "never_triggered": "Belum Pernah Dipicu",
       "tips": "Untuk mencegah notifikasi terlalu sering, kami menggunakan masa tenggang:</br> <b>Masa Tenggang</b>: Jika klien offline dan tidak terhubung kembali dalam waktu ini, notifikasi offline akan dikirim.",
-      "title": "Mati"
+      "title": "Mati",
+      "description": "Atur masa tenggang offline dan jeda notifikasi per node untuk mengurangi peringatan akibat putus singkat."
     },
     "ping_loss": {
       "add": "Tambah peringatan pemantauan latensi",
@@ -581,7 +643,8 @@
       "threshold": "Ambang packet loss",
       "title": "Pemantauan Latensi",
       "window": "Jendela",
-      "window_minutes": "Jendela (menit)"
+      "window_minutes": "Jendela (menit)",
+      "description": "Atur ambang packet loss, jendela evaluasi, dan jeda berdasarkan hasil pemantauan latensi."
     },
     "title": "Notifikasi",
     "traffic_report": {
@@ -610,7 +673,8 @@
       "sent_success": "Laporan hari ini dikirim untuk {{count}} server",
       "title": "Laporan Trafik",
       "traffic_content": "Trafik unggah/unduh",
-      "weekly": "Mingguan"
+      "weekly": "Mingguan",
+      "description": "Konfigurasikan laporan trafik harian, mingguan, dan bulanan untuk setiap node."
     }
   },
   "page_not_found": "Server tidak dapat menemukan halaman yang Anda minta.",
@@ -627,10 +691,14 @@
     "task": "Tugas",
     "task_view": "Tampilan Tugas",
     "title": "Latensi",
-    "type": "Tipe"
+    "type": "Tipe",
+    "default_task_count": "Tugas aktif default",
+    "linked_server_count": "Server tertaut",
+    "task_count": "Tugas pemantauan"
   },
   "return_route": {
-    "title": "Pemantauan Rute Balik"
+    "title": "Pemantauan Rute Balik",
+    "description": "Identifikasi rute balik China Mobile, Telecom, dan Unicom, lalu beri tahu saat perpindahan dan pemulihan terkonfirmasi."
   },
   "pwa": {
     "browser": "Mode Peramban",
@@ -791,7 +859,11 @@
       "auto_discovery": "Penemuan Otomatis",
       "auto_discovery_key": "Kunci Penemuan Otomatis",
       "auto_discovery_key_description": "Gunakan penemuan otomatis untuk mendaftarkan klien secara massal. Biarkan kosong untuk menonaktifkan penemuan otomatis.",
-      "title": "Umum"
+      "title": "Umum",
+      "page_description": "Konfigurasikan penemuan otomatis, GeoIP, dan perilaku global lainnya.",
+      "admin_default_page_size": "Paginasi daftar bawaan",
+      "admin_default_page_size_description": "Atur jumlah item bawaan per halaman untuk semua daftar berpaginasi. Nilai diterapkan saat halaman daftar dibuka kembali.",
+      "admin_default_page_size_invalid": "Masukkan bilangan bulat antara {{min}} dan {{max}}"
     },
     "geoip": {
       "enable_description": "Tampilkan lokasi geografis node",
@@ -872,7 +944,16 @@
       "stop_dialog_title": "Hentikan cloudflared",
       "stop_success": "cloudflared berhasil dihentikan",
       "stopped": "berhenti",
-      "title": "Reverse Proxy"
+      "title": "Reverse Proxy",
+      "cloudflare_overview": "Ringkasan runtime",
+      "cloudflare_overview_description": "Tinjau status cloudflared, Tunnel, dan token serta kelola koneksinya.",
+      "page_description": "Kelola HTTPS bawaan dan akses Cloudflare Tunnel.",
+      "runtime_records": "Catatan runtime",
+      "runtime_records_description": "Tinjau status terbaru, kesalahan, dan keluaran cloudflared.",
+      "token_guide": "Lihat panduan pengaturan token",
+      "token_missing": "Belum dikonfigurasi",
+      "token_ready": "Dikonfigurasi",
+      "token_status": "Token koneksi"
     },
     "storage": {
       "main_description": "Data konfigurasi, server, dan tugas",
@@ -882,7 +963,8 @@
       "overview": "Ikhtisar Penyimpanan",
       "storage_usage": "Penggunaan Penyimpanan",
       "title": "Data & Penyimpanan",
-      "total_description": "Berkas basis data dan berkas runtime sementara"
+      "total_description": "Berkas basis data dan berkas runtime sementara",
+      "page_description": "Tinjau penggunaan basis data dan kelola data pemantauan, migrasi, serta pemeliharaan."
     },
     "metrics": {
       "advanced_title": "Opsi Lanjutan",
@@ -1130,7 +1212,8 @@
       "template_description": "Komari Lite akan mengirim pemberitahuan sesuai dengan template pemberitahuan pesan",
       "test_description": "Kirim pesan uji coba",
       "test_title": "Kirim pesan uji coba",
-      "title": "Notifikasi"
+      "title": "Notifikasi",
+      "page_description": "Konfigurasikan saluran notifikasi, parameter koneksi, dan templat pesan."
     },
     "settings_save_failed": "Gagal menyimpan pengaturan",
     "settings_saved": "Pengaturan berhasil disimpan",
@@ -1173,7 +1256,8 @@
       "ws_allowed_origins": "Daftar izin Origin WebSocket",
       "ws_allowed_origins_description": "Satu Origin per baris atau dipisahkan dengan koma, misalnya https://example.com",
       "ws_origin_check_enabled": "Pemeriksaan Origin WebSocket",
-      "ws_origin_check_enabled_description": "Jika diaktifkan, permintaan WebSocket hanya diizinkan dari Origin yang sama atau dalam daftar izin"
+      "ws_origin_check_enabled_description": "Jika diaktifkan, permintaan WebSocket hanya diizinkan dari Origin yang sama atau dalam daftar izin",
+      "page_description": "Konfigurasikan informasi situs, kontrol akses, cadangan, dan konten khusus."
     },
     "sso": {
       "callback_url_tips": "Konfigurasikan penyedia SSO Anda dengan URL callback berikut: {{url}}",
@@ -1307,8 +1391,10 @@
       "title": "XtermJS",
       "transparent_background": "Latar Transparan",
       "transparent_hint": "Aktifkan transparansi hanya jika latar kontainer juga transparan.",
-      "transparent_theme_hint": "Latar tema masih opak. Gunakan rgba(...) atau hsla(...)."
-    }
+      "transparent_theme_hint": "Latar tema masih opak. Gunakan rgba(...) atau hsla(...).",
+      "page_description": "Atur font, warna, scrollback, dan perilaku tampilan terminal jarak jauh."
+    },
+    "account_security_page_description": "Kelola kredensial login, autentikasi dua faktor, sesi, dan akses API."
   },
   "status_settings": "Pengaturan Status",
   "terminal": {
@@ -1427,7 +1513,9 @@
     "uploading": "Mengunggah tema...",
     "uploda_413_content_too_large": "Unggahan file gagal (413). Silakan periksa dan tingkatkan batas ukuran file dalam konfigurasi server proxy terbalik Anda (seperti Nginx/CDN) (client_max_body_size), pastikan nilai tersebut lebih besar dari ukuran file yang Anda tuju.",
     "version": "Versi",
-    "zip_files_only": "Hanya file .zip yang didukung"
+    "zip_files_only": "Hanya file .zip yang didukung",
+    "manage_description": "Atur opsi tampilan dan fitur yang disediakan tema saat ini.",
+    "page_description": "Kelola tema terpasang, ganti tema aktif, dan pelihara pengaturan tema."
   },
   "time": {
     "ago": "yang lalu",

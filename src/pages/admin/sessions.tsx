@@ -12,7 +12,11 @@ import { useTranslation } from "react-i18next";
 import { Dialog, Flex, Button } from "@radix-ui/themes";
 import { UserAgentHelper } from "@/utils/UserAgentHelper";
 import Loading from "@/components/loading";
-import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSectionTitle } from "@/components/admin/AdminPageTitle";
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 type Resp = {
   current: string;
   data: Array<{
@@ -32,6 +36,9 @@ type Resp = {
 export default function Sessions() {
   const [t] = useTranslation();
   const [sessions, setSessions] = React.useState<Resp | null>(null);
+  const sessionItems = sessions?.data ?? [];
+  const { page, setPage, pageItems, pageSize, setPageSize } =
+    useAdminPagination(sessionItems);
   React.useEffect(() => {
     fetch("/api/admin/session/get")
       .then((response) => {
@@ -108,7 +115,7 @@ export default function Sessions() {
 
   return (
     <Flex direction="column" gap="3" className="w-full min-w-0">
-      <AdminPageTitle>{t("sessions.title")}</AdminPageTitle>
+      <AdminSectionTitle>{t("sessions.title")}</AdminSectionTitle>
       <div>
         <Dialog.Root>
           <Dialog.Trigger>
@@ -132,7 +139,8 @@ export default function Sessions() {
           </Dialog.Content>
         </Dialog.Root>
       </div>
-      <div className="w-full min-w-0 overflow-x-auto rounded-lg">
+      <div className="w-full min-w-0 overflow-hidden rounded-md border border-[var(--gray-a5)]">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -146,7 +154,7 @@ export default function Sessions() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sessions.data.map((s) => {
+            {pageItems.map((s) => {
               const isCurrent = s.session === sessions.current;
               return (
                 <TableRow key={s.uuid}>
@@ -272,6 +280,15 @@ export default function Sessions() {
             })}
           </TableBody>
         </Table>
+        </div>
+        <AdminPagination
+          page={page}
+          total={sessionItems.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          showSummary={false}
+        />
       </div>
     </Flex>
   );

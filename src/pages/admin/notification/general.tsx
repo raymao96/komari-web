@@ -31,7 +31,14 @@ const Inner = () => {
   }
   return (
     <>
-      <AdminPageTitle>{t("settings.general.title")}</AdminPageTitle>
+      <AdminPageTitle
+        description={t(
+          "admin.notification.page_description",
+          "管理到期、登录和流量用量等通用通知规则。",
+        )}
+      >
+        {t("settings.general.title")}
+      </AdminPageTitle>
       <SettingCardLabel>
         {t("admin.notification.expire_title")}
       </SettingCardLabel>
