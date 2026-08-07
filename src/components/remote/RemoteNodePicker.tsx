@@ -2,7 +2,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  Copy,
   Layers3,
   Network,
   Search,
@@ -11,7 +10,6 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 
 import Flag from "@/components/Flag";
 import AdminNodeStatusSummary from "@/components/admin/AdminNodeStatusSummary";
@@ -91,15 +89,6 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
     return () => observer.disconnect();
   }, [hasResults, rowsPerPage]);
 
-  const copyAddress = async (address: string) => {
-    try {
-      await navigator.clipboard.writeText(address);
-      toast.success(t("copy_success"));
-    } catch {
-      // Clipboard access can be unavailable outside a secure browser context.
-    }
-  };
-
   return (
     <div className="remote-node-picker">
       <div className="remote-node-picker-controls">
@@ -166,6 +155,18 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
               <article
                 key={node.uuid}
                 className={`remote-node-picker-card${selected ? " is-selected" : ""}${online ? "" : " is-offline"}`}
+                role="button"
+                tabIndex={online ? 0 : -1}
+                aria-disabled={!online}
+                aria-label={online ? t("terminal.open_terminal") : t("nodeCard.offline")}
+                onClick={() => {
+                  if (online) onSelect(node);
+                }}
+                onKeyDown={(event) => {
+                  if (!online || (event.key !== "Enter" && event.key !== " ")) return;
+                  event.preventDefault();
+                  onSelect(node);
+                }}
               >
                 <header className="remote-node-picker-card-header">
                   <span className="remote-node-picker-identity">
@@ -190,14 +191,6 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
                       <div className="remote-node-picker-address" key={type}>
                         <span>{type}</span>
                         <code title={value}>{value}</code>
-                        <button
-                          type="button"
-                          title={t("terminal.copy_address", { type })}
-                          aria-label={t("terminal.copy_address", { type })}
-                          onClick={() => void copyAddress(value)}
-                        >
-                          <Copy size={14} aria-hidden="true" />
-                        </button>
                       </div>
                     )) : (
                       <span>{t("terminal.address_unreported")}</span>
@@ -212,16 +205,12 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
                       {node.group?.trim() || t("terminal.ungrouped")}
                     </span>
                   </span>
-                  <button
-                    type="button"
+                  <span
                     className="remote-node-picker-enter"
-                    disabled={!online}
-                    title={online ? t("terminal.open_terminal") : t("nodeCard.offline")}
-                    aria-label={online ? t("terminal.open_terminal") : t("nodeCard.offline")}
-                    onClick={() => onSelect(node)}
+                    aria-hidden="true"
                   >
                     <SquareTerminal size={19} aria-hidden="true" />
-                  </button>
+                  </span>
                 </footer>
               </article>
             );

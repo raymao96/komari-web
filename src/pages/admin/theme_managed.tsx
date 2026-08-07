@@ -1,12 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Flex, Heading, Callout, Separator, Button } from "@radix-ui/themes";
+import { Flex, Callout, Button } from "@radix-ui/themes";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
-import {
-  SettingCardSelect,
-  SettingCardSwitch,
-  SettingCardShortTextInput,
-  SettingCardLongTextInput,
-} from "@/components/admin/SettingCard";
+import ThemeConfigTabs from "@/components/admin/ThemeConfigTabs";
 import { toast } from "sonner";
 import Loading from "@/components/loading";
 import { useTranslation } from "react-i18next";
@@ -17,17 +12,9 @@ import {
   type ThemeConfiguration,
 } from "@/utils/themeConfiguration";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import type { ThemeConfigTabField } from "@/utils/themeConfigTabs";
 
-interface ThemeFieldBase {
-  name?: I18nText; // 显示名（字符串或多语言字典）
-  help?: I18nText; // 帮助文本（字符串或多语言字典）
-  type: "title" | "switch" | "select" | "number" | "string" | "richtext";
-  key?: string; // 对应设置键（title 无需）
-  default?: any; // 默认值
-  options?: string; // 仅 select 支持，逗号分隔
-  optionLabels?: Record<string, I18nText>; // 可选的多语言显示文本，不改变实际保存值
-  required?: boolean;
-}
+type ThemeFieldBase = ThemeConfigTabField;
 
 interface ThemeConfigResponse {
   name?: I18nText;
@@ -85,7 +72,7 @@ const ThemeManaged: React.FC = () => {
           setValues({});
           return;
         }
-        const ds = configuration.data;
+        const ds = configuration.data as ThemeFieldBase[];
         setFields(ds);
         // 初始值：优先 publicInfo.theme_settings，其次 default
         const init: Record<string, any> = {};
@@ -159,7 +146,11 @@ const ThemeManaged: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" gap="4" className="p-0 md:p-4">
+    <Flex
+      direction="column"
+      gap="4"
+      className="km-page-admin-theme-managed p-0 md:p-4"
+    >
       <Flex justify="between" align="center" gap="3" wrap="wrap">
         <AdminPageTitle description={t("theme.manage_description", "调整当前主题提供的显示和功能选项。")}> 
           {theme
@@ -185,109 +176,20 @@ const ThemeManaged: React.FC = () => {
           <Callout.Text>{t("theme.no_config")}</Callout.Text>
         </Callout.Root>
       )}
-      <Separator size="4" />
-      <Flex direction="column" gap="3">
-        {fields.map((f, idx) => {
-          if (f.type === "title") {
-            return (
-              <Heading key={idx} size="3" className="mt-4">
-                {resolveI18nText(f.name, currentLanguage) || t("common.title")}
-              </Heading>
-            );
-          }
-          if (!f.key) return null;
-          const val = values[f.key];
-          const title = resolveI18nText(f.name, currentLanguage);
-          const description = resolveI18nText(f.help, currentLanguage);
-          switch (f.type) {
-            case "switch":
-              return (
-                <SettingCardSwitch
-                  key={f.key}
-                  title={title}
-                  description={description}
-                  defaultChecked={!!val}
-                  onChange={(checked) => handleValueChange(f.key!, checked)}
-                />
-              );
-            case "select": {
-              const opts = (f.options || "")
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-                .map((o) => ({
-                  value: o,
-                  label: resolveI18nText(
-                    f.optionLabels?.[o],
-                    currentLanguage,
-                  ),
-                }));
-              const selectedLabel =
-                opts.find((option) => option.value === val)?.label || val;
-              return (
-                <SettingCardSelect
-                  key={f.key}
-                  title={title}
-                  description={description}
-                  value={val}
-                  options={opts}
-                  OnSave={(v) => handleValueChange(f.key!, v)}
-                  label={selectedLabel || t("common.select")}
-                />
-              );
-            }
-            case "number":
-              return (
-                <SettingCardShortTextInput
-                  key={f.key}
-                  title={title}
-                  description={description}
-                  type="number"
-                  showSaveButton={false}
-                  value={val !== undefined ? String(val) : ""}
-                  onChange={(e) =>
-                    handleValueChange(
-                      f.key!,
-                      e.target.value === ""
-                        ? undefined
-                        : Number(e.target.value),
-                    )
-                  }
-                />
-              );
-            case "richtext":
-              return (
-                <SettingCardLongTextInput
-                  key={f.key}
-                  title={title}
-                  description={description}
-                  defaultValue={val !== undefined ? String(val) : ""}
-                  showSaveButton={false}
-                  onChange={(e) => handleValueChange(f.key!, e.target.value)}
-                />
-              );
-            case "string":
-            default:
-              return (
-                <SettingCardShortTextInput
-                  key={f.key}
-                  title={title}
-                  description={description}
-                  value={val !== undefined ? String(val) : ""}
-                  required={f.required}
-                  showSaveButton={false}
-                  onChange={(e) => handleValueChange(f.key!, e.target.value)}
-                />
-              );
-          }
-        })}
-      </Flex>
       {fields.length > 0 && (
-        <Flex>
-          <Button onClick={saveAll} disabled={saving}>
-            {t("common.save")}
-          </Button>
-        </Flex>
+        <ThemeConfigTabs
+          fields={fields}
+          values={values}
+          onValueChange={handleValueChange}
+          resolveText={(value) => resolveI18nText(value, currentLanguage)}
+          footer={
+            <Flex>
+              <Button onClick={saveAll} disabled={saving}>
+                {t("common.save")}
+              </Button>
+            </Flex>
+          }
+        />
       )}
     </Flex>
   );

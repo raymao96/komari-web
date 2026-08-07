@@ -103,6 +103,12 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: "dashboard",
+            element: React.createElement(
+              lazy(() => import("./pages/admin/settings/dashboard"))
+            ),
+          },
+          {
             path: "theme",
             element: React.createElement(
               lazy(() => import("./pages/admin/settings/theme"))

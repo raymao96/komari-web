@@ -54,8 +54,11 @@ test("mobile navigation uses a partial overlay without hiding the page", () => {
   assert.match(source, /const MOBILE_SIDEBAR_WIDTH = "clamp\(184px, 42vw, 244px\)"/);
   assert.match(source, /open:\s*\{\s*x: 0,/);
   assert.match(source, /closed:\s*\{\s*x: "-100%",/);
-  assert.match(source, /width: isMobile \? MOBILE_SIDEBAR_WIDTH : undefined/);
-  assert.match(source, /willChange: isMobile \? "transform" : "width"/);
+  assert.match(
+    source,
+    /width: isMobile\s*\? MOBILE_SIDEBAR_WIDTH\s*:\s*sidebarOpen\s*\? `\$\{DESKTOP_SIDEBAR_WIDTH\}px`\s*:\s*"0px"/,
+  );
+  assert.match(source, /willChange: isMobile \? "transform" : undefined/);
   assert.doesNotMatch(source, /open:\s*\{\s*width: isMobile/);
   assert.match(source, /data-testid="mobile-sidebar-trigger"/);
   assert.match(source, /data-testid="mobile-sidebar-close"/);

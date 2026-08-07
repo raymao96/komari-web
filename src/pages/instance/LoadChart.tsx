@@ -1,4 +1,5 @@
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
+import { shouldShowPersistentMetricDots } from "@/utils/chartDisplay";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -1561,6 +1562,9 @@ const LoadChart = ({ data = [], onRealtimeActiveChange }: LoadChartProps) => {
           const chartConfig = toChartConfig(built.series);
           const latestText = getLatestText(chartRows, built.series);
           const allHidden = built.series.length > 0 && built.series.every((item) => isSeriesHidden(chart.id, item));
+          const visibleSeriesCount = built.series.filter(
+            (item) => !isSeriesHidden(chart.id, item),
+          ).length;
 
           return (
             <SortableChartCard
@@ -1760,7 +1764,15 @@ const LoadChart = ({ data = [], onRealtimeActiveChange }: LoadChartProps) => {
                         name={item.dataKey}
                         yAxisId={item.yAxisId}
                         stroke={item.color}
-                        dot={item.pointCount !== undefined && item.pointCount <= 30}
+                        dot={
+                          shouldShowPersistentMetricDots(
+                            visibleSeriesCount,
+                            item.pointCount,
+                          )
+                            ? { r: 2.5, strokeWidth: 1 }
+                            : false
+                        }
+                        activeDot={{ r: 4, strokeWidth: 1.5 }}
                         isAnimationActive={false}
                         strokeWidth={2}
                         connectNulls={false}

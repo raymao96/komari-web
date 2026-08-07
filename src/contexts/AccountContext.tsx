@@ -1,5 +1,10 @@
 import React from "react";
-import { fetchAccount, type Account } from "@/utils/adminAuth";
+import {
+  fetchAccount,
+  saveAccountPreferences,
+  type Account,
+  type AccountPreferences,
+} from "@/utils/adminAuth";
 
 // Context
 export interface AccountContextType {
@@ -7,6 +12,7 @@ export interface AccountContextType {
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
+  updatePreferences: (preferences: AccountPreferences) => Promise<void>;
 }
 
 // 创建Context
@@ -37,8 +43,28 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void refresh();
   }, [refresh]);
 
+  const updatePreferences = React.useCallback(
+    async (preferences: AccountPreferences) => {
+      await saveAccountPreferences(preferences);
+      setAccount((current) =>
+        current?.logged_in
+          ? {
+              ...current,
+              ...(preferences.language
+                ? { language: preferences.language }
+                : {}),
+              ...(preferences.color ? { color: preferences.color } : {}),
+            }
+          : current,
+      );
+    },
+    [],
+  );
+
   return (
-    <AccountContext.Provider value={{ account, loading, error, refresh }}>
+    <AccountContext.Provider
+      value={{ account, loading, error, refresh, updatePreferences }}
+    >
       {children}
     </AccountContext.Provider>
   );

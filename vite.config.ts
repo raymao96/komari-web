@@ -6,7 +6,7 @@ import { visualizer } from "rollup-plugin-visualizer";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
-import type { Plugin, UserConfig } from "vite";
+import type { UserConfig } from "vite";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -14,60 +14,22 @@ import dotenv from "dotenv";
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
-function localKomariThemePlugin(): Plugin {
-  const themeRequestPath = "/themes/default/komari-theme.json";
-  const localThemeFile = path.resolve(configDir, "komari-theme.json");
-
-  return {
-    name: "local-komari-theme",
-    apply: "serve",
-    enforce: "pre",
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        if (!req.url) return next();
-
-        const url = new URL(req.url, "http://localhost");
-        if (!url.pathname.endsWith(themeRequestPath)) return next();
-
-        fs.readFile(localThemeFile, (err, data) => {
-          if (err) {
-            res.statusCode = 404;
-            res.setHeader("Content-Type", "application/json; charset=utf-8");
-            res.end(
-              JSON.stringify({
-                error: "Local theme file not found",
-                file: localThemeFile,
-              })
-            );
-            return;
-          }
-
-          res.statusCode = 200;
-          res.setHeader("Content-Type", "application/json; charset=utf-8");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(data);
-        });
-      });
-    },
-  };
-}
-
 export default defineConfig(({ mode }) => {
   const buildTime = new Date().toISOString();
+  const systemUiBuild = process.env.VITE_SYSTEM_UI_BUILD === "1";
 
   // Supports configuring BASE_URL via environment variables, defaulting to the root path.
   const base: string = process.env.VITE_BASE_URL ? process.env.VITE_BASE_URL : '/';
   const baseConfig: UserConfig = {
     base: base,
     plugins: [
-      localKomariThemePlugin(),
       react(),
       tailwindcss(),
       Pages({
         dirs: "src/pages",
         extensions: ["tsx", "jsx"],
       }),
-      VitePWA({
+      ...(systemUiBuild ? [] : [VitePWA({
         registerType: "autoUpdate",
         includeManifestIcons: false,
         manifest: {
@@ -96,7 +58,10 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           cleanupOutdatedCaches: true,
-          globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+          // HTML is rendered by Komari so it can inject the current site
+          // title and custom Head/Body content. Precaching the build-time
+          // index would bypass that server-side rendering.
+          globPatterns: ["**/*.{js,css,ico,png,svg}"],
           // The public document is selected by Komari at request time. A
           // cached SPA fallback would keep serving the previous theme after
           // an administrator switches themes.
@@ -118,7 +83,7 @@ export default defineConfig(({ mode }) => {
             },
           ],
         },
-      }),
+      })]),
       visualizer({
         open: false,
         filename: "bundle-analysis.html",

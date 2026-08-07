@@ -38,7 +38,7 @@ test("admin node table keeps persisted ordering and prioritizes identity and bil
   assert.doesNotMatch(pageSource, /ResourceStatus|TrafficQuota|ResourceUsage/);
   assert.match(pageSource, /t\("common\.group", "分组"\)/);
   assert.match(pageSource, /t\("common\.remark", "备注"\)/);
-  assert.match(pageSource, /w-\[21%\].*admin\.nodeTable\.billing/);
+  assert.match(pageSource, /w-\[224px\].*admin\.nodeTable\.billing/);
   assert.match(pageSource, /nodeTable\.agent[\s\S]*publicVersion\(node\.version\)/);
   assert.match(pageSource, /admin-node-country-flag/);
   assert.match(pageSource, /reorderEnabled=\{!searchTerm\.trim\(\) && statusFilter === "all"\}/);
@@ -107,9 +107,9 @@ test("admin node toolbar aligns status left and search actions right", () => {
   assert.doesNotMatch(pageSource, /style=\{\{ height: "48px" \}\}/);
   assert.doesNotMatch(pageSource, /lastReportRecent|liveRefreshInterval/);
   assert.doesNotMatch(pageSource, /resourceFromLatestReport/);
-  assert.match(pageSource, /IPv4 \{node\.ipv4 \|\| "--"\}/);
-  assert.match(pageSource, /IPv6 \{node\.ipv6 \? compactIPv6/);
-  assert.match(pageSource, /flex min-w-0 flex-col text-sm leading-\[1\.125rem\] text-muted-foreground/);
+  assert.match(pageSource, /networkAddresses\.length > 0 \? networkAddresses\.map/);
+  assert.match(pageSource, /type === "IPv6" \? compactIPv6\(address\) : address/);
+  assert.match(pageSource, /flex min-w-0 flex-col justify-center text-sm leading-\[1\.125rem\] text-muted-foreground/);
   assert.match(statusSummarySource, /bg-\[var\(--color-panel-solid\)\]/);
   assert.doesNotMatch(pageSource, /md:inline-flex md:w-fit/);
 });
@@ -128,6 +128,10 @@ test("server details use a centered read-only form dialog", () => {
   assert.match(pageSource, /admin-node-detail-country-flag/);
   assert.doesNotMatch(pageSource, /admin-node-detail-country-flag[^\n]*border/);
   assert.match(globalCssSource, /\.admin-node-detail-country-flag > span \{[\s\S]*width: 36px[\s\S]*height: 27px/);
+});
+
+test("delete confirmation names the server before the question", () => {
+  assert.match(pageSource, /<Dialog\.Description>[\s\S]*<Text as="span" weight="bold">\{node\.name\}<\/Text>[\s\S]*confirmDeleteQuestion/);
 });
 
 test("admin tables share one header color and mobile actions stay compact", () => {
@@ -170,6 +174,27 @@ test("wide admin tables turn into labelled row cards on mobile", () => {
   assert.match(globalCssSource, /\.admin-responsive-table tbody tr \{[\s\S]*border-radius: calc\(var\(--radius\) - 2px\)/);
   assert.doesNotMatch(globalCssSource, /\.admin-selection-table tbody tr:first-child[\s\S]*border-top-left-radius: 0/);
   assert.match(globalCssSource, /content: attr\(data-label\)/);
+});
+
+test("desktop node table keeps readable name and network columns while resizing", () => {
+  assert.match(
+    pageSource,
+    /admin-responsive-table admin-node-table min-w-\[1136px\] table-fixed/,
+  );
+  assert.match(pageSource, /TableCell className="w-\[44px\] px-2 !align-middle"/);
+  assert.match(pageSource, /TableHead className="w-\[44px\]"/);
+  assert.match(pageSource, /TableHead className="w-\[190px\]"/);
+  assert.equal(pageSource.match(/TableHead className="w-\[190px\]"/g)?.length, 2);
+  assert.match(pageSource, /TableHead className="w-\[72px\] text-center"/);
+  assert.equal(pageSource.match(/TableHead className="w-\[72px\]/g)?.length, 3);
+  assert.match(pageSource, /TableHead className="w-\[224px\]"/);
+  assert.match(pageSource, /TableHead className="w-\[272px\]"/);
+  assert.match(pageSource, /text-sm hover:bg-\[var\(--accent-a2\)\][^\n]*\[&>td\]:py-1\.5/);
+  assert.match(pageSource, /text-sm leading-\[1\.125rem\]/);
+  assert.match(pageSource, /data-label=\{t\("admin\.nodeTable\.name"\)\}[\s\S]{0,80}title=\{node\.name\}/);
+  assert.match(pageSource, /\["IPv4", node\.ipv4\?\.trim\(\)\][\s\S]{0,80}\["IPv6", node\.ipv6\?\.trim\(\)\]/);
+  assert.match(pageSource, /networkAddresses\.length > 0 \? networkAddresses\.map/);
+  assert.doesNotMatch(pageSource, /IPv[46] \{node\.ipv[46] \|\| "--"\}/);
 });
 
 test("admin tables align selection controls and use available text width", () => {

@@ -1,3 +1,5 @@
+import { allowedColors, type Colors } from "../contexts/ThemeContext.ts";
+
 export type Account = {
   logged_in: boolean;
   sso_id: string;
@@ -5,7 +7,44 @@ export type Account = {
   username: string;
   uuid: string;
   "2fa_enabled": boolean;
+  language?: string;
+  color?: string;
 };
+
+export type AccountPreferences = {
+  language?: string;
+  color?: Colors;
+};
+
+const supportedAccountLanguages = new Set([
+  "en-US",
+  "zh-CN",
+  "zh-TW",
+  "ja-JP",
+  "id-ID",
+]);
+
+export function normalizeAccountPreferenceLanguage(language?: string | null) {
+  const normalized = (language ?? "").trim().replace(/_/g, "-");
+  if (supportedAccountLanguages.has(normalized)) return normalized;
+
+  const lower = normalized.toLowerCase();
+  if (lower === "en" || lower.startsWith("en-")) return "en-US";
+  if (lower === "ja" || lower.startsWith("ja-")) return "ja-JP";
+  if (lower === "id" || lower.startsWith("id-")) return "id-ID";
+  if (lower === "zh" || lower.startsWith("zh-")) {
+    return /(?:^|-)(?:tw|hk|mo|hant)(?:-|$)/i.test(normalized)
+      ? "zh-TW"
+      : "zh-CN";
+  }
+  return "";
+}
+
+export function normalizeAccountPreferenceColor(
+  color?: string | null,
+): Colors | "" {
+  return allowedColors.includes(color as Colors) ? (color as Colors) : "";
+}
 
 export type AdminAuthView = "loading" | "error" | "login" | "admin";
 
@@ -54,6 +93,31 @@ export async function fetchAccount(
     throw new Error(`Failed to fetch account data (${response.status})`);
   }
   return response.json() as Promise<Account>;
+}
+
+export async function saveAccountPreferences(
+  preferences: AccountPreferences,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const response = await fetcher("/api/rpc2", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "admin:updateAccountPreferences",
+      params: preferences,
+    }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: { message?: string };
+  };
+  if (!response.ok || payload.error) {
+    throw new Error(
+      payload.error?.message ||
+        `Failed to save account preferences (${response.status})`,
+    );
+  }
 }
 
 type PasswordLoginInput = {

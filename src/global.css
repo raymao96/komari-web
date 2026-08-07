@@ -273,7 +273,139 @@ body, * {
   height: 1.125rem;
 }
 
+.admin-deployment-delivery {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.625rem;
+  border: 1px solid var(--gray-a5);
+  border-radius: 6px;
+  background: var(--gray-a2);
+}
+
+.admin-deployment-delivery-body {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-deployment-delivery-current {
+  display: inline-flex;
+  min-height: 1.875rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--gray-a5);
+  border-radius: 4px;
+  background: var(--color-panel-solid);
+  color: var(--gray-a10);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.admin-deployment-delivery-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.admin-deployment-delivery-current[data-status="sent"] {
+  border-color: var(--blue-a6);
+  background: var(--blue-a3);
+  color: var(--blue-11);
+}
+
+.admin-deployment-delivery-current[data-status="applied"] {
+  border-color: var(--green-a6);
+  background: var(--green-a3);
+  color: var(--green-11);
+}
+
+.admin-deployment-delivery-current[data-status="failed"] {
+  border-color: var(--red-a6);
+  background: var(--red-a3);
+  color: var(--red-11);
+}
+
+.admin-deployment-delivery-current[data-status="saved"] {
+  border-color: var(--blue-a6);
+  background: var(--blue-a3);
+  color: var(--blue-11);
+}
+
+.admin-deployment-delivery-hint {
+  min-width: 0;
+  min-height: 1rem;
+}
+
+.admin-deployment-delivery-hint svg {
+  flex: 0 0 auto;
+  margin-top: 0.0625rem;
+}
+
+.admin-agent-config-status {
+  display: inline-flex;
+  min-height: 1.25rem;
+  max-width: 100%;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  padding: 0.0625rem 0.4375rem;
+  border: 1px solid var(--blue-a6);
+  border-radius: 4px;
+  background: var(--blue-a3);
+  color: var(--blue-11);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-agent-config-status[data-status="sent"] {
+  border-color: var(--orange-a6);
+  background: var(--orange-a3);
+  color: var(--orange-11);
+}
+
+.admin-agent-config-status[data-status="saved"] {
+  border-color: var(--blue-a6);
+  background: var(--blue-a3);
+  color: var(--blue-11);
+}
+
+.admin-agent-config-status[data-status="applied"] {
+  border-color: var(--green-a6);
+  background: var(--green-a3);
+  color: var(--green-11);
+}
+
+.admin-agent-config-status[data-status="failed"] {
+  border-color: var(--red-a6);
+  background: var(--red-a3);
+  color: var(--red-11);
+}
+
 @media (max-width: 767px) {
+  .admin-deployment-delivery {
+    gap: 0.5rem;
+  }
+
+  .admin-deployment-delivery-body {
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+
   .rt-BaseDialogScrollPadding {
     box-sizing: border-box;
     width: 100%;
@@ -454,6 +586,11 @@ body, * {
     gap: 0.25rem;
   }
 
+  .admin-node-table .admin-node-agent-cell {
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+
   .admin-sortable-table tbody td:nth-child(2) {
     order: -1;
     grid-template-columns: minmax(0, 1fr);
@@ -616,5 +753,144 @@ body, * {
   textarea,
   select {
     font-size: 16px !important;
+  }
+}
+
+.km-page-admin-theme-managed,
+.km-theme-config-form,
+.km-theme-config-section,
+.km-theme-config-tabs-root,
+.km-theme-config-tabs-viewport {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.km-theme-config-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  margin-inline: -0.25rem;
+  padding: 0.25rem 0.25rem 0;
+  border-bottom: 1px solid var(--gray-a5);
+  background: var(--accent-1);
+}
+
+.km-theme-config-tabs-viewport {
+  position: relative;
+  overflow: hidden;
+}
+
+.km-theme-config-tabs-viewport::before,
+.km-theme-config-tabs-viewport::after {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 4px;
+  width: 2rem;
+  pointer-events: none;
+  content: "";
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.km-theme-config-tabs-viewport::before {
+  left: 0;
+  background: linear-gradient(to right, var(--accent-1) 30%, transparent);
+}
+
+.km-theme-config-tabs-viewport::after {
+  right: 0;
+  background: linear-gradient(to left, var(--accent-1) 30%, transparent);
+}
+
+.km-theme-config-tabs-viewport.can-scroll-left::before,
+.km-theme-config-tabs-viewport.can-scroll-right::after {
+  opacity: 1;
+}
+
+.km-theme-config-tabs-list {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 2.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-a6) transparent;
+}
+
+.km-theme-config-tabs-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.km-theme-config-tabs-list::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background-color: var(--gray-a6);
+}
+
+.km-theme-config-tabs-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.km-theme-config-tabs-trigger {
+  min-height: 2.5rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.km-theme-config-scroll-button {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--gray-a5);
+  border-radius: 50%;
+  background: var(--color-panel-solid);
+  color: var(--gray-11);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-50%);
+}
+
+.km-theme-config-scroll-button:hover {
+  color: var(--accent-11);
+}
+
+.km-theme-config-scroll-button.is-left {
+  left: 0.125rem;
+}
+
+.km-theme-config-scroll-button.is-right {
+  right: 0.125rem;
+}
+
+.km-theme-config-section {
+  scroll-margin-top: 4rem;
+}
+
+@media (max-width: 767px) {
+  .km-theme-config-tabs {
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+  }
+
+  .km-theme-config-tabs-trigger {
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+  }
+
+  .km-theme-config-scroll-button {
+    display: none;
   }
 }

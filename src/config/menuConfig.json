@@ -114,6 +114,11 @@
           "icon": "Home"
         },
         {
+          "labelKey": "settings.dashboard.title",
+          "path": "/admin/settings/dashboard",
+          "icon": "LayoutDashboard"
+        },
+        {
           "labelKey": "settings.reverse_proxy.title",
           "path": "/admin/settings/reverse-proxy",
           "icon": "Globe"

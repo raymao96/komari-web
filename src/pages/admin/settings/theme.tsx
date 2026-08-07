@@ -357,12 +357,6 @@ const ThemePage = () => {
   // 删除主题
   const deleteTheme = async (themeShort: string) => {
     try {
-      // 如果删除的是当前活跃主题，先切换到默认主题
-      if (themeShort === currentTheme) {
-        await setActiveTheme("default");
-        await refetchSettings();
-      }
-
       const response = await fetch("/api/admin/theme/delete", {
         method: "POST",
         headers: {
@@ -376,7 +370,20 @@ const ThemePage = () => {
         throw new Error(errorData.message || "Delete failed");
       }
 
-      // 重新获取主题列表
+      const payload = await response.json();
+      if (themeShort === currentTheme) {
+        await clearThemeNavigationCache();
+        try {
+          window.localStorage.setItem(
+            THEME_CHANGE_STORAGE_KEY,
+            `${payload?.data?.theme || "fallback"}:${Date.now()}`,
+          );
+        } catch {
+          // Other public tabs will update on their next navigation.
+        }
+      }
+
+      await refetchSettings();
       await fetchThemes();
 
       setDeleteDialogOpen(false);
@@ -716,7 +723,7 @@ const ThemePage = () => {
                 {t("theme.set_active")}
               </Button>
             )}
-            {selectedTheme && selectedTheme.short !== "default" && (
+            {selectedTheme && (
               <Button
                 variant="soft"
                 color="blue"
@@ -730,11 +737,12 @@ const ThemePage = () => {
                 {t("theme.update")}
               </Button>
             )}
-            {selectedTheme && selectedTheme.short !== "default" && (
+            {selectedTheme && (
               <Button
                 size="2"
                 variant="solid"
                 color="red"
+                disabled={themes.length <= 1}
                 onClick={() => {
                   setThemeToDelete(selectedTheme);
                   setDeleteDialogOpen(true);

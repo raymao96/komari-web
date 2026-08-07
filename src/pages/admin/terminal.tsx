@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Callout } from "@radix-ui/themes";
 import { CircleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import Loading from "@/components/loading";
@@ -10,7 +11,7 @@ import { useNodeList } from "@/contexts/NodeListContext";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import type { LiveDataResponse } from "@/types/LiveData";
 import { mergeLatestStatus } from "@/utils/liveData";
-import { remoteTerminalPath } from "@/utils/remoteLaunch";
+import { openRemoteTerminal } from "@/utils/remoteLaunch";
 
 const statusRefreshInterval = 3_000;
 
@@ -74,7 +75,9 @@ export default function AdminRemoteTerminal() {
         nodes={nodes}
         onlineSet={online}
         rowsPerPage={3}
-        onSelect={(node) => window.location.assign(remoteTerminalPath(node.uuid))}
+        onSelect={(node) => {
+          if (!openRemoteTerminal(node.uuid)) toast.error("浏览器阻止了远程管理窗口");
+        }}
       />
     </div>
   );

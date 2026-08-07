@@ -102,7 +102,14 @@ test("keeps the terminal portal aligned with the dashboard visual language", () 
   assert.equal(pickerSource.includes('t("terminal.address_unreported")'), true);
   assert.equal(pickerSource.includes('type: "IPv4" as const'), true);
   assert.equal(pickerSource.includes('type: "IPv6" as const'), true);
-  assert.equal(pickerSource.includes('t("terminal.copy_address"'), true);
+  assert.match(pickerSource, /ipv4 \? \{ type: "IPv4"[\s\S]*ipv6 \? \{ type: "IPv6"/);
+  assert.match(pickerStyles, /\.remote-node-picker-addresses \{[\s\S]*justify-content: center/);
+  assert.equal(pickerSource.includes('t("terminal.copy_address"'), false);
+  assert.equal(pickerSource.includes('role="button"'), true);
+  assert.equal(pickerSource.includes('if (online) onSelect(node)'), true);
+  assert.equal(pickerSource.includes('event.key !== "Enter" && event.key !== " "'), true);
+  assert.equal(portalSource.includes("openRemoteTerminal(node.uuid)"), true);
+  assert.equal(portalSource.includes("window.location.assign"), false);
   assert.equal(terminalStyles.includes("width: min(94vw, 1040px)"), true);
   assert.equal(terminalStyles.includes("max-height: calc(100dvh - 24px)"), true);
   assert.equal(terminalStyles.includes("height: min(calc(100vh - 24px), 820px)"), false);

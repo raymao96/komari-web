@@ -3,6 +3,7 @@ import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { resources } from "../i18n/config";
 import { writeLanguageCookie } from "@/utils/language";
+import { useOptionalAccount } from "@/contexts/AccountContext";
 interface LanguageSwitch {
   icon?: ReactNode;
 }
@@ -29,6 +30,7 @@ const LanguageSwitch = ({
   ),
 }: LanguageSwitch = {}) => {
   const { i18n } = useTranslation();
+  const accountContext = useOptionalAccount();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>{icon}</DropdownMenu.Trigger>
@@ -37,8 +39,15 @@ const LanguageSwitch = ({
           <DropdownMenu.Item
             key={lang.code}
             onClick={() => {
-              i18n.changeLanguage(lang.code);
+              void i18n.changeLanguage(lang.code);
               writeLanguageCookie(lang.code);
+              if (accountContext?.account?.logged_in) {
+                void accountContext
+                  .updatePreferences({ language: lang.code })
+                  .catch((error) => {
+                    console.warn("Failed to save language preference:", error);
+                  });
+              }
             }}
           >
             {lang.name} ({lang.code.slice(0, 2)})

@@ -93,8 +93,21 @@
   color: var(--gray-12);
 }
 
-.remote-node-picker-card:hover {
+.remote-node-picker-card:not(.is-offline) {
+  cursor: pointer;
+}
+
+.remote-node-picker-card:not(.is-offline):hover {
   border-color: var(--accent-7);
+}
+
+.remote-node-picker-card:focus-visible {
+  outline: 2px solid var(--accent-8);
+  outline-offset: 2px;
+}
+
+.remote-node-picker-card.is-offline {
+  cursor: not-allowed;
 }
 
 .remote-node-picker-card.is-selected {
@@ -207,7 +220,7 @@
 .remote-node-picker-address {
   display: grid;
   min-width: 0;
-  grid-template-columns: 38px minmax(0, 1fr) 26px;
+  grid-template-columns: 38px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -227,25 +240,10 @@
   white-space: nowrap;
 }
 
-.remote-node-picker-address button,
 .remote-node-picker-enter {
   display: grid;
   place-items: center;
-  border: 0;
   border-radius: var(--radius-2);
-  cursor: pointer;
-}
-
-.remote-node-picker-address button {
-  width: 26px;
-  height: 26px;
-  background: transparent;
-  color: var(--gray-9);
-}
-
-.remote-node-picker-address button:hover {
-  background: var(--gray-a4);
-  color: var(--gray-12);
 }
 
 .remote-node-picker-card-footer {
@@ -276,15 +274,8 @@
   color: var(--accent-10);
 }
 
-.remote-node-picker-enter:hover:not(:disabled) {
-  background: var(--accent-a3);
-  color: var(--accent-11);
-}
-
-.remote-node-picker-enter:disabled {
-  background: transparent;
+.remote-node-picker-card.is-offline .remote-node-picker-enter {
   color: var(--red-9);
-  cursor: not-allowed;
 }
 
 .remote-node-picker-empty {

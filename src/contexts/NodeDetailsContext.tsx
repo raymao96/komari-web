@@ -20,6 +20,7 @@ export type NodeDetail = {
   swap_total: number;
   disk_total: number;
   version: string;
+  deployment_status?: "" | "saved" | "sent" | "applied" | "failed";
   weight: number;
   price: number;
   remark: string | undefined;
@@ -45,6 +46,38 @@ interface NodeDetailsContextType {
 }
 const NodeDetailsContext = React.createContext<NodeDetailsContextType | undefined>(undefined);
 const PREAUTHENTICATED_NODE_DATA = "__preauthenticated__";
+
+declare global {
+  interface ObjectConstructor {
+    hasOwn(object: object, property: PropertyKey): boolean;
+  }
+}
+
+function hasDeploymentStatus(node: NodeDetail): boolean {
+  return typeof Object.hasOwn === "function"
+    ? Object.hasOwn(node, "deployment_status")
+    : Object.prototype.hasOwnProperty.call(node, "deployment_status");
+}
+
+async function hydrateLegacyDeploymentStatuses(nodes: NodeDetail[]) {
+  if (nodes.every(hasDeploymentStatus)) {
+    return nodes;
+  }
+  return Promise.all(nodes.map(async (node) => {
+    if (hasDeploymentStatus(node)) return node;
+    try {
+      const response = await fetch(`/api/admin/client/${node.uuid}/deployment-profile`, {
+        cache: "no-store",
+      });
+      if (!response.ok) return { ...node, deployment_status: "" as const };
+      const result = await response.json();
+      const status = result?.saved ? result?.delivery_state?.status || "saved" : "";
+      return { ...node, deployment_status: status };
+    } catch {
+      return { ...node, deployment_status: "" as const };
+    }
+  }));
+}
 
 const NodeDetailsProviderValue: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -77,12 +110,14 @@ const NodeDetailsProviderValue: React.FC<{ children: React.ReactNode }> = ({
         }
         return response.json();
       })
-      .then((data: NodeDetail[]) => {
+      .then(async (data: NodeDetail[]) => {
         if (sequence !== requestSequence.current) return;
         if (!Array.isArray(data)) {
           throw new Error("Invalid node details response");
         }
-        setNodeDetail(data);
+        const nodes = await hydrateLegacyDeploymentStatuses(data);
+        if (sequence !== requestSequence.current) return;
+        setNodeDetail(nodes);
       })
       .catch((error: unknown) => {
         if (sequence !== requestSequence.current) return;

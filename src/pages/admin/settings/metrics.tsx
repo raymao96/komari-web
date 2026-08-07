@@ -757,6 +757,7 @@ function MetricRetentionTable({
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
+            showSummary={false}
           />
         </div>
         <Flex justify="end">

@@ -30,13 +30,37 @@ import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import FullPageLoading from "./components/FullPageLoading";
 import DocumentTitle from "./components/DocumentTitle";
+import AccountPreferenceSync from "./components/AccountPreferenceSync";
 
 const AdminRoutePreloader = () => {
   const { account } = useAccount();
 
   React.useEffect(() => {
     if (!account?.logged_in) return;
-    preloadAdminEntry();
+
+    let idleHandle: number | undefined;
+    let fallbackHandle: number | undefined;
+    const preloadWhenIdle = () => {
+      if ("requestIdleCallback" in window) {
+        idleHandle = window.requestIdleCallback(() => preloadAdminEntry(), {
+          timeout: 2000,
+        });
+        return;
+      }
+      fallbackHandle = Number(globalThis.setTimeout(preloadAdminEntry, 800));
+    };
+
+    if (document.readyState === "complete") {
+      preloadWhenIdle();
+    } else {
+      window.addEventListener("load", preloadWhenIdle, { once: true });
+    }
+
+    return () => {
+      window.removeEventListener("load", preloadWhenIdle);
+      if (idleHandle !== undefined) window.cancelIdleCallback(idleHandle);
+      if (fallbackHandle !== undefined) globalThis.clearTimeout(fallbackHandle);
+    };
   }, [account?.logged_in]);
 
   return null;
@@ -116,6 +140,7 @@ const App = () => {
 		  </PublicInfoProvider>
 		) : (
 		  <AccountProvider>
+			<AccountPreferenceSync />
 			<AdminRoutePreloader />
 			<RPC2Provider>
 			  <PublicInfoProvider>

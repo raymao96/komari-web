@@ -33,6 +33,11 @@ test("node traffic progress uses the effective cycle quota", () => {
   assert.match(listSource, /n\.effective_traffic_type \?\? n\.traffic_limit_type \?\? "sum"/);
 });
 
+test("new nodes default the edit form traffic accounting mode to sum", () => {
+  assert.match(editSource, /defaultValue=\{node\.traffic_limit_type \|\| "sum"\}/);
+  assert.doesNotMatch(editSource, /defaultValue=\{node\.traffic_limit_type \|\| "max"\}/);
+});
+
 test("every admin language explains reset quota behavior", () => {
   for (const locale of ["en", "id_ID", "ja_JP", "zh_CN", "zh_TW"]) {
     const translations = JSON.parse(

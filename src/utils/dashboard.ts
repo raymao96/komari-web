@@ -18,6 +18,15 @@ export interface DashboardTrafficHour {
   down: number;
 }
 
+export interface DashboardTrafficRankItem {
+  uuid: string;
+  name: string;
+  up: number;
+  down: number;
+  billable: number;
+  detail_url?: string;
+}
+
 export interface DashboardDatabaseFiles {
   database: number;
   wal: number;
@@ -54,6 +63,87 @@ export interface DashboardReturnRouteStatus {
   error?: string;
 }
 
+export interface DashboardAlertLatest {
+  title: string;
+  node_name?: string;
+  occurred_at?: string;
+}
+
+export interface DashboardAlertSummary {
+  current: number;
+  affected_nodes: number;
+  recovered_today: number;
+  latest_alert?: DashboardAlertLatest;
+  error?: string;
+}
+
+export interface DashboardAlerts {
+  resource: DashboardAlertSummary;
+  offline: DashboardAlertSummary;
+  latency_loss: DashboardAlertSummary;
+  traffic: DashboardAlertSummary;
+  return_route: DashboardAlertSummary;
+  billing: DashboardAlertSummary;
+}
+
+export interface DashboardLatencyPoint {
+  time: string;
+  average: number;
+}
+
+export interface DashboardLatencySummary {
+  average: number;
+  targets: number;
+  points: DashboardLatencyPoint[];
+  ranking: DashboardLatencyRankItem[];
+  jitter_ranking: DashboardLatencyJitterRankItem[];
+  jitter_error?: string;
+  error?: string;
+}
+
+export interface DashboardLatencyRankItem {
+  uuid: string;
+  name: string;
+  average: number;
+  detail_url?: string;
+}
+
+export interface DashboardLatencyJitterRankItem {
+  uuid: string;
+  name: string;
+  previous: number;
+  current: number;
+  delta: number;
+  detail_url?: string;
+}
+
+export interface DashboardPacketLossRankItem {
+  uuid: string;
+  name: string;
+  task_id: number;
+  task_name: string;
+  loss_rate: number;
+  lost: number;
+  total: number;
+  valid: number;
+  detail_url?: string;
+}
+
+export interface DashboardResourceRankItem {
+  uuid: string;
+  name: string;
+  cpu: number;
+  memory: number;
+  disk: number;
+  detail_url?: string;
+}
+
+export interface DashboardResourceSummary {
+  cpu: DashboardResourceRankItem[];
+  memory: DashboardResourceRankItem[];
+  disk: DashboardResourceRankItem[];
+}
+
 export interface DashboardData {
   servers: {
     total: number;
@@ -61,14 +151,7 @@ export interface DashboardData {
     offline: number;
     offline_nodes: DashboardOfflineNode[];
   };
-  traffic: {
-    today_up: number;
-    today_down: number;
-    today_billable: number;
-    hourly: DashboardTrafficHour[];
-    daily: DashboardTrafficDay[];
-    history_ready: boolean;
-  };
+  resources: DashboardResourceSummary;
   database: {
     type: string;
     size: number;
@@ -84,6 +167,27 @@ export interface DashboardData {
     last_compacted_at: string | null;
   };
   return_route: DashboardReturnRouteStatus;
+  alerts: DashboardAlerts;
+  generated_at: string;
+}
+
+export interface DashboardChartsData {
+  traffic: {
+    today_up: number;
+    today_down: number;
+    today_billable: number;
+    hourly: DashboardTrafficHour[];
+    daily: DashboardTrafficDay[];
+    ranking: DashboardTrafficRankItem[];
+    history_ready: boolean;
+    error?: string;
+  };
+  latency: DashboardLatencySummary;
+  packet_loss: {
+    window_minutes: number;
+    ranking: DashboardPacketLossRankItem[];
+    error?: string;
+  };
   generated_at: string;
 }
 
@@ -115,3 +219,13 @@ export function shortDashboardDay(day: string, locale: string): string {
     day: "numeric",
   }).format(parsed);
 }
+
+export function dashboardTrafficAxisWidth(values: readonly number[]): number {
+  const longestLabel = values.reduce((longest, value) => {
+    if (!Number.isFinite(value)) return longest;
+    const label = formatBytes(Math.max(0, value)).replace(" ", "");
+    return Math.max(longest, label.length);
+  }, 0);
+  return Math.min(104, Math.max(68, longestLabel * 8 + 16));
+}
+import { formatBytes } from "./unitHelper.ts";

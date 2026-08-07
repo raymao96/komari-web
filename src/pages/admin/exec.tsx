@@ -8,13 +8,15 @@ import {
     Flex,
     Text,
     Badge,
+    Popover,
     TextField
 } from "@radix-ui/themes";
-import { Play, AlertCircle, CheckCircle2, Copy, Clock } from "lucide-react";
+import { Play, AlertCircle, CheckCircle2, ChevronDown, Copy, Clock } from "lucide-react";
 import { toast } from "sonner";
-import NodeSelector from "@/components/NodeSelector";
-import { SettingCardCollapse } from "@/components/admin/SettingCard";
+import RemoteExecNodeSelector from "@/components/remote/RemoteExecNodeSelector";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { SettingCardCollapse } from "@/components/admin/SettingCard";
+import { useAccount } from "@/contexts/AccountContext";
 import {
     AdminPagination,
     useAdminPagination,
@@ -61,6 +63,7 @@ const COMMAND_EDITOR_LINE_HEIGHT_VAR = "--command-editor-line-height";
 const COMMAND_EDITOR_VERTICAL_PADDING_VAR = "--command-editor-vertical-padding";
 const COMMAND_EDITOR_COLLAPSED_HEIGHT = `calc(${COMMAND_EDITOR_COLLAPSED_LINES} * var(${COMMAND_EDITOR_LINE_HEIGHT_VAR}) + var(${COMMAND_EDITOR_VERTICAL_PADDING_VAR}))`;
 const COMMAND_EDITOR_LINE_NUMBER_LIMIT = 500;
+const SELECTED_NODE_PREVIEW_LIMIT = 15;
 
 const parsePixelValue = (value: string) => {
     const parsedValue = Number.parseFloat(value);
@@ -95,6 +98,7 @@ const ExecPage = () => {
 const ExecContent = () => {
     const { t } = useTranslation();
     const { nodeDetail, isLoading, error } = useNodeDetails();
+    const { account } = useAccount();
     const [command, setCommand] = useState("");
     const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
     const [executing, setExecuting] = useState(false);
@@ -103,8 +107,8 @@ const ExecContent = () => {
     const [polling, setPolling] = useState(false);
     const [commandFocused, setCommandFocused] = useState(false);
     const [commandEditorHeight, setCommandEditorHeight] = useState(COMMAND_EDITOR_COLLAPSED_HEIGHT);
-    const [twoFaEnabled, setTwoFaEnabled] = useState(false);
     const [twoFaCode, setTwoFaCode] = useState("");
+    const twoFaEnabled = Boolean(account?.["2fa_enabled"]);
     const {
         page: resultPage,
         setPage: setResultPage,
@@ -173,17 +177,6 @@ const ExecContent = () => {
         return () => {
             clearPolling();
         };
-    }, []);
-
-    useEffect(() => {
-        fetch("/api/me")
-            .then((response) => response.json())
-            .then((data) => {
-                setTwoFaEnabled(Boolean(data?.["2fa_enabled"]));
-            })
-            .catch(() => {
-                setTwoFaEnabled(false);
-            });
     }, []);
 
     useLayoutEffect(() => {
@@ -363,12 +356,12 @@ const ExecContent = () => {
         toast.success(t("common.success"));
     };
 
-    const getSelectedNodeNames = () => {
-        return selectedNodes.map(uuid => {
-            const node = nodeDetail.find(n => n.uuid === uuid);
-            return node ? node.name : uuid;
-        }).join(", ");
-    };
+    const selectedNodeNames = selectedNodes.map(uuid => {
+        const node = nodeDetail.find(n => n.uuid === uuid);
+        return node ? node.name : uuid;
+    });
+    const selectedNodePreview = selectedNodeNames.slice(0, SELECTED_NODE_PREVIEW_LIMIT);
+    const hiddenSelectedNodeCount = selectedNodeNames.length - selectedNodePreview.length;
 
     const getTaskStatus = (result: TaskResult) => {
         if (result.finished_at === null) {
@@ -390,7 +383,7 @@ const ExecContent = () => {
             </AdminPageTitle>
 
             {/* 命令输入区域 */}
-            <Card className="p-4 sm:p-5">
+            <section>
                 <Flex direction="column" gap="4">
 
                     <label htmlFor={COMMAND_EDITOR_ID} className="text-base font-semibold leading-6">
@@ -445,29 +438,64 @@ const ExecContent = () => {
 
                     <div>
                         <SettingCardCollapse title={t("exec.selectNodes")} defaultOpen>
-                            <NodeSelector
+                            <RemoteExecNodeSelector
+                                nodes={nodeDetail}
                                 value={selectedNodes}
                                 onChange={setSelectedNodes}
-                                className="min-h-[200px]"
                             />
                         </SettingCardCollapse>
                         {selectedNodes.length > 0 && (
-                            <Text size="2" color="gray" className="mt-2">
-                                {t("exec.selectedNodes", "已选择节点")}: {getSelectedNodeNames()}
-                            </Text>
+                            <Flex align="center" gap="2" wrap="wrap" className="mt-2">
+                                <Text size="2" color="gray">
+                                    {t("exec.selectedNodes", "已选择节点")}
+                                </Text>
+                                {selectedNodePreview.map((name, index) => (
+                                    <Badge key={`${selectedNodes[index]}-${name}`} variant="soft">
+                                        {name}
+                                    </Badge>
+                                ))}
+                                {hiddenSelectedNodeCount > 0 && (
+                                    <Popover.Root>
+                                        <Popover.Trigger>
+                                            <Button size="1" variant="soft" className="tabular-nums">
+                                                +{hiddenSelectedNodeCount}
+                                                <ChevronDown size={13} />
+                                            </Button>
+                                        </Popover.Trigger>
+                                        <Popover.Content
+                                            align="end"
+                                            sideOffset={6}
+                                            className="max-h-72 w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-3"
+                                        >
+                                            <Text as="div" size="2" weight="medium" className="mb-2">
+                                                {t("exec.selectedNodes", "已选择节点")}
+                                            </Text>
+                                            <Flex gap="1" wrap="wrap">
+                                                {selectedNodeNames.map((name, index) => (
+                                                    <Badge key={`${selectedNodes[index]}-${name}`} color="gray" variant="soft">
+                                                        {name}
+                                                    </Badge>
+                                                ))}
+                                            </Flex>
+                                        </Popover.Content>
+                                    </Popover.Root>
+                                )}
+                            </Flex>
                         )}
                     </div>
 
                     <Flex justify="end" gap="2" className="flex-col sm:flex-row">
-                        {twoFaEnabled ? (
-                            <TextField.Root
-                                className="w-full sm:w-32"
-                                type="number"
-                                placeholder="2FA"
-                                value={twoFaCode}
-                                onChange={(e) => setTwoFaCode((e.target as HTMLInputElement).value)}
-                            />
-                        ) : null}
+                        <TextField.Root
+                            className="w-full sm:w-64"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            aria-label={t("admin.nodeTable.twoFactorCode")}
+                            placeholder={t("admin.nodeTable.twoFactorCode")}
+                            value={twoFaCode}
+                            onChange={(e) => setTwoFaCode((e.target as HTMLInputElement).value.replace(/\D/g, "").slice(0, 6))}
+                        />
                         <Button
                             className="w-full sm:w-auto"
                             onClick={executeCommand}
@@ -487,7 +515,7 @@ const ExecContent = () => {
                         </Button>
                     </Flex>
                 </Flex>
-            </Card>
+            </section>
 
             {/* 执行结果区域 */}
             {results.length > 0 && (
