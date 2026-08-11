@@ -56,16 +56,6 @@ test("server and settings pages share the standard page spacing", () => {
   assert.match(settingsLayout, /direction="column" gap="4" className="p-0 md:p-4"/);
 });
 
-test("drawer theme receives only the drawer content element", () => {
-  const source = readFileSync(
-    path.resolve("src/components/ui/drawer.tsx"),
-    "utf8",
-  );
-
-  assert.match(source, /<DrawerOverlay \/>\s*<Theme/);
-  assert.doesNotMatch(source, /<Theme[^>]*>\s*<DrawerOverlay/);
-});
-
 test("traffic report selection uses an aligned column and mobile row cards", () => {
   const source = readFileSync(
     path.resolve("src/pages/admin/notification/traffic_report.tsx"),

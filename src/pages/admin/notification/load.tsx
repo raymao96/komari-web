@@ -31,6 +31,7 @@ import {
   Select,
   TextField,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal, Pencil, Trash } from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -123,10 +124,15 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
     threshold: alert.threshold || 80,
     ratio: alert.ratio || 0.8,
     clients: alert.clients || [],
+    default_on: alert.default_on ?? false,
     interval: alert.interval || 15,
   });
 
   const submitEdit = (newForm: typeof form) => {
+    if (!newForm.default_on && newForm.clients.length === 0) {
+      toast.error(t("ping.default_on_description"));
+      return;
+    }
     setEditSaving(true);
     fetch("/api/admin/notification/load/edit", {
       method: "POST",
@@ -140,6 +146,7 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
             threshold: newForm.threshold,
             ratio: newForm.ratio,
             clients: newForm.clients,
+            default_on: newForm.default_on,
             interval: newForm.interval,
           },
         ],
@@ -212,12 +219,18 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
                   .join(", ")
               : t("common.none")}
           </span>
+          {alert.default_on && (
+            <span className="shrink-0 text-xs text-accent-11">
+              {t("ping.default_on_short")}
+            </span>
+          )}
           <NodeSelectorDialog
             value={form.clients ?? []}
             hiddenUuidOnlyClient
             onChange={(uuids) => {
-              setForm((f) => ({ ...f, clients: uuids }));
-              submitEdit({ ...form, clients: uuids });
+              const nextForm = { ...form, clients: uuids };
+              setForm(nextForm);
+              submitEdit(nextForm);
             }}
           >
             <IconButton variant="ghost" className="shrink-0">
@@ -297,6 +310,18 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
                   onChange={(v) => setForm((f) => ({ ...f, clients: v }))}
                 />
               </Flex>
+              <label className="flex min-h-10 items-center gap-2 text-sm font-normal">
+                <Checkbox
+                  checked={form.default_on}
+                  onCheckedChange={(checked) =>
+                    setForm((f) => ({ ...f, default_on: !!checked }))
+                  }
+                />
+                <span>{t("ping.default_on")}</span>
+              </label>
+              <label className="text-sm font-normal text-gray-500">
+                {t("ping.default_on_description")}
+              </label>
               <label>
                 {t("ping.interval")} ({t("time.minute")})
               </label>
@@ -367,6 +392,7 @@ const AddButton: React.FC = () => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<string[]>([]);
+  const [defaultOn, setDefaultOn] = React.useState(false);
   const { refresh } = useLoadAlert();
   const [selectedType, setSelectedType] = React.useState<
     "cpu" | "ram" | "disk" | "net_in" | "net_out"
@@ -374,12 +400,17 @@ const AddButton: React.FC = () => {
   const [saving, setSaving] = React.useState(false);
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!defaultOn && selected.length === 0) {
+      toast.error(t("ping.default_on_description"));
+      return;
+    }
     const payload = {
       name: e.currentTarget.load_name.value,
       metric: selectedType,
       threshold: parseFloat(e.currentTarget.threshold.value),
       ratio: parseFloat(e.currentTarget.ratio.value),
       clients: selected,
+      default_on: defaultOn,
       interval: parseInt(e.currentTarget.interval.value, 10),
     };
     setSaving(true);
@@ -394,6 +425,7 @@ const AddButton: React.FC = () => {
         if (response.ok) {
           setIsOpen(false);
           setSelected([]);
+          setDefaultOn(false);
           setSelectedType("cpu");
           toast.success(t("common.success"));
         } else {
@@ -470,6 +502,16 @@ const AddButton: React.FC = () => {
                 {t("common.selected", { count: selected.length })}
               </label>
             </div>
+            <label className="flex min-h-10 items-center gap-2 text-sm font-normal">
+              <Checkbox
+                checked={defaultOn}
+                onCheckedChange={(checked) => setDefaultOn(!!checked)}
+              />
+              <span>{t("ping.default_on")}</span>
+            </label>
+            <label className="text-sm font-normal text-gray-500">
+              {t("ping.default_on_description")}
+            </label>
             <label htmlFor="interval">
               {t("ping.interval")} ({t("time.minute")})
             </label>

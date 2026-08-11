@@ -36,15 +36,17 @@ test("static manifest resources remain valid under a non-root base URL", () => {
   assert.equal(existsSync("public/assets/pwa-icon.png"), true);
 });
 
-test("every configured operating system image exists in public assets", () => {
-  const source = readFileSync("src/utils/osImageHelper.ts", "utf8");
-  const imagePaths = [...source.matchAll(/image:\s*"([^"]+)"/g)].map(
-    (match) => match[1],
-  );
+test("the default production build is guarded as an embedded system UI build", () => {
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+    scripts?: Record<string, string>;
+  };
+  const buildScript = readFileSync("script/build-system-ui.mjs", "utf8");
+  const viteConfig = readFileSync("vite.config.ts", "utf8");
 
-  assert.ok(imagePaths.length > 0);
-  assert.deepEqual(
-    imagePaths.filter((path) => !existsSync(join("public", path))),
-    [],
-  );
+  assert.equal(packageJson.scripts?.build, "tsc -b && node ./script/build-system-ui.mjs");
+  assert.match(buildScript, /VITE_SYSTEM_UI_BUILD = "1"/);
+  assert.match(buildScript, /VITE_BASE_URL = "\/system-assets\/"/);
+  assert.match(buildScript, /system-assets\/assets\/entry-/);
+  assert.match(viteConfig, /mode !== "development"/);
+  assert.match(viteConfig, /process\.env\.VITE_SYSTEM_UI_BUILD !== "0"/);
 });

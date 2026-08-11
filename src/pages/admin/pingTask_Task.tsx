@@ -32,13 +32,13 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Button,
-  Checkbox,
   Dialog,
   Flex,
   IconButton,
   Select,
   TextField,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MenuIcon, MoreHorizontal, Pencil, Trash } from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";

@@ -5,6 +5,7 @@ import {
 } from "@/utils/shellQuote";
 import { publicVersion } from "@/utils/version";
 import { normalizeOptionalServiceUrl } from "@/utils/serviceUrl";
+import { writeClipboardText } from "@/utils/clipboard";
 import React, { useEffect, useState } from "react";
 import {
   NodeDetailsProvider,
@@ -15,7 +16,6 @@ import {
   Flex,
   TextField,
   Button,
-  Checkbox,
   Text,
   Dialog,
   IconButton,
@@ -23,6 +23,7 @@ import {
   SegmentedControl,
   Callout,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   CircleDollarSign,
   CheckCircle2,
@@ -43,7 +44,7 @@ import {
   Trash2Icon,
   XCircle,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
 import {
   DndContext,
@@ -91,6 +92,7 @@ import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { localizeTokenRotationError } from "@/utils/tokenRotation";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AdminActiveFilter from "@/components/admin/AdminActiveFilter";
 import AdminNodeStatusSummary, {
   type AdminNodeStatusFilter,
 } from "@/components/admin/AdminNodeStatusSummary";
@@ -99,6 +101,16 @@ import {
 } from "@/components/admin/AdminPagination";
 import { useAdminDefaultPageSize } from "@/hooks/useAdminDefaultPageSize";
 import { useAdminNodeLiveData } from "@/hooks/use-admin-node-live-data";
+import {
+  getDashboardAlertItemsSnapshot,
+  requestDashboardAlertItems,
+  serverAlertKinds,
+} from "@/utils/adminAlertFilters";
+import { useAccount } from "@/contexts/AccountContext";
+import type {
+  DashboardAlertAffectedItem,
+  DashboardAlertKind,
+} from "@/utils/dashboard";
 import {
   getRegionCode,
   getRegionDisplayName,
@@ -118,18 +130,71 @@ const PREVIOUS_PAGE_DROP_ID = "admin-node-previous-page";
 const NEXT_PAGE_DROP_ID = "admin-node-next-page";
 
 const Layout = () => {
+  const { t } = useTranslation();
+  const { account } = useAccount();
+  const accountKey = account?.uuid || account?.username || "authenticated";
   const { nodeDetail, isLoading, error, refresh } = useNodeDetails();
   const { settings, loading: settingsLoading } = useSettings();
   const { liveData, available } = useAdminNodeLiveData();
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<AdminNodeStatusFilter>("all");
+  const routeNode = searchParams.get("node")?.trim() || "";
+  const alertParam = searchParams.get("alert")?.trim() as DashboardAlertKind | null;
+  const routeAlert = alertParam && serverAlertKinds.has(alertParam) ? alertParam : null;
+  const initialAlertSnapshot = routeAlert
+    ? getDashboardAlertItemsSnapshot(routeAlert, accountKey)
+    : null;
+  const [alertItems, setAlertItems] = useState<DashboardAlertAffectedItem[]>(
+    initialAlertSnapshot?.items ?? [],
+  );
+  const [alertFilterLoading, setAlertFilterLoading] = useState(
+    Boolean(routeAlert && !initialAlertSnapshot),
+  );
+  const [alertFilterError, setAlertFilterError] = useState("");
   const onlineSet = React.useMemo(
     () => new Set(liveData?.data.online ?? []),
     [liveData?.data.online],
   );
+
+  useEffect(() => {
+    if (!routeAlert) {
+      setAlertItems([]);
+      setAlertFilterLoading(false);
+      setAlertFilterError("");
+      return;
+    }
+    const snapshot = getDashboardAlertItemsSnapshot(routeAlert, accountKey);
+    if (snapshot) {
+      setAlertItems(snapshot.items);
+      setAlertFilterLoading(false);
+      setAlertFilterError("");
+      return;
+    }
+    const controller = new AbortController();
+    setAlertFilterLoading(true);
+    setAlertFilterError("");
+    void requestDashboardAlertItems(routeAlert, controller.signal, accountKey)
+      .then((response) => setAlertItems(response.items))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setAlertItems([]);
+        setAlertFilterError(requestError instanceof Error ? requestError.message : String(requestError));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setAlertFilterLoading(false);
+      });
+    return () => controller.abort();
+  }, [accountKey, routeAlert]);
+
+  const alertItemOrder = React.useMemo(
+    () => new Map(alertItems.map((item, index) => [item.node_uuid, index])),
+    [alertItems],
+  );
   const filteredNodes = React.useMemo(
-    () => (Array.isArray(nodeDetail)
-      ? nodeDetail.filter((node) => {
+    () => {
+      if (!Array.isArray(nodeDetail)) return [];
+      const filtered = nodeDetail.filter((node) => {
         const matchesSearch = node.name
           .toLowerCase()
           .includes(searchTerm.toLowerCase());
@@ -138,11 +203,36 @@ const Layout = () => {
           statusFilter === "all" ||
           (statusFilter === "online" && isOnline) ||
           (statusFilter === "offline" && !isOnline);
-          return matchesSearch && matchesStatus;
-        })
-      : []),
-    [nodeDetail, onlineSet, searchTerm, statusFilter],
+        const matchesNode = !routeNode || node.uuid === routeNode;
+        const matchesAlert = !routeAlert || alertItemOrder.has(node.uuid);
+        return matchesSearch && matchesStatus && matchesNode && matchesAlert;
+      });
+      if (routeAlert === "billing") {
+        filtered.sort((left, right) => (
+          (alertItemOrder.get(left.uuid) ?? Number.MAX_SAFE_INTEGER)
+          - (alertItemOrder.get(right.uuid) ?? Number.MAX_SAFE_INTEGER)
+        ));
+      }
+      return filtered;
+    },
+    [alertItemOrder, nodeDetail, onlineSet, routeAlert, routeNode, searchTerm, statusFilter],
   );
+
+  const activeFilterLabel = React.useMemo(() => {
+    if (routeNode) {
+      return nodeDetail.find((node) => node.uuid === routeNode)?.name || routeNode;
+    }
+    if (!routeAlert) return "";
+    const keys: Record<DashboardAlertKind, string> = {
+      offline: "alert_offline",
+      resource: "alert_resource",
+      latency_loss: "alert_latency_loss",
+      traffic: "alert_traffic",
+      return_route: "alert_return_route",
+      billing: "alert_billing",
+    };
+    return t(`admin_dashboard.${keys[routeAlert]}`);
+  }, [nodeDetail, routeAlert, routeNode, t]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -171,15 +261,24 @@ const Layout = () => {
         setStatusFilter={setStatusFilter}
       />
 
-      {isEmpty ? (
+      {activeFilterLabel ? (
+        <AdminActiveFilter label={activeFilterLabel} clearTo="/admin/servers" />
+      ) : null}
+      {alertFilterError ? (
+        <Callout.Root color="red" size="1"><Callout.Text>{alertFilterError}</Callout.Text></Callout.Root>
+      ) : null}
+
+      {alertFilterLoading ? null : isEmpty ? (
         <EmptyNodesGuide />
+      ) : filteredNodes.length === 0 ? (
+        <Callout.Root color="gray"><Callout.Text>{t("common.no_data", "没有符合当前筛选的服务器")}</Callout.Text></Callout.Root>
       ) : (
         <>
           <NodeTable
             nodes={filteredNodes}
             settings={settings}
             onlineSet={onlineSet}
-            reorderEnabled={!searchTerm.trim() && statusFilter === "all"}
+            reorderEnabled={!searchTerm.trim() && statusFilter === "all" && !routeNode && !routeAlert}
           />
         </>
       )}
@@ -426,7 +525,7 @@ const AutoDiscoverySection = ({
 
   const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await writeClipboardText(text);
       toast.success(t("copy_success", "已复制到剪贴板"));
     } catch (err) {
       console.error("Failed to copy text: ", err);
@@ -1140,9 +1239,13 @@ const SortableRow = React.memo(({
     transition,
     borderColor: "var(--gray-a5)",
   };
-  function copy(text: string) {
-    navigator.clipboard.writeText(text);
-    toast.success(t("copy_success"));
+  async function copy(text: string) {
+    try {
+      await writeClipboardText(text);
+      toast.success(t("copy_success"));
+    } catch (err) {
+      console.error("Failed to copy text:", err);
+    }
   }
   const networkAddresses = ([
     ["IPv4", node.ipv4?.trim()],
@@ -1983,6 +2086,7 @@ type DeploymentDeliveryState = {
 function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings: any }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
+  const isMobile = useIsMobile();
   const configuredResetDay = Number(node.traffic_reset_day);
   const initialResetDay =
     Number.isInteger(configuredResetDay) &&
@@ -2025,6 +2129,11 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   const [loadingProfile, setLoadingProfile] = React.useState(false);
   const [profileAction, setProfileAction] = React.useState<"dispatch" | "copy" | null>(null);
   const [deliveryState, setDeliveryState] = React.useState<DeploymentDeliveryState>();
+  const [copyFeedback, setCopyFeedback] = React.useState<{
+    kind: "success" | "warning" | "error";
+    message: string;
+  }>();
+  const commandTextAreaRef = React.useRef<HTMLTextAreaElement>(null);
   const deliveryStatus = deliveryState?.status;
 
   React.useEffect(() => {
@@ -2300,6 +2409,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
 
   const saveProfile = async (copyCommand: boolean) => {
     if (profileAction) return;
+    setCopyFeedback(undefined);
     const trafficResetDay = selectedTrafficResetDay();
     if (trafficResetDay === null) {
       toast.error(
@@ -2323,6 +2433,12 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
 
     const action = copyCommand ? "copy" : "dispatch";
     setProfileAction(action);
+    const copyAttempt = copyCommand
+      ? writeClipboardText(generateCommand()).then(
+          (value) => ({ ok: true as const, value }),
+          (error: unknown) => ({ ok: false as const, error }),
+        )
+      : null;
     try {
       const response = await fetch(
         `/api/admin/client/${node.uuid}/deployment-profile`,
@@ -2338,11 +2454,6 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       }
       const result = (await response.json()) as DeploymentProfileResponse;
       setDeliveryState(result.delivery_state);
-
-      if (copyCommand) {
-        await navigator.clipboard.writeText(generateCommand());
-      }
-      refresh();
       const deliveryMessage = result.delivery_state?.status === "applied"
         ? t("admin.nodeTable.deliveryApplied", "已生效")
         : result.delivery_state?.status === "failed"
@@ -2352,21 +2463,56 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         : result.delivery === "agent_upgrade_required"
           ? t("admin.nodeTable.runtimeConfigUpgradeRequired", "配置已保存，Agent 升级后应用")
           : t("admin.nodeTable.deliverySaved", "已保存");
-      toast.success(
-        copyCommand
+
+      if (copyAttempt) {
+        const copyResult = await copyAttempt;
+        if (!copyResult.ok) {
+          refresh();
+          const message = `${deliveryMessage}；${t(
+              "admin.nodeTable.installCommandCopyDenied",
+              "浏览器拒绝访问剪贴板，请检查网站权限后重试",
+            )}`;
+          setCopyFeedback({ kind: "error", message });
+          commandTextAreaRef.current?.focus();
+          commandTextAreaRef.current?.select();
+          toast.warning(message);
+          return;
+        }
+        if (!copyResult.value.confirmed) {
+          refresh();
+          const message = `${deliveryMessage}；${t(
+              "admin.nodeTable.installCommandCopyUnconfirmed",
+              "浏览器无法确认复制，请从上方指令框手动复制",
+            )}`;
+          setCopyFeedback({ kind: "warning", message });
+          commandTextAreaRef.current?.focus();
+          commandTextAreaRef.current?.select();
+          toast.warning(message);
+          return;
+        }
+      }
+      refresh();
+      const message = copyCommand
           ? `${deliveryMessage}；${t(
               "admin.nodeTable.installCommandSaved",
               "部署指令已复制到剪贴板",
             )}`
-          : deliveryMessage,
-      );
+          : deliveryMessage;
+      if (copyCommand) {
+        setCopyFeedback({ kind: "success", message });
+      }
+      toast.success(message);
     } catch (err) {
       console.error("Failed to save install options or copy command:", err);
-      toast.error(
-        err instanceof Error
+      const message = err instanceof Error
           ? err.message
-          : t("admin.nodeTable.installCommandSaveFailed", "保存配置失败"),
-      );
+          : t("admin.nodeTable.installCommandSaveFailed", "保存配置失败");
+      if (copyCommand) {
+        setCopyFeedback({ kind: "error", message });
+        commandTextAreaRef.current?.focus();
+        commandTextAreaRef.current?.select();
+      }
+      toast.error(message);
     } finally {
       setProfileAction(null);
     }
@@ -3019,14 +3165,16 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
             </label>
             <div className="relative">
               <TextArea
-                disabled
+                ref={commandTextAreaRef}
+                readOnly
                 className="w-full"
                 style={{ minHeight: "80px" }}
                 value={generateCommand()}
+                onFocus={(event) => event.currentTarget.select()}
               />
             </div>
           </Flex>
-          <Flex justify="center">
+          <Flex direction="column" gap="2">
             <Button
               style={{ width: "100%" }}
               aria-busy={profileAction === "copy"}
@@ -3039,6 +3187,25 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               <Copy size={16} />
               {t("admin.nodeTable.saveAndCopyCommand", "保存并复制部署指令")}
             </Button>
+            {isMobile && copyFeedback && (
+              <Text
+                as="div"
+                size="2"
+                weight="medium"
+                color={
+                  copyFeedback.kind === "success"
+                    ? "green"
+                    : copyFeedback.kind === "warning"
+                      ? "amber"
+                      : "red"
+                }
+                role="status"
+                aria-live="polite"
+                className="px-1"
+              >
+                {copyFeedback.message}
+              </Text>
+            )}
           </Flex>
         </div>
       </Dialog.Content>
@@ -3422,9 +3589,13 @@ function ReadOnlyDetailField({
               color="gray"
               title={t("copy", "复制")}
               aria-label={t("copy", "复制")}
-              onClick={() => {
-                navigator.clipboard.writeText(displayValue);
-                toast.success(t("copy_success"));
+              onClick={async () => {
+                try {
+                  await writeClipboardText(displayValue);
+                  toast.success(t("copy_success"));
+                } catch (err) {
+                  console.error("Failed to copy text:", err);
+                }
               }}
             >
               <Copy size={14} />

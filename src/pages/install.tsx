@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   Button,
   Callout,
@@ -30,6 +30,49 @@ type APIResponse<T> = {
   data?: T;
 };
 type InstallStatus = { state: string; required: boolean };
+const INSTALL_REDIRECT_DELAY_MS = 2500;
+const INSTALL_STEPS = ["welcome", "administrator", "site", "database", "confirm"];
+
+function InstallLayout({
+  step,
+  children,
+}: {
+  step: number;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <main className="min-h-screen px-4 py-8 sm:px-6">
+      <Container size="2">
+        <div className="mb-5">
+          <GuideHeader />
+        </div>
+        <Heading size="7" mb="5">
+          {t("install.title")}
+        </Heading>
+        <Progress
+          value={((step + 1) / INSTALL_STEPS.length) * 100}
+          size="2"
+          mb="4"
+        />
+        <Flex gap="3" mb="6" wrap="wrap">
+          {INSTALL_STEPS.map((title, index) => (
+            <Text
+              key={title}
+              size="2"
+              weight={index === step ? "bold" : "regular"}
+              color={index === step ? undefined : "gray"}
+            >
+              {index + 1}. {t(`install.steps.${title}`)}
+            </Text>
+          ))}
+        </Flex>
+        {children}
+      </Container>
+    </main>
+  );
+}
 
 function isSQLiteDSN(dsn: string): boolean {
   const normalized = dsn.trim().toLowerCase();
@@ -51,6 +94,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       : init?.headers,
     cache: "no-store",
   });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json"))
+    throw new Error(`HTTP ${response.status}`);
   const payload = (await response.json()) as APIResponse<T>;
   if (!response.ok || payload.status !== "success")
     throw new Error(payload.message || `HTTP ${response.status}`);
@@ -88,6 +134,15 @@ export default function Install() {
       );
   }, [t]);
 
+  useEffect(() => {
+    if (ready !== false) return;
+    const redirect = window.setTimeout(
+      () => window.location.replace("/"),
+      INSTALL_REDIRECT_DELAY_MS,
+    );
+    return () => window.clearTimeout(redirect);
+  }, [ready]);
+
   const next = () => {
     setError("");
     if (step === 1 && !username.trim())
@@ -121,7 +176,7 @@ export default function Install() {
           metric_dsn: metricDSN,
         }),
       });
-      window.setTimeout(() => window.location.assign("/"), 1200);
+      setReady(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("install.failed"));
       setBusy(false);
@@ -199,36 +254,48 @@ export default function Install() {
     restoreXhr?.abort();
   };
 
-  if (ready === false)
+  if (ready === null)
     return (
       <main className="flex min-h-screen items-center justify-center p-6">
-        <Text>{t("install.completed")}</Text>
+        <Flex direction="column" align="center" gap="4">
+          <LoaderCircle
+            size={28}
+            className={error ? undefined : "animate-spin"}
+          />
+          <Text color={error ? "red" : "gray"}>
+            {error || t("loading")}
+          </Text>
+        </Flex>
       </main>
     );
 
-  const titles = ["welcome", "administrator", "site", "database", "confirm"];
+  if (ready === false)
+    return (
+      <InstallLayout step={INSTALL_STEPS.length - 1}>
+        <Card size="3">
+          <Flex
+            direction="column"
+            align="center"
+            gap="5"
+            className="py-10 text-center sm:py-14"
+            aria-live="polite"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--green-a3)] text-[var(--green-11)]">
+              <Check size={34} strokeWidth={2} />
+            </div>
+            <Flex direction="column" align="center" gap="2">
+              <Heading size="7">{t("install.completed_title")}</Heading>
+              <Text size="3" color="gray">
+                {t("install.completed")}
+              </Text>
+            </Flex>
+          </Flex>
+        </Card>
+      </InstallLayout>
+    );
+
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6">
-      <Container size="2">
-        <div className="mb-5">
-          <GuideHeader />
-        </div>
-        <Heading size="7" mb="5">
-          {t("install.title")}
-        </Heading>
-        <Progress value={((step + 1) / titles.length) * 100} size="2" mb="4" />
-        <Flex gap="3" mb="6" wrap="wrap">
-          {titles.map((title, index) => (
-            <Text
-              key={title}
-              size="2"
-              weight={index === step ? "bold" : "regular"}
-              color={index === step ? undefined : "gray"}
-            >
-              {index + 1}. {t(`install.steps.${title}`)}
-            </Text>
-          ))}
-        </Flex>
+    <InstallLayout step={step}>
         {error && (
           <Callout.Root color="red" variant="surface" mb="4">
             <Callout.Text>{error}</Callout.Text>
@@ -439,7 +506,6 @@ export default function Install() {
           onFileSelected={restoreBackup}
           closeLabel={t("common.cancel")}
         />
-      </Container>
-    </main>
+    </InstallLayout>
   );
 }

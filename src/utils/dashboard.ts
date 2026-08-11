@@ -66,7 +66,29 @@ export interface DashboardReturnRouteStatus {
 export interface DashboardAlertLatest {
   title: string;
   node_name?: string;
+  node_uuid?: string;
+  task_id?: number;
+  task_name?: string;
   occurred_at?: string;
+  due_at?: string;
+}
+
+export type DashboardAlertKind =
+  | "offline"
+  | "resource"
+  | "latency_loss"
+  | "traffic"
+  | "return_route"
+  | "billing";
+
+export interface DashboardAlertAffectedItem extends DashboardAlertLatest {
+  kind: DashboardAlertKind;
+}
+
+export interface DashboardAlertItemsResponse {
+  kind: DashboardAlertKind;
+  items: DashboardAlertAffectedItem[];
+  generated_at: string;
 }
 
 export interface DashboardAlertSummary {

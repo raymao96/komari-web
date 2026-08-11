@@ -301,6 +301,8 @@
         "resetDayRequired": "Atur tanggal reset trafik di editor server terlebih dahulu"
       },
       "description": "Tinjau koneksi node, sumber daya, trafik, dan tagihan di satu tempat. Seret baris untuk mengatur urutan tampilan global.",
+      "installCommandCopyDenied": "Browser menolak akses papan klip. Periksa izin situs ini lalu coba lagi",
+      "installCommandCopyUnconfirmed": "Browser tidak dapat memastikan penyalinan. Salin perintah secara manual dari kolom di atas",
       "installCommandSaveFailed": "Gagal menyimpan pengaturan perintah instalasi",
       "installCommandSaved": "Pengaturan perintah instalasi disimpan",
       "invalidMonthRotate": "Tanggal reset trafik harus antara 0 dan 31",
@@ -891,7 +893,10 @@
       "page_description": "Konfigurasikan penemuan otomatis, GeoIP, dan perilaku global lainnya.",
       "admin_default_page_size": "Paginasi daftar bawaan",
       "admin_default_page_size_description": "Atur jumlah item bawaan per halaman untuk semua daftar berpaginasi. Nilai diterapkan saat halaman daftar dibuka kembali.",
-      "admin_default_page_size_invalid": "Masukkan bilangan bulat antara {{min}} dan {{max}}"
+      "admin_default_page_size_invalid": "Masukkan bilangan bulat antara {{min}} dan {{max}}",
+      "interface_motion": "Gerakan antarmuka",
+      "reduce_motion": "Kurangi gerakan",
+      "reduce_motion_description": "Nonaktifkan transisi halaman, tab, dan bilah samping untuk perpindahan langsung."
     },
     "geoip": {
       "enable_description": "Tampilkan lokasi geografis node",
@@ -1485,9 +1490,6 @@
     "author": "Penulis",
     "confirm_delete": "Konfirmasi Hapus Tema",
     "dark": "Gelap",
-    "default_description": "Tema bawaan sistem",
-    "default_no_config": "Tema bawaan tidak memiliki opsi konfigurasi.",
-    "default_preview": "Tidak ada pratinjau untuk tema bawaan",
     "default_theme": "Tema Bawaan",
     "delete_failed": "Gagal menghapus tema",
     "delete_success": "Tema berhasil dihapus",
@@ -1601,7 +1603,8 @@
     "restore_failed": "Gagal memulihkan cadangan. Silakan coba lagi.",
     "restore_413": "Unggahan cadangan gagal (413). Tingkatkan batas ukuran unggahan pada CDN atau proksi balik seperti Nginx (misalnya client_max_body_size), atau unggah cadangan secara manual ke ./data/backup.zip lalu mulai ulang layanan.",
     "complete": "Selesaikan instalasi",
-    "completed": "Instalasi sudah selesai. Kembali ke halaman masuk.",
+    "completed": "Instalasi selesai. Dasbor publik akan segera dibuka.",
+    "completed_title": "Instalasi selesai",
     "failed": "Instalasi gagal. Silakan coba lagi.",
     "connection_error": "Tidak dapat terhubung ke server",
     "username_required": "Masukkan nama pengguna.",

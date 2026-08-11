@@ -76,6 +76,18 @@ export default function GeneralSettings() {
         }}
       />
       <SettingCardLabel>
+        {t("settings.general.interface_motion")}
+      </SettingCardLabel>
+      <SettingCardSwitch
+        title={t("settings.general.reduce_motion")}
+        description={t("settings.general.reduce_motion_description")}
+        defaultChecked={Boolean(settings.reduce_motion)}
+        onChange={async (checked) => {
+          await updateSettingsWithToast({ reduce_motion: checked }, t);
+          await refetch();
+        }}
+      />
+      <SettingCardLabel>
         {t("settings.general.auto_discovery")}
       </SettingCardLabel>
       <ApiCard settings={settings} />

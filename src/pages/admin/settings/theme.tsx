@@ -707,7 +707,7 @@ const ThemePage = () => {
             </Flex>
           </Box>
 
-          <Flex gap="3" mt="4" justify="end">
+          <Flex gap="3" mt="4" justify="end" wrap="wrap" className="km-theme-preview-actions">
             <Dialog.Close>
               <Button variant="soft" color="gray">
                 {t("common.close")}

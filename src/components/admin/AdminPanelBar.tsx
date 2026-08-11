@@ -11,7 +11,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation /*useNavigate*/ } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ColorSwitch from "../ColorSwitch";
@@ -47,6 +47,8 @@ import {
   buildAdminMenuItems,
   toggleSingleSubMenu,
 } from "@/utils/adminMenu";
+import { useSettings } from "@/lib/api";
+import { preloadAdminRoute } from "@/routes";
 
 // 将JSON配置转换为类型安全的菜单项数组 (基础静态菜单)
 const parsedMenuConfig = menuConfig as {
@@ -58,14 +60,13 @@ const footerMenuItems = parsedMenuConfig.footer ?? [];
 const DESKTOP_SIDEBAR_WIDTH = 212;
 const MOBILE_SIDEBAR_WIDTH = "clamp(184px, 42vw, 244px)";
 const MOBILE_SIDEBAR_OPEN_TRANSITION = {
-  duration: 0.18,
-  ease: "easeOut",
+  duration: 0.22,
+  ease: [0.22, 1, 0.36, 1],
 } as const;
 const MOBILE_SIDEBAR_CLOSE_TRANSITION = {
-  duration: 0.16,
-  ease: "easeIn",
+  duration: 0.18,
+  ease: [0.4, 0, 1, 1],
 } as const;
-
 interface AdminPanelBarProps {
   content: ReactNode;
 }
@@ -301,6 +302,8 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   const ishttps = window.location.protocol === "https:";
   const [t, i18n] = useTranslation();
   const location = useLocation();
+  const { settings } = useSettings();
+  const reduceMotion = Boolean(settings.reduce_motion);
   const { publicInfo } = usePublicInfo();
   //const navigate = useNavigate();
   // 获取版本信息
@@ -333,6 +336,130 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
     () => buildAdminMenuItems(baseMenuItems, extraMenuItems),
     [extraMenuItems],
   );
+
+  useEffect(() => {
+    document.documentElement.dataset.reduceMotion = reduceMotion ? "true" : "false";
+    document.documentElement.dataset.adminShellActive = "true";
+    return () => {
+      delete document.documentElement.dataset.reduceMotion;
+      delete document.documentElement.dataset.adminShellActive;
+    };
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>("[data-admin-shell]");
+    if (!shell || reduceMotion) return;
+
+    const tabLists = new Set<HTMLElement>();
+    const scheduledFrames = new Map<HTMLElement, number>();
+
+    const updateIndicator = (list: HTMLElement) => {
+      scheduledFrames.delete(list);
+      const activeTab = list.querySelector<HTMLElement>(
+        '.rt-TabsTrigger[data-state="active"], [role="tab"][aria-selected="true"]',
+      );
+      if (!activeTab) return;
+
+      const listRect = list.getBoundingClientRect();
+      const tabRect = activeTab.getBoundingClientRect();
+      list.style.setProperty(
+        "--admin-tab-highlight-x",
+        `${tabRect.left - listRect.left + list.scrollLeft}px`,
+      );
+      list.style.setProperty("--admin-tab-highlight-width", `${tabRect.width}px`);
+      if (!list.hasAttribute("data-admin-tab-motion-ready")) {
+        window.requestAnimationFrame(() => {
+          if (list.isConnected) list.setAttribute("data-admin-tab-motion-ready", "true");
+        });
+      }
+    };
+
+    const scheduleIndicator = (list: HTMLElement) => {
+      const currentFrame = scheduledFrames.get(list);
+      if (currentFrame) window.cancelAnimationFrame(currentFrame);
+      scheduledFrames.set(
+        list,
+        window.requestAnimationFrame(() => updateIndicator(list)),
+      );
+    };
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => scheduleIndicator(entry.target as HTMLElement));
+    });
+
+    const registerTabList = (list: HTMLElement) => {
+      if (tabLists.has(list)) return;
+      tabLists.add(list);
+      resizeObserver.observe(list);
+      list.addEventListener("scroll", handleTabListScroll, { passive: true });
+      updateIndicator(list);
+    };
+
+    function handleTabListScroll(event: Event) {
+      scheduleIndicator(event.currentTarget as HTMLElement);
+    }
+
+    const registerTabListsWithin = (root: ParentNode) => {
+      root.querySelectorAll<HTMLElement>(".rt-TabsList").forEach(registerTabList);
+    };
+
+    registerTabListsWithin(shell);
+    const mutationObserver = new MutationObserver((records) => {
+      records.forEach((record) => {
+        if (record.type === "attributes") {
+          const list = (record.target as HTMLElement).closest<HTMLElement>(".rt-TabsList");
+          if (list) scheduleIndicator(list);
+          return;
+        }
+        record.addedNodes.forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          if (node.matches(".rt-TabsList")) registerTabList(node);
+          registerTabListsWithin(node);
+        });
+      });
+    });
+    mutationObserver.observe(shell, {
+      attributes: true,
+      attributeFilter: ["data-state", "aria-selected"],
+      childList: true,
+      subtree: true,
+    });
+
+    const handleResize = () => tabLists.forEach(scheduleIndicator);
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => {
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
+      scheduledFrames.forEach((frame) => window.cancelAnimationFrame(frame));
+      tabLists.forEach((list) => {
+        list.removeEventListener("scroll", handleTabListScroll);
+        list.removeAttribute("data-admin-tab-motion-ready");
+        list.style.removeProperty("--admin-tab-highlight-x");
+        list.style.removeProperty("--admin-tab-highlight-width");
+      });
+    };
+  }, [reduceMotion]);
+
+  const getAdminLinkTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return null;
+    const anchor = target.closest<HTMLAnchorElement>("a[href]");
+    if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) {
+      return null;
+    }
+    if (anchor.dataset.adminReloadDocument === "true") return null;
+    const url = new URL(anchor.href, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    if (url.pathname !== "/admin" && !url.pathname.startsWith("/admin/")) {
+      return null;
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  };
+
+  const preloadAdminLink = (target: EventTarget | null) => {
+    const href = getAdminLinkTarget(target);
+    if (href) void preloadAdminRoute(href);
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -508,7 +635,16 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   }, [location.pathname, menuItems]);
 
   // 侧边栏动画变体
-  const sidebarVariants = isMobile
+  const sidebarVariants = reduceMotion
+    ? {
+        open: { x: 0, opacity: 1, transition: { duration: 0 } },
+        closed: {
+          x: isMobile ? "-100%" : 0,
+          opacity: 1,
+          transition: { duration: 0 },
+        },
+      }
+    : isMobile
     ? {
         open: {
           x: 0,
@@ -546,14 +682,14 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
       opacity: 1,
       x: 0,
       transition: {
-        duration: 0.3,
+        duration: reduceMotion ? 0 : 0.3,
       },
     },
     closed: {
       opacity: 1,
       x: 0,
       transition: {
-        duration: 0.3,
+        duration: reduceMotion ? 0 : 0.3,
       },
     },
   };
@@ -698,6 +834,27 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
     items.map((item) => {
       const isOpen = openSubMenus[item.path];
       if (item.children?.length) {
+        const submenu = (
+          <Flex direction="column" className="ml-4 gap-1">
+            {item.children.map((child) => (
+              <SidebarItem
+                key={child.path}
+                to={child.path}
+                icon={renderIcon(
+                  child.icon,
+                  child.labelKey,
+                  "flex w-4 h-5 items-center justify-center",
+                )}
+                onClick={() => isMobile && setSidebarOpen(false)}
+                newTab={child.newTab}
+                reloadDocument={child.reloadDocument}
+              >
+                {child.rawLabel || t(child.labelKey)}
+              </SidebarItem>
+            ))}
+          </Flex>
+        );
+
         return (
           <div key={item.path}>
             <Flex
@@ -731,27 +888,10 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                   ? { height: "auto", opacity: 1 }
                   : { height: 0, opacity: 0 }
               }
-              transition={{ duration: 0.14 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.14 }}
               style={{ overflow: "hidden" }}
             >
-              <Flex direction="column" className="ml-4 gap-1">
-                {item.children.map((child) => (
-                  <SidebarItem
-                    key={child.path}
-                    to={child.path}
-                    icon={renderIcon(
-                      child.icon,
-                      child.labelKey,
-                      "flex w-4 h-5 items-center justify-center",
-                    )}
-                    onClick={() => isMobile && setSidebarOpen(false)}
-                    newTab={child.newTab}
-                    reloadDocument={child.reloadDocument}
-                  >
-                    {child.rawLabel || t(child.labelKey)}
-                  </SidebarItem>
-                ))}
-              </Flex>
+              {submenu}
             </motion.div>
           </div>
         );
@@ -777,17 +917,25 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
   return (
     <>
       <Grid
+        data-admin-shell
+        onPointerOverCapture={(event) => preloadAdminLink(event.target)}
+        onFocusCapture={(event) => preloadAdminLink(event.target)}
+        onTouchStartCapture={(event) => preloadAdminLink(event.target)}
         columns={{
           initial: "1fr",
           md: sidebarOpen
             ? `${DESKTOP_SIDEBAR_WIDTH}px 1fr`
             : "0px 1fr",
         }} // 动态调整网格列
-        rows={{ initial: "auto 1fr", md: "auto 1fr" }}
+        rows={{
+          initial: "auto minmax(0, 1fr)",
+          md: "auto minmax(0, 1fr)",
+        }}
         style={{
-          height: "100vh",
-          width: "100vw",
-          overflow: "auto",
+          height: "var(--app-viewport-height, 100vh)",
+          width: "100%",
+          overflow: "hidden",
+          overscrollBehavior: "none",
           backgroundColor: "var(--accent-1)",
           position: "relative",
         }}
@@ -967,9 +1115,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: reduceMotion ? 0 : 0.2 }}
               onClick={() => setSidebarOpen(false)}
-              className="absolute inset-0 z-[49] cursor-default border-0 bg-[var(--black-a6)] p-0"
+              className="absolute inset-0 z-[49] touch-none cursor-default border-0 bg-[var(--black-a6)] p-0"
             />
           )}
           <motion.div
@@ -992,6 +1140,8 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
               zIndex: isMobile ? 50 : 1,
               overflowY: "auto",
               overflowX: "hidden",
+              overscrollBehaviorY: "contain",
+              WebkitOverflowScrolling: "touch",
               willChange: isMobile ? "transform" : undefined,
               backfaceVisibility: isMobile ? "hidden" : undefined,
               pointerEvents: isMobile && !sidebarOpen ? "none" : "auto",
@@ -1077,6 +1227,7 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
             backgroundColor: "var(--accent-3)",
             display: "block",
             height: "100%", // Ensure the container takes full height
+            minHeight: 0,
             minWidth: 0,
             maxWidth: "100%",
             overflow: "hidden", // Prevent this container from scrolling
@@ -1089,7 +1240,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
               height: "100%",
               borderRadius: "0",
               padding: isMobile ? "8px" : "16px",
-              overflowY: "auto",
+              overflowY: isMobile && sidebarOpen ? "hidden" : "auto",
+              overscrollBehaviorY: "contain",
+              WebkitOverflowScrolling: "touch",
               boxSizing: "border-box",
             }}
           >
@@ -1112,7 +1265,9 @@ const AdminPanelBar = ({ content }: AdminPanelBarProps) => {
                 </Text>
               </Callout.Text>
             </Callout.Root>
-            {content}
+            <div data-admin-page-content style={{ minHeight: "100%" }}>
+              {content}
+            </div>
           </div>
         </motion.div>
       </Grid>
@@ -1146,11 +1301,15 @@ const SidebarItem = ({
     (location.pathname === to ||
       (to !== "/admin" && location.pathname.startsWith(to)));
   const openInNewTab = newTab === true || (isExternalLink && newTab !== false);
+  const preload = () => {
+    if (!isExternalLink && !reloadDocument) void preloadAdminRoute(to);
+  };
 
   if (openInNewTab || reloadDocument) {
     return (
       <a
         href={to}
+        data-admin-reload-document={reloadDocument ? "true" : undefined}
         onClick={onClick}
         target={openInNewTab ? "_blank" : undefined}
         rel={openInNewTab ? "noopener noreferrer" : undefined}
@@ -1187,6 +1346,9 @@ const SidebarItem = ({
   return (
     <Link
       to={to}
+      onPointerEnter={preload}
+      onFocus={preload}
+      onTouchStart={preload}
       onClick={onClick}
       className="group transition-colors duration-200 hover:bg-accent-3 rounded-md"
     >

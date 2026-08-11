@@ -17,7 +17,7 @@ import "./i18n/config";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { Suspense } from "react";
 import { useRoutes } from "react-router-dom";
-import { preloadAdminEntry, routes } from "./routes";
+import { preloadAdminEntry, preloadAdminRoutes, routes } from "./routes";
 import Loading from "./components/loading";
 import { PublicInfoProvider } from "./contexts/PublicInfoContext";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
@@ -42,12 +42,12 @@ const AdminRoutePreloader = () => {
     let fallbackHandle: number | undefined;
     const preloadWhenIdle = () => {
       if ("requestIdleCallback" in window) {
-        idleHandle = window.requestIdleCallback(() => preloadAdminEntry(), {
+        idleHandle = window.requestIdleCallback(() => void preloadAdminRoutes(), {
           timeout: 2000,
         });
         return;
       }
-      fallbackHandle = Number(globalThis.setTimeout(preloadAdminEntry, 800));
+      fallbackHandle = Number(globalThis.setTimeout(() => void preloadAdminRoutes(), 800));
     };
 
     if (document.readyState === "complete") {
@@ -129,7 +129,7 @@ const App = () => {
           className="theme-root"
           style={{
             backgroundColor: "transparent",
-            minHeight: "100vh",
+            minHeight: "var(--app-viewport-height, 100vh)",
           }}
         >
 		{isRestrictedGuideRoute ? (

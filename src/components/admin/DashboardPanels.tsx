@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -30,12 +30,20 @@ import {
 
 import { ChartContainer } from "@/components/ui/chart";
 import {
+  type DashboardAlertKind,
   type DashboardAlertSummary,
   type DashboardChartsData,
   type DashboardData,
   type DashboardDatabaseStatus,
   type DashboardResourceRankItem,
 } from "@/utils/dashboard";
+import {
+  dashboardAlertCategoryPath,
+  dashboardAlertDetailPath,
+  formatBillingAlertStatus,
+  prefetchDashboardAlertItems,
+  serverAlertKinds,
+} from "@/utils/adminAlertFilters";
 import { formatBytes } from "@/utils/unitHelper";
 import { readDashboardSession, writeDashboardSession } from "@/utils/dashboardSession";
 
@@ -293,42 +301,72 @@ function relativeTime(value: string | null, locale: string, fallback: string): s
   return formatter.format(Math.round(hours / 24), "day");
 }
 
-export function AlertOverviewPanel({ data, locale }: { data: DashboardData; locale: string }) {
+export function AlertOverviewPanel({
+  data,
+  locale,
+  accountKey = "authenticated",
+}: {
+  data: DashboardData;
+  locale: string;
+  accountKey?: string;
+}) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const prepareCategory = React.useCallback((kind: DashboardAlertKind) => {
+    if (serverAlertKinds.has(kind)) {
+      void prefetchDashboardAlertItems(kind, accountKey).catch(() => undefined);
+    }
+  }, [accountKey]);
+  const openCategory = React.useCallback(async (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    kind: DashboardAlertKind,
+    to: string,
+  ) => {
+    if (
+      !serverAlertKinds.has(kind)
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+    event.preventDefault();
+    try {
+      await prefetchDashboardAlertItems(kind, accountKey);
+    } catch {
+      // The destination page keeps its normal error handling if prefetch fails.
+    }
+    navigate(to);
+  }, [accountKey, navigate]);
   const items: Array<{
+    kind: DashboardAlertKind;
     label: string;
-    to: string;
     summary: DashboardAlertSummary;
     marker: string;
   }> = [
-    { label: t("admin_dashboard.alert_offline"), to: "/admin/notification/offline", summary: data.alerts.offline, marker: "bg-[var(--red-9)]" },
-    { label: t("admin_dashboard.alert_resource"), to: "/admin/notification/load", summary: data.alerts.resource, marker: "bg-[var(--orange-9)]" },
-    { label: t("admin_dashboard.alert_latency_loss"), to: "/admin/notification/ping-loss", summary: data.alerts.latency_loss, marker: "bg-[var(--orange-9)]" },
-    { label: t("admin_dashboard.alert_traffic"), to: "/admin/servers", summary: data.alerts.traffic, marker: "bg-[var(--accent-9)]" },
-    { label: t("admin_dashboard.alert_return_route"), to: "/admin/return-route", summary: data.alerts.return_route, marker: "bg-[var(--orange-9)]" },
-    { label: t("admin_dashboard.alert_billing"), to: "/admin/servers", summary: data.alerts.billing, marker: "bg-[var(--gray-8)]" },
+    { kind: "offline", label: t("admin_dashboard.alert_offline"), summary: data.alerts.offline, marker: "bg-[var(--red-9)]" },
+    { kind: "resource", label: t("admin_dashboard.alert_resource"), summary: data.alerts.resource, marker: "bg-[var(--orange-9)]" },
+    { kind: "latency_loss", label: t("admin_dashboard.alert_latency_loss"), summary: data.alerts.latency_loss, marker: "bg-[var(--orange-9)]" },
+    { kind: "traffic", label: t("admin_dashboard.alert_traffic"), summary: data.alerts.traffic, marker: "bg-[var(--accent-9)]" },
+    { kind: "return_route", label: t("admin_dashboard.alert_return_route"), summary: data.alerts.return_route, marker: "bg-[var(--orange-9)]" },
+    { kind: "billing", label: t("admin_dashboard.alert_billing"), summary: data.alerts.billing, marker: "bg-[var(--gray-8)]" },
   ];
   const available = items.filter((item) => !item.summary.error);
   const current = available.reduce((total, item) => total + item.summary.current, 0);
   const affected = available.reduce((total, item) => total + item.summary.affected_nodes, 0);
   const recovered = available.reduce((total, item) => total + item.summary.recovered_today, 0);
-  const latestItem = available
-    .filter((item) => item.summary.latest_alert?.occurred_at)
-    .sort((left, right) => (
-      new Date(right.summary.latest_alert?.occurred_at ?? 0).getTime()
-      - new Date(left.summary.latest_alert?.occurred_at ?? 0).getTime()
-    ))[0];
-  const latest = latestItem?.summary.latest_alert;
-  const latestText = [latest?.node_name, latest?.title].filter(Boolean).join(" · ");
 
   return (
-    <section className="rounded-md border bg-[var(--color-panel-solid)] p-3">
+    <section
+      className="flex h-full min-w-0 flex-col rounded-md border bg-[var(--color-panel-solid)] p-3"
+      style={{ containerType: "inline-size" }}
+    >
       <PanelHeader
         title={t("admin_dashboard.alerts_overview")}
         description={t("admin_dashboard.alerts_overview_hint")}
         trailing={<BellRing size={18} className="mt-0.5 text-muted-foreground" />}
       />
-      <div className="grid grid-cols-3 divide-x border-b pb-3">
+      <div className="grid grid-cols-3 divide-x pb-3">
         {[
           [t("admin_dashboard.current_alerts"), current, "text-[var(--red-11)]"],
           [t("admin_dashboard.affected_nodes"), affected, "text-[var(--orange-11)]"],
@@ -340,34 +378,77 @@ export function AlertOverviewPanel({ data, locale }: { data: DashboardData; loca
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b py-3">
-        {items.map((item) => (
-          <Link
-            key={item.label}
-            to={item.to}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-sm text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--accent-8)]"
-          >
-            <span className={`size-1.5 shrink-0 rounded-full ${item.marker}`} />
-            <span className="whitespace-nowrap">{item.label}</span>
-            <strong className="shrink-0 font-semibold tabular-nums text-foreground">
-              {item.summary.error ? "-" : item.summary.current}
-            </strong>
-          </Link>
-        ))}
-      </div>
-      <div className="flex min-h-10 items-center justify-between gap-3 pt-2.5 text-xs">
-        <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">
-            {latestText || t("admin_dashboard.no_recent_alert")}
-          </div>
-          {latestItem ? <div className="mt-0.5 truncate text-muted-foreground">{latestItem.label}</div> : null}
-        </div>
-        {latest?.occurred_at ? (
-          <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-            <Clock3 size={12} />
-            {relativeTime(latest.occurred_at, locale, t("admin_dashboard.not_available"))}
-          </span>
-        ) : null}
+      <div className="dashboard-alert-grid grid flex-1 auto-rows-fr">
+        {items.map((item) => {
+          const latest = item.summary.latest_alert;
+          const categoryTo = dashboardAlertCategoryPath(item.kind);
+          const detailTo = dashboardAlertDetailPath(item.kind, latest);
+          const detailSummary = item.kind === "billing"
+            ? formatBillingAlertStatus(latest?.due_at, locale)
+            : item.kind === "offline"
+              ? item.label
+              : item.kind === "latency_loss"
+                ? latest?.task_name || item.label
+                : latest?.title || item.label;
+          return (
+            <div
+              key={item.kind}
+              className="flex min-h-16 min-w-0 flex-col justify-start gap-1.5 border-t border-[var(--gray-a5)] px-1 py-3"
+            >
+              <Link
+                to={categoryTo}
+                onPointerEnter={() => prepareCategory(item.kind)}
+                onFocus={() => prepareCategory(item.kind)}
+                onTouchStart={() => prepareCategory(item.kind)}
+                onClick={(event) => void openCategory(event, item.kind, categoryTo)}
+                className="flex min-w-0 items-start justify-between gap-2 rounded-sm text-xs outline-none hover:text-[var(--accent-11)] focus-visible:ring-2 focus-visible:ring-[var(--accent-8)]"
+              >
+                <span className="flex min-w-0 items-start gap-1.5 font-medium">
+                  <span className={`mt-1 size-1.5 shrink-0 rounded-full ${item.marker}`} />
+                  <span className="break-words leading-4">{item.label}</span>
+                </span>
+                <strong className="shrink-0 font-semibold tabular-nums text-foreground">
+                  {item.summary.error ? "-" : item.summary.current}
+                </strong>
+              </Link>
+              {item.summary.error ? (
+                <span className="break-words text-[11px] leading-4 text-[var(--red-11)]">
+                  {t("admin_dashboard.not_available")}
+                </span>
+              ) : item.summary.current === 0 ? (
+                <span className="flex items-center gap-1 text-[11px] leading-4 text-[var(--green-11)]">
+                  <CheckCircle2 size={12} className="shrink-0" />
+                  {t("admin_dashboard.alert_normal", "正常")}
+                </span>
+              ) : latest ? (
+                <Link
+                  to={detailTo}
+                  className="min-w-0 break-words rounded-sm text-[11px] leading-4 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-[var(--accent-8)]"
+                >
+                  <span className="font-medium text-foreground">{latest.node_name || latest.task_name || item.label}</span>
+                  {detailSummary ? <span> · {detailSummary}</span> : null}
+                  {latest.occurred_at ? (
+                    <span className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <Clock3 size={10} />
+                      {relativeTime(latest.occurred_at, locale, t("admin_dashboard.not_available"))}
+                    </span>
+                  ) : null}
+                </Link>
+              ) : (
+                <Link
+                  to={categoryTo}
+                  onPointerEnter={() => prepareCategory(item.kind)}
+                  onFocus={() => prepareCategory(item.kind)}
+                  onTouchStart={() => prepareCategory(item.kind)}
+                  onClick={(event) => void openCategory(event, item.kind, categoryTo)}
+                  className="break-words text-[11px] leading-4 text-muted-foreground hover:text-foreground"
+                >
+                  {t("admin_dashboard.affected_nodes", { count: item.summary.affected_nodes })}
+                </Link>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

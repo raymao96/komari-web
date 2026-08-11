@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Checkbox, Flex, Text, TextField } from "@radix-ui/themes";
+import { Button, Flex, Text, TextField } from "@radix-ui/themes";
 import { ListChecks, Search } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,7 @@ import {
   AdminPagination,
   useAdminPagination,
 } from "@/components/admin/AdminPagination";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,

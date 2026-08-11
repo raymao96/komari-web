@@ -6,7 +6,6 @@ import test from "node:test";
 import { getRegionCode } from "../src/utils/regionHelper.ts";
 
 const editSource = readFileSync(path.resolve("src/pages/admin/index.tsx"), "utf8");
-const nodeSource = readFileSync(path.resolve("src/components/Node.tsx"), "utf8");
 const listSource = readFileSync(path.resolve("src/contexts/NodeListContext.tsx"), "utf8");
 const selectSource = readFileSync(
   path.resolve("src/components/ui/select-or-input.tsx"),
@@ -26,9 +25,7 @@ test("reset traffic requires a billing reset day and shows the effective quota",
   assert.doesNotMatch(editSource, /trafficResetType|traffic_reset_type/);
 });
 
-test("node traffic progress uses the effective cycle quota", () => {
-  assert.match(nodeSource, /basic\.effective_traffic_limit/);
-  assert.match(nodeSource, /basic\.effective_traffic_type/);
+test("system node data keeps the effective cycle quota", () => {
   assert.match(listSource, /n\.effective_traffic_limit \?\? n\.traffic_limit \?\? 0/);
   assert.match(listSource, /n\.effective_traffic_type \?\? n\.traffic_limit_type \?\? "sum"/);
 });

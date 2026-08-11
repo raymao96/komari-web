@@ -6,6 +6,7 @@ import {
   writeDashboardSession,
   type DashboardSessionStorage,
 } from "../src/utils/dashboardSession.ts";
+import { readFileSync } from "node:fs";
 
 function memoryStorage(): DashboardSessionStorage {
   const values = new Map<string, string>();
@@ -37,4 +38,24 @@ test("dashboard session snapshots expire without blocking rendering", () => {
     now: 3001,
     maxAgeMs: 2000,
   }), null);
+});
+
+test("dashboard view snapshots keep only the scroll position and module anchor", () => {
+  const storage = memoryStorage();
+  const view = { scrollTop: 820, moduleId: "alerts", moduleOffset: 148 };
+  writeDashboardSession("view", "admin-a", "overview", view, { storage, now: 1000 });
+  assert.deepEqual(
+    readDashboardSession("view", "admin-a", "overview", { storage, now: 1500 }),
+    view,
+  );
+});
+
+test("dashboard restores the clicked module after layout stabilization without scroll listeners", () => {
+  const source = readFileSync("src/pages/admin/dashboard.tsx", "utf8");
+  assert.match(source, /data-dashboard-module=/);
+  assert.match(source, /moduleOffset: moduleElement\.getBoundingClientRect\(\)\.top/);
+  assert.match(source, /window\.requestAnimationFrame\(restore\)/);
+  assert.match(source, /window\.addEventListener\("pagehide", saveBeforePageHide\)/);
+  assert.match(source, /document\.addEventListener\("visibilitychange", saveWhenHidden\)/);
+  assert.doesNotMatch(source, /addEventListener\("scroll"/);
 });

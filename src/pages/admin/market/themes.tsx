@@ -220,9 +220,6 @@ export default function ThemeMarketPage() {
   const uninstallTheme = async (theme: MarketTheme) => {
     setDeletingTheme(theme.short);
     try {
-      if (currentTheme === theme.short) {
-        await request("/api/admin/theme/set?theme=default");
-      }
       await request("/api/admin/theme/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

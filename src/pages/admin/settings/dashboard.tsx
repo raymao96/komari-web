@@ -2,11 +2,11 @@ import React from "react";
 import {
   Button,
   Callout,
-  Checkbox,
   IconButton,
   Select,
   Tooltip,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DndContext,
   KeyboardSensor,

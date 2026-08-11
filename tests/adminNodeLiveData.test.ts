@@ -41,7 +41,7 @@ test("admin node table keeps persisted ordering and prioritizes identity and bil
   assert.match(pageSource, /w-\[224px\].*admin\.nodeTable\.billing/);
   assert.match(pageSource, /nodeTable\.agent[\s\S]*publicVersion\(node\.version\)/);
   assert.match(pageSource, /admin-node-country-flag/);
-  assert.match(pageSource, /reorderEnabled=\{!searchTerm\.trim\(\) && statusFilter === "all"\}/);
+  assert.match(pageSource, /reorderEnabled=\{!searchTerm\.trim\(\) && statusFilter === "all" && !routeNode && !routeAlert\}/);
   assert.doesNotMatch(pageSource, /selectedNodes|handleSelectAll|handleSelectNode/);
 });
 
@@ -97,9 +97,18 @@ test("all admin information lists share configurable pagination", () => {
   assert.match(pingTaskSource, /destinationPage = page \+ 1/);
 });
 
+test("theme deletion lets the backend choose an installed fallback", () => {
+  assert.match(marketSource, /request\("\/api\/admin\/theme\/delete"/);
+  assert.doesNotMatch(marketSource, /theme\/set\?theme=default/);
+});
+
 test("admin node toolbar aligns status left and search actions right", () => {
   assert.match(pageSource, /<AdminNodeStatusSummary/);
   assert.match(statusSummarySource, /aria-pressed=\{value === filter\}/);
+  assert.match(statusSummarySource, /useReduceMotionPreference\(\)/);
+  assert.doesNotMatch(statusSummarySource, /useSettings\(\)/);
+  assert.match(statusSummarySource, /layoutId=\{reduceMotion \? undefined : "admin-node-status-highlight"\}/);
+  assert.match(statusSummarySource, /whileTap=\{reduceMotion \? undefined/);
   assert.match(statusSummarySource, /onClick=\{\(\) => onValueChange\(filter\)\}/);
   assert.match(pageSource, /flex flex-col gap-3 md:flex-row md:items-end md:justify-between/);
   assert.match(pageSource, /showStatusSummary[\s\S]*md:ml-auto md:w-auto/);
@@ -207,6 +216,24 @@ test("admin tables align selection controls and use available text width", () =>
   assert.match(pingTaskSource, /admin-responsive-table admin-sortable-table/);
   assert.match(pingTaskSource, /admin-card-actions admin-dual-actions flex items-center gap-3/);
   assert.match(loadSource, /admin-card-actions admin-dual-actions flex items-center gap-3/);
+});
+
+test("load notifications support default-on in add and edit flows", () => {
+  assert.match(
+    loadSource,
+    /import \{ Checkbox \} from "@\/components\/ui\/checkbox"/,
+  );
+  assert.match(loadSource, /default_on: alert\.default_on \?\? false/);
+  assert.match(loadSource, /default_on: newForm\.default_on/);
+  assert.match(
+    loadSource,
+    /if \(!newForm\.default_on && newForm\.clients\.length === 0\)/,
+  );
+  assert.match(loadSource, /const \[defaultOn, setDefaultOn\] = React\.useState\(false\)/);
+  assert.match(loadSource, /default_on: defaultOn/);
+  assert.match(loadSource, /checked=\{form\.default_on\}/);
+  assert.match(loadSource, /checked=\{defaultOn\}/);
+  assert.match(loadSource, /ping\.default_on_description/);
 });
 
 test("batch selection uses one responsive toolbar instead of header checkboxes", () => {

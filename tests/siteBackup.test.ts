@@ -40,6 +40,12 @@ test("global list pagination is configured under general settings", () => {
   assert.equal(locales.zhCN.settings.general.admin_default_page_size, "列表默认分页");
 });
 
+test("general settings exposes the Komari motion preference", () => {
+  assert.match(generalSource, /settings\.general\.reduce_motion/);
+  assert.match(generalSource, /reduce_motion: checked/);
+  assert.equal(locales.zhCN.settings.general.reduce_motion, "减少动态效果");
+});
+
 test("auto discovery help opens the dedicated agent guide", () => {
   assert.match(
     generalSource,

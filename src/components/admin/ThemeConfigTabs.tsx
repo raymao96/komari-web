@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Box, Flex, Heading, Tabs } from "@radix-ui/themes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import {
   SettingCardLongTextInput,
@@ -20,6 +21,7 @@ import {
   groupThemeConfigFields,
   type ThemeConfigTabField,
 } from "@/utils/themeConfigTabs";
+import { useSettings } from "@/lib/api";
 
 interface ThemeConfigTabsProps {
   fields: ThemeConfigTabField[];
@@ -37,8 +39,11 @@ const ThemeConfigTabs = ({
   footer,
 }: ThemeConfigTabsProps) => {
   const { t } = useTranslation();
+  const { settings } = useSettings();
+  const reduceMotion = Boolean(settings.reduce_motion);
   const groups = useMemo(() => groupThemeConfigFields(fields), [fields]);
   const [activeTab, setActiveTab] = useState(0);
+  const [tabDirection, setTabDirection] = useState(1);
   const [scrollEdges, setScrollEdges] = useState({ left: false, right: false });
   const tabsListRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -80,25 +85,32 @@ const ThemeConfigTabs = ({
     const listRect = list.getBoundingClientRect();
     const tabRect = tab.getBoundingClientRect();
     if (tabRect.left < listRect.left) {
-      list.scrollBy({ left: tabRect.left - listRect.left - 12, behavior: "smooth" });
+      list.scrollBy({
+        left: tabRect.left - listRect.left - 12,
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
     } else if (tabRect.right > listRect.right) {
-      list.scrollBy({ left: tabRect.right - listRect.right + 12, behavior: "smooth" });
+      list.scrollBy({
+        left: tabRect.right - listRect.right + 12,
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
     }
     window.requestAnimationFrame(updateScrollEdges);
-  }, [activeTab, updateScrollEdges]);
+  }, [activeTab, reduceMotion, updateScrollEdges]);
 
   const scrollTabs = (direction: -1 | 1) => {
     const list = tabsListRef.current;
     if (!list) return;
     list.scrollBy({
       left: direction * Math.max(160, list.clientWidth * 0.7),
-      behavior: "smooth",
+      behavior: reduceMotion ? "auto" : "smooth",
     });
   };
 
   const handleTabChange = (value: string) => {
     const index = Number(value);
     if (Number.isNaN(index) || index < 0 || index >= groups.length) return;
+    setTabDirection(index >= currentTab ? 1 : -1);
     setActiveTab(index);
   };
 
@@ -257,7 +269,17 @@ const ThemeConfigTabs = ({
       )}
 
       {activeGroup && (
-        <Box className="km-theme-config-section">
+        <motion.div
+          key={currentTab}
+          className="km-theme-config-section"
+          initial={reduceMotion ? false : { opacity: 0.35, x: tabDirection * 8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+          }
+        >
           {activeGroup.title && (
             <Heading size="3">
               {resolveText(activeGroup.title) || t("common.title")}
@@ -266,7 +288,7 @@ const ThemeConfigTabs = ({
           <Flex direction="column" gap="3" className="mt-5 mb-3">
             {activeGroup.items.map(renderField)}
           </Flex>
-        </Box>
+        </motion.div>
       )}
       {footer}
     </Flex>

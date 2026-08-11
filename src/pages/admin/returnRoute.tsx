@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AdminActiveFilter from "@/components/admin/AdminActiveFilter";
 import {
   AdminPagination,
 } from "@/components/admin/AdminPagination";
@@ -12,17 +13,21 @@ import {
   Dialog,
   Flex,
   IconButton,
+  Popover,
   Select,
   Switch,
   Tabs,
   Text,
   TextField,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Activity,
   AlertTriangle,
   BookOpen,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Download,
   History,
   Pencil,
@@ -36,11 +41,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import Loading from "@/components/loading";
-import {
-  NodeDetailsProvider,
-  useNodeDetails,
-} from "@/contexts/NodeDetailsContext";
+import { useNodeDetails } from "@/contexts/NodeDetailsContext";
+import { useAccount } from "@/contexts/AccountContext";
 
 type Task = {
   id?: number;
@@ -68,6 +72,23 @@ type TaskForm = Omit<Task, "interval" | "switch_confirm" | "recovery_confirm" | 
   recovery_confirm: string;
   cooldown: string;
 };
+
+type TaskBatchForm = Pick<
+  TaskForm,
+  | "carrier"
+  | "region"
+  | "target"
+  | "ip_version"
+  | "expected_line"
+  | "protocol"
+  | "interval"
+  | "switch_confirm"
+  | "recovery_confirm"
+  | "cooldown"
+  | "notify"
+  | "notify_recovery"
+  | "enabled"
+>;
 
 type Status = {
   task_id: number;
@@ -132,6 +153,26 @@ type RuleStatus = {
 };
 type RuleView = { status: RuleStatus; rules: RuleDocument };
 
+const returnRouteTaskSnapshots = new Map<string, TaskPage>();
+const returnRouteSummarySnapshots = new Map<string, SummaryData>();
+
+function returnRouteTaskSnapshotKey(
+  accountKey: string,
+  query: { page: number; page_size: number; keyword: string; carrier: string; state: string },
+  routeState: string,
+  routeTask: number,
+) {
+  return JSON.stringify([
+    accountKey,
+    query.page,
+    query.page_size,
+    query.keyword,
+    query.carrier,
+    routeTask ? "" : routeState || query.state,
+    routeTask || 0,
+  ]);
+}
+
 const defaults: Task = {
   name: "",
   client: "",
@@ -171,6 +212,35 @@ function toTaskPayload(form: TaskForm): Task {
   };
 }
 
+function toTaskBatchForm(task: Task): TaskBatchForm {
+  const form = toTaskForm(task);
+  return {
+    carrier: form.carrier,
+    region: form.region,
+    target: form.target,
+    ip_version: form.ip_version,
+    expected_line: form.expected_line,
+    protocol: form.protocol,
+    interval: form.interval,
+    switch_confirm: form.switch_confirm,
+    recovery_confirm: form.recovery_confirm,
+    cooldown: form.cooldown,
+    notify: form.notify,
+    notify_recovery: form.notify_recovery,
+    enabled: form.enabled,
+  };
+}
+
+function toTaskBatchPayload(form: TaskBatchForm) {
+  return {
+    ...form,
+    interval: Number(form.interval),
+    switch_confirm: Number(form.switch_confirm),
+    recovery_confirm: Number(form.recovery_confirm),
+    cooldown: Number(form.cooldown),
+  };
+}
+
 const lineOptions: Record<Task["carrier"], string[]> = {
   mobile: ["CMIN2", "CMI", "CMNET"],
   telecom: ["CN2 GIA", "CN2 GT", "163"],
@@ -192,6 +262,7 @@ const ruleGroupNames: Record<string, string> = {
 const ruleGroupOrder = ["cmin2", "cmi", "cmnet", "cn2_global", "cn2_backbone", "telecom_163", "unicom_10099", "unicom_9929", "unicom_4837"];
 
 const allLineOptions = Object.values(lineOptions).flat();
+const pendingLineOptions = new Set(["CN2 待确认", "CUG 待确认"]);
 
 const regionOptions = ["华北", "东北", "华东", "华中", "华南", "西南", "西北", "港澳台", "其他"];
 
@@ -233,6 +304,102 @@ function formatTime(value?: string) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("zh-CN", { hour12: false });
 }
 
+function MultiNodeSelect({
+  nodes,
+  value,
+  onChange,
+}: {
+  nodes: Array<{ uuid: string; name: string }>;
+  value: string[];
+  onChange: (clients: string[]) => void;
+}) {
+  const listboxRef = useRef<HTMLDivElement>(null);
+  const selected = useMemo(() => new Set(value), [value]);
+  const selectedNames = value.map(
+    (uuid) => nodes.find((node) => node.uuid === uuid)?.name || uuid,
+  );
+  const triggerLabel = selectedNames.length > 0
+    ? selectedNames.join("、")
+    : "选择服务器（支持多选）";
+
+  const toggle = (uuid: string) => {
+    if (selected.has(uuid)) {
+      onChange(value.filter((item) => item !== uuid));
+    } else {
+      onChange([...value, uuid]);
+    }
+  };
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger>
+        <button
+          type="button"
+          className="rt-reset rt-SelectTrigger rt-r-size-2 rt-variant-surface w-full"
+          aria-label="选择探测节点"
+        >
+          <span
+            className={`rt-SelectTriggerInner ${selectedNames.length === 0 ? "text-[var(--gray-a10)]" : ""}`}
+          >
+            {triggerLabel}
+          </span>
+          <ChevronDown className="rt-SelectIcon" size={14} aria-hidden="true" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Content
+        align="start"
+        sideOffset={4}
+        style={{
+          padding: 4,
+          width: "var(--radix-popover-trigger-width)",
+          minWidth: 260,
+          maxWidth: "min(420px, calc(100vw - 24px))",
+        }}
+      >
+        <div
+          ref={listboxRef}
+          tabIndex={-1}
+          className="max-h-[320px] overflow-y-auto py-1 focus:outline-none"
+          role="listbox"
+          aria-multiselectable="true"
+        >
+          {nodes.length === 0 ? (
+            <Text as="div" size="2" color="gray" className="px-3 py-2">
+              暂无可选服务器
+            </Text>
+          ) : nodes.map((node) => {
+            const checked = selected.has(node.uuid);
+            return (
+              <button
+                key={node.uuid}
+                type="button"
+                role="option"
+                aria-selected={checked}
+                data-state={checked ? "checked" : "unchecked"}
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-normal text-[var(--gray-12)] transition-colors duration-150 hover:bg-[var(--accent-9)] hover:text-[var(--accent-contrast)] focus-visible:bg-[var(--accent-9)] focus-visible:text-[var(--accent-contrast)] focus-visible:outline-none"
+                onClick={(event) => {
+                  toggle(node.uuid);
+                  if (event.detail > 0) {
+                    listboxRef.current?.focus({ preventScroll: true });
+                  }
+                }}
+              >
+                <span
+                  className="flex size-4 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  {checked ? <Check size={16} strokeWidth={2.5} /> : null}
+                </span>
+                <span className="min-w-0 truncate">{node.name || node.uuid}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Popover.Content>
+    </Popover.Root>
+  );
+}
+
 function RouteTaskDialog({
   task,
   nodes,
@@ -247,9 +414,15 @@ function RouteTaskDialog({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<TaskForm>(() => toTaskForm(task));
+  const [selectedClients, setSelectedClients] = useState<string[]>(() =>
+    task?.client ? [task.client] : [],
+  );
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) setForm(toTaskForm(task));
+    if (nextOpen) {
+      setForm(toTaskForm(task));
+      setSelectedClients(task?.client ? [task.client] : []);
+    }
     setOpen(nextOpen);
   };
 
@@ -262,19 +435,38 @@ function RouteTaskDialog({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.name.trim() || !form.client.trim() || !form.target.trim() || !form.expected_line.trim()) {
+    const clients = task?.id ? [form.client] : selectedClients;
+    if (!form.name.trim() || clients.length === 0 || !form.target.trim() || !form.expected_line.trim()) {
       toast.error("任务名称、客户端、探测目标和预期线路为必填项");
       return;
     }
     setSaving(true);
     try {
-      const result = await request(task?.id ? "/edit" : "/add", toTaskPayload(form));
       if (task?.id) {
+        await request("/edit", toTaskPayload(form));
         toast.success("任务已更新");
-      } else if (result?.dispatched) {
-        toast.success("任务已创建，首次探测已下发，通常 30 秒内返回");
       } else {
-        toast.success("任务已创建，将在节点连接后按周期探测");
+        let dispatched = 0;
+        for (const client of clients) {
+          const result = await request(
+            "/add",
+            toTaskPayload({ ...form, client }),
+          );
+          if (result?.dispatched) dispatched += 1;
+        }
+        if (dispatched === clients.length) {
+          toast.success(
+            `已为 ${clients.length} 台节点创建任务，首次探测已下发`,
+          );
+        } else if (dispatched > 0) {
+          toast.success(
+            `已创建 ${clients.length} 个任务，其中 ${dispatched} 个已下发首次探测`,
+          );
+        } else {
+          toast.success(
+            `已为 ${clients.length} 台节点创建任务，将在节点连接后按周期探测`,
+          );
+        }
       }
       setOpen(false);
       onSaved();
@@ -304,10 +496,18 @@ function RouteTaskDialog({
               <TextField.Root required value={form.name} placeholder="例如：东京到上海移动" onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </Field>
             <Field label="探测节点">
-              <Select.Root value={form.client || undefined} onValueChange={(client) => setForm({ ...form, client })}>
-                <Select.Trigger placeholder="选择服务器" className="w-full" />
-                <Select.Content>{nodes.map((node) => <Select.Item key={node.uuid} value={node.uuid}>{node.name || node.uuid}</Select.Item>)}</Select.Content>
-              </Select.Root>
+              {task?.id ? (
+                <Select.Root value={form.client || undefined} onValueChange={(client) => setForm({ ...form, client })}>
+                  <Select.Trigger placeholder="选择服务器" className="w-full" />
+                  <Select.Content>{nodes.map((node) => <Select.Item key={node.uuid} value={node.uuid}>{node.name || node.uuid}</Select.Item>)}</Select.Content>
+                </Select.Root>
+              ) : (
+                <MultiNodeSelect
+                  nodes={nodes}
+                  value={selectedClients}
+                  onChange={setSelectedClients}
+                />
+              )}
             </Field>
             <Field label="运营商">
               <Select.Root value={form.carrier} onValueChange={(value) => setCarrier(value as Task["carrier"])}>
@@ -373,6 +573,132 @@ function RouteTaskDialog({
   );
 }
 
+function RouteTaskBatchDialog({
+  tasks,
+  onSaved,
+  onClear,
+  children,
+}: {
+  tasks: Task[];
+  onSaved: () => void;
+  onClear: () => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<TaskBatchForm>(() =>
+    toTaskBatchForm(tasks[0] || defaults),
+  );
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen && tasks.length > 0) {
+      setForm(toTaskBatchForm(tasks[0]));
+    }
+    setOpen(nextOpen);
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const ids = tasks.flatMap((task) => task.id ? [task.id] : []);
+    if (ids.length === 0 || !form.target.trim() || !form.expected_line.trim()) {
+      toast.error("请选择任务并填写探测目标和预期线路");
+      return;
+    }
+    setSaving(true);
+    try {
+      await request("/edit/batch", { ids, ...toTaskBatchPayload(form) });
+      toast.success(`已批量更新 ${ids.length} 个任务`);
+      setOpen(false);
+      onClear();
+      onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "批量修改失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
+      <Dialog.Trigger>{children}</Dialog.Trigger>
+      <Dialog.Content maxWidth="760px">
+        <Dialog.Title>批量修改回程监测</Dialog.Title>
+        <Dialog.Description size="2" color="gray">
+          已选择 {tasks.length} 个任务。下列配置会同步更新，任务名称和各自的探测节点保持不变。
+        </Dialog.Description>
+        <div className="mt-3 flex max-h-20 flex-wrap gap-1.5 overflow-y-auto rounded-md bg-[var(--gray-a2)] p-2">
+          {tasks.map((task) => (
+            <Badge key={task.id} color="gray" variant="soft">
+              {task.name} · {task.client_info?.name || task.client}
+            </Badge>
+          ))}
+        </div>
+        <form onSubmit={submit} className="mt-5 space-y-6">
+          <FormSection title="探测配置">
+            <Field label="运营商">
+              <Select.Root value={form.carrier} onValueChange={(carrier) => setForm({ ...form, carrier: carrier as Task["carrier"] })}>
+                <Select.Trigger className="w-full" />
+                <Select.Content>{Object.entries(carrierNames).map(([value, label]) => <Select.Item key={value} value={value}>{label}</Select.Item>)}</Select.Content>
+              </Select.Root>
+            </Field>
+            <Field label="地区（仅用于标记）">
+              <Select.Root value={form.region || undefined} onValueChange={(region) => setForm({ ...form, region })}>
+                <Select.Trigger placeholder="选择地区" className="w-full" />
+                <Select.Content>{regionOptions.map((region) => <Select.Item key={region} value={region}>{region}</Select.Item>)}</Select.Content>
+              </Select.Root>
+            </Field>
+            <Field label="目标 IP 或域名">
+              <TextField.Root required value={form.target} placeholder="运营商测试目标" onChange={(event) => setForm({ ...form, target: event.target.value })} />
+            </Field>
+            <Field label="地址类型">
+              <Select.Root value={String(form.ip_version)} onValueChange={(value) => setForm({ ...form, ip_version: Number(value) })}>
+                <Select.Trigger className="w-full" />
+                <Select.Content><Select.Item value="4">IPv4</Select.Item><Select.Item value="6">IPv6</Select.Item></Select.Content>
+              </Select.Root>
+            </Field>
+          </FormSection>
+
+          <FormSection title="判定规则">
+            <Field label="预期线路">
+              <Select.Root value={form.expected_line} onValueChange={(expected_line) => setForm({ ...form, expected_line })}>
+                <Select.Trigger className="w-full" />
+                <Select.Content>{allLineOptions.map((line) => <Select.Item key={line} value={line}>{line}</Select.Item>)}</Select.Content>
+              </Select.Root>
+            </Field>
+            <Field label="探测协议">
+              <Select.Root value="icmp" disabled><Select.Trigger className="w-full" /><Select.Content><Select.Item value="icmp">内置 ICMP（推荐）</Select.Item></Select.Content></Select.Root>
+            </Field>
+            <Field label="探测间隔（秒）">
+              <TextField.Root required type="number" min="60" max="86400" step="1" value={form.interval} onChange={(event) => setForm({ ...form, interval: event.target.value })} />
+            </Field>
+            <Field label="切线确认次数">
+              <TextField.Root required type="number" min="1" max="20" step="1" value={form.switch_confirm} onChange={(event) => setForm({ ...form, switch_confirm: event.target.value })} />
+            </Field>
+            <Field label="恢复确认次数">
+              <TextField.Root required type="number" min="1" max="20" step="1" value={form.recovery_confirm} onChange={(event) => setForm({ ...form, recovery_confirm: event.target.value })} />
+            </Field>
+          </FormSection>
+
+          <FormSection title="通知与状态">
+            <Field label="切线通知冷却时间（秒）">
+              <TextField.Root required type="number" min="0" max="604800" step="1" value={form.cooldown} onChange={(event) => setForm({ ...form, cooldown: event.target.value })} />
+            </Field>
+            <div className="flex flex-col justify-end gap-3 pb-1">
+              <label className="flex items-center justify-between gap-3 text-sm"><span>发送切线通知</span><Switch checked={form.notify} onCheckedChange={(notify) => setForm({ ...form, notify })} /></label>
+              <label className="flex items-center justify-between gap-3 text-sm"><span>发送恢复通知</span><Switch checked={form.notify_recovery} onCheckedChange={(notify_recovery) => setForm({ ...form, notify_recovery })} /></label>
+              <label className="flex items-center justify-between gap-3 text-sm"><span>启用任务</span><Switch checked={form.enabled} onCheckedChange={(enabled) => setForm({ ...form, enabled })} /></label>
+            </div>
+          </FormSection>
+          <Flex justify="end" gap="3" mt="6">
+            <Dialog.Close><Button type="button" variant="soft" color="gray">取消</Button></Dialog.Close>
+            <Button type="submit" loading={saving}>保存到 {tasks.length} 个任务</Button>
+          </Flex>
+        </form>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="flex min-w-0 flex-col gap-1.5"><Text size="2" weight="medium">{label}</Text>{children}</label>;
 }
@@ -383,18 +709,30 @@ function FormSection({ title, children }: { title: string; children: React.React
 
 function ReturnRouteContent() {
   const { t } = useTranslation();
+  const { account } = useAccount();
+  const accountKey = account?.uuid || account?.username || "authenticated";
+  const [searchParams] = useSearchParams();
+  const routeState = searchParams.get("state")?.trim() || "";
+  const routeTask = Number(searchParams.get("task") || 0);
   const defaultPageSize = useAdminDefaultPageSize();
   const { nodeDetail, isLoading: nodesLoading } = useNodeDetails();
   const nodes = Array.isArray(nodeDetail) ? nodeDetail.map((node) => ({ uuid: node.uuid, name: node.name })) : [];
   const [activeTab, setActiveTab] = useState<"tasks" | "records" | "rules">("tasks");
   const [taskQuery, setTaskQuery] = useState({ page: 1, page_size: defaultPageSize, keyword: "", carrier: "", state: "" });
+  const taskSnapshotKey = useMemo(
+    () => returnRouteTaskSnapshotKey(accountKey, taskQuery, routeState, routeTask),
+    [accountKey, routeState, routeTask, taskQuery],
+  );
+  const initialTaskSnapshot = returnRouteTaskSnapshots.get(taskSnapshotKey);
   const [recordQuery, setRecordQuery] = useState({ page: 1, page_size: defaultPageSize, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" });
-  const [taskData, setTaskData] = useState<TaskPage>({ tasks: [], statuses: [], probing_task_ids: [], total: 0, page: 1, page_size: defaultPageSize });
+  const [taskData, setTaskData] = useState<TaskPage>(() => initialTaskSnapshot || { tasks: [], statuses: [], probing_task_ids: [], total: 0, page: 1, page_size: defaultPageSize });
   const [recordData, setRecordData] = useState<RecordPage>({ events: [], total: 0, page: 1, page_size: defaultPageSize });
-  const [summary, setSummary] = useState<SummaryData>({ tasks: 0, healthy: 0, switched: 0, recent_events: 0 });
-  const [taskLoading, setTaskLoading] = useState(true);
+  const [summary, setSummary] = useState<SummaryData>(() => returnRouteSummarySnapshots.get(accountKey) || { tasks: 0, healthy: 0, switched: 0, recent_events: 0 });
+  const [taskLoading, setTaskLoading] = useState(() => !initialTaskSnapshot);
+  const hasRenderedTaskData = useRef(Boolean(initialTaskSnapshot));
   const [recordLoading, setRecordLoading] = useState(false);
   const [probingTasks, setProbingTasks] = useState<Set<number>>(new Set());
+  const [selectedTaskIDs, setSelectedTaskIDs] = useState<Set<number>>(new Set());
   const [ruleView, setRuleView] = useState<RuleView | null>(null);
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesBusy, setRulesBusy] = useState<"reload" | "refresh" | "upload" | "">("");
@@ -403,25 +741,34 @@ function ReturnRouteContent() {
   const loadSummary = useCallback(async (quiet = false) => {
     try {
       const data = await request("/summary");
-      setSummary({ tasks: data?.tasks || 0, healthy: data?.healthy || 0, switched: data?.switched || 0, recent_events: data?.recent_events || 0 });
+      const next = { tasks: data?.tasks || 0, healthy: data?.healthy || 0, switched: data?.switched || 0, recent_events: data?.recent_events || 0 };
+      returnRouteSummarySnapshots.set(accountKey, next);
+      setSummary(next);
     } catch (error) {
       if (!quiet) toast.error(error instanceof Error ? error.message : "概览加载失败");
     }
-  }, []);
+  }, [accountKey]);
 
   const loadTasks = useCallback(async (quiet = false) => {
-    if (!quiet) setTaskLoading(true);
+    if (!quiet && !hasRenderedTaskData.current && !returnRouteTaskSnapshots.has(taskSnapshotKey)) setTaskLoading(true);
     try {
-      const data = await request("/tasks/query", taskQuery);
+      const data = await request("/tasks/query", {
+        ...taskQuery,
+        task_id: routeTask || undefined,
+        state: routeTask ? "" : routeState || taskQuery.state,
+      });
       const probingTaskIDs = data?.probing_task_ids || [];
-      setTaskData({ tasks: data?.tasks || [], statuses: data?.statuses || [], probing_task_ids: probingTaskIDs, total: data?.total || 0, page: data?.page || 1, page_size: data?.page_size || taskQuery.page_size });
+      const next = { tasks: data?.tasks || [], statuses: data?.statuses || [], probing_task_ids: probingTaskIDs, total: data?.total || 0, page: data?.page || 1, page_size: data?.page_size || taskQuery.page_size };
+      returnRouteTaskSnapshots.set(taskSnapshotKey, next);
+      hasRenderedTaskData.current = true;
+      setTaskData(next);
       setProbingTasks(new Set(probingTaskIDs));
     } catch (error) {
       if (!quiet) toast.error(error instanceof Error ? error.message : "任务加载失败");
     } finally {
       if (!quiet) setTaskLoading(false);
     }
-  }, [taskQuery]);
+  }, [routeState, routeTask, taskQuery, taskSnapshotKey]);
 
   const loadRecords = useCallback(async (quiet = false) => {
     if (!quiet) setRecordLoading(true);
@@ -457,6 +804,16 @@ function ReturnRouteContent() {
   }, [defaultPageSize]);
 
   useEffect(() => {
+    if (!routeState && !routeTask) return;
+    setActiveTab("tasks");
+    setTaskQuery((current) => ({
+      ...current,
+      page: 1,
+      state: routeTask ? "" : routeState,
+    }));
+  }, [routeState, routeTask]);
+
+  useEffect(() => {
     if (activeTab !== "tasks") return;
     const timer = window.setTimeout(() => loadTasks(), taskQuery.keyword ? 300 : 0);
     return () => window.clearTimeout(timer);
@@ -483,6 +840,42 @@ function ReturnRouteContent() {
   }, [activeTab, loadRecords, loadRules, loadSummary, loadTasks]);
 
   const statuses = useMemo(() => new Map(taskData.statuses.map((item) => [item.task_id, item])), [taskData.statuses]);
+  const selectedTasks = useMemo(
+    () => taskData.tasks.filter((task) => task.id && selectedTaskIDs.has(task.id)),
+    [selectedTaskIDs, taskData.tasks],
+  );
+  const visibleTaskIDs = useMemo(
+    () => taskData.tasks.flatMap((task) => task.id ? [task.id] : []),
+    [taskData.tasks],
+  );
+  const allVisibleTasksSelected = visibleTaskIDs.length > 0 && visibleTaskIDs.every((id) => selectedTaskIDs.has(id));
+
+  useEffect(() => {
+    const visible = new Set(visibleTaskIDs);
+    setSelectedTaskIDs((current) => {
+      const next = new Set([...current].filter((id) => visible.has(id)));
+      if (next.size === current.size && [...next].every((id) => current.has(id))) return current;
+      return next;
+    });
+  }, [visibleTaskIDs]);
+
+  const toggleTaskSelection = (id: number) => {
+    setSelectedTaskIDs((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleVisibleTaskSelection = () => {
+    setSelectedTaskIDs((current) => {
+      const next = new Set(current);
+      if (allVisibleTasksSelected) visibleTaskIDs.forEach((id) => next.delete(id));
+      else visibleTaskIDs.forEach((id) => next.add(id));
+      return next;
+    });
+  };
   const updateTaskQuery = (updates: Partial<typeof taskQuery>) => setTaskQuery((current) => ({ ...current, ...updates, page: updates.page ?? 1 }));
   const updateRecordQuery = (updates: Partial<typeof recordQuery>) => setRecordQuery((current) => ({ ...current, ...updates, page: updates.page ?? 1 }));
   const refreshTasksAfterChange = () => {
@@ -490,6 +883,14 @@ function ReturnRouteContent() {
     if (taskQuery.page === 1) loadTasks();
     else updateTaskQuery({ page: 1 });
   };
+  const activeFilterLabel = useMemo(() => {
+    if (routeTask) {
+      const task = taskData.tasks.find((item) => item.id === routeTask);
+      return task?.name || `#${routeTask}`;
+    }
+    if (routeState === "switched") return "已确认切线";
+    return routeState;
+  }, [routeState, routeTask, taskData.tasks]);
 
   const runNow = async (id?: number) => {
     if (!id) return;
@@ -588,6 +989,10 @@ function ReturnRouteContent() {
         {t("return_route.title", "回程线路监测")}
       </AdminPageTitle>
 
+      {activeFilterLabel ? (
+        <AdminActiveFilter label={activeFilterLabel} clearTo="/admin/return-route" />
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Summary label="监测任务" value={summary.tasks} icon={<Route size={20} />} />
         <Summary label="线路正常" value={summary.healthy} tone="green" icon={<CheckCircle2 size={20} />} />
@@ -619,14 +1024,27 @@ function ReturnRouteContent() {
                     </Select.Root>
                   </Field>
                   <Field label="状态">
-                    <Select.Root value={taskQuery.state || "all"} onValueChange={(state) => updateTaskQuery({ state: state === "all" ? "" : state })}>
+                    <Select.Root disabled={Boolean(routeState || routeTask)} value={(routeTask ? "" : routeState || taskQuery.state) || "all"} onValueChange={(state) => updateTaskQuery({ state: state === "all" ? "" : state })}>
                       <Select.Trigger className="min-w-[130px]" />
                       <Select.Content><Select.Item value="all">全部</Select.Item><Select.Item value="healthy">线路正常</Select.Item><Select.Item value="probing">探测中</Select.Item><Select.Item value="observing">确认中</Select.Item><Select.Item value="switched">已切线</Select.Item><Select.Item value="unknown">无法识别</Select.Item><Select.Item value="pending">等待探测</Select.Item><Select.Item value="disabled">已暂停</Select.Item></Select.Content>
                     </Select.Root>
                   </Field>
                 </div>
-                <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
-                  <Button variant="soft" color="gray" disabled={!taskQuery.keyword && !taskQuery.carrier && !taskQuery.state} onClick={() => setTaskQuery((current) => ({ ...current, page: 1, keyword: "", carrier: "", state: "" }))}>重置</Button>
+                <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+                  <Button variant="soft" disabled={!taskQuery.keyword && !taskQuery.carrier && (!taskQuery.state || Boolean(routeState || routeTask))} onClick={() => setTaskQuery((current) => ({ ...current, page: 1, keyword: "", carrier: "", state: routeTask ? "" : routeState }))}>重置</Button>
+                  <Button type="button" variant="soft" disabled={visibleTaskIDs.length === 0} onClick={toggleVisibleTaskSelection}>
+                    {allVisibleTasksSelected ? "取消全选" : "全选"}
+                  </Button>
+                  <RouteTaskBatchDialog
+                    tasks={selectedTasks}
+                    onClear={() => setSelectedTaskIDs(new Set())}
+                    onSaved={refreshTasksAfterChange}
+                  >
+                    <Button type="button" variant="soft" disabled={selectedTasks.length === 0}>
+                      <Pencil size={16} />批量修改
+                      {selectedTasks.length > 0 ? <Badge color="blue">{selectedTasks.length}</Badge> : null}
+                    </Button>
+                  </RouteTaskBatchDialog>
                   <RouteTaskDialog nodes={nodes} onSaved={refreshTasksAfterChange}><Button><Plus size={16} />新建任务</Button></RouteTaskDialog>
                 </div>
               </div>
@@ -636,18 +1054,20 @@ function ReturnRouteContent() {
               ) : (
                 <section className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
                   <div className="admin-responsive-table-scroll overflow-x-auto">
-                    <table className="admin-responsive-table w-full min-w-[1080px] text-left text-sm">
-                      <thead className="admin-table-header text-sm"><tr><th className="p-3">任务 / 节点</th><th className="p-3">运营商 / 地区</th><th className="p-3">线路</th><th className="p-3">状态</th><th className="p-3">关键 ASN</th><th className="p-3">最后探测</th><th className="py-3 pl-6 pr-3">操作</th></tr></thead>
+                    <table className="admin-responsive-table w-full min-w-[1120px] text-left text-sm">
+                      <thead className="admin-table-header text-sm"><tr><th className="w-11 p-3"><span className="sr-only">选择</span></th><th className="p-3">任务 / 节点</th><th className="p-3">运营商 / 地区</th><th className="p-3">线路</th><th className="p-3">状态</th><th className="p-3">关键 ASN</th><th className="p-3">最后探测</th><th className="py-3 pl-6 pr-3">操作</th></tr></thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                         {taskData.tasks.map((task) => {
                           const status = statuses.get(task.id || 0);
                           const needed = status?.candidate_line === task.expected_line ? task.recovery_confirm : task.switch_confirm;
                           const probing = probingTasks.has(task.id || 0);
-                          return <tr key={task.id} className="align-top hover:bg-gray-50/60 dark:hover:bg-gray-900/50">
+                          const selected = Boolean(task.id && selectedTaskIDs.has(task.id));
+                          return <tr key={task.id} className={`align-top hover:bg-gray-50/60 dark:hover:bg-gray-900/50 ${selected ? "bg-[var(--accent-a2)]" : ""}`}>
+                            <td data-label="选择" className="p-3 align-middle"><Checkbox aria-label={`选择任务 ${task.name}`} checked={selected} onCheckedChange={() => task.id && toggleTaskSelection(task.id)} /></td>
                             <td data-label="任务 / 节点" className="p-3"><div className="return-route-cell-pair"><div className="font-medium">{task.name}</div><div className="mt-1 text-xs text-gray-500">{task.client_info?.name || task.client}</div></div></td>
                             <td data-label="运营商 / 地区" className="p-3"><div className="return-route-cell-pair"><div>{carrierNames[task.carrier]}</div><div className="mt-1 text-xs text-gray-500">{task.region || "未标记"} · IPv{task.ip_version}</div></div></td>
                             <td data-label="线路" className="p-3"><div className="return-route-cell-pair"><div><span className="text-gray-500">当前 </span><strong>{status?.current_line || "-"}</strong></div><div className="mt-1 text-xs text-gray-500">预期 {task.expected_line}</div></div></td>
-                            <td data-label="状态" className="p-3"><div className="return-route-cell-content">{!task.enabled ? <Badge color="gray">已暂停</Badge> : probing ? <Badge color="blue"><RefreshCw size={12} className="mr-1 animate-spin" />探测中</Badge> : stateBadge(status)}{status?.candidate_line && <div className="mt-1 text-xs text-amber-600">{status.candidate_line} {status.candidate_count}/{needed}</div>}{(status?.confidence ?? 0) > 0 && <div className="mt-1 text-xs text-gray-500">置信度 {((status?.confidence ?? 0) * 100).toFixed(0)}%</div>}</div></td>
+                            <td data-label="状态" className="p-3"><div className="return-route-cell-content">{!task.enabled ? <Badge color="gray">已暂停</Badge> : probing ? <Badge color="blue"><RefreshCw size={12} className="mr-1 animate-spin" />探测中</Badge> : stateBadge(status)}{status?.candidate_line && <div className="mt-1 text-xs text-amber-600">{status.candidate_line}{pendingLineOptions.has(status.candidate_line) ? null : <> {status.candidate_count}/{needed}</>}</div>}{(status?.confidence ?? 0) > 0 && <div className="mt-1 text-xs text-gray-500">置信度 {((status?.confidence ?? 0) * 100).toFixed(0)}%</div>}</div></td>
                             <td data-label="关键 ASN" className="max-w-[320px] p-3"><div className="return-route-cell-content"><div className="flex flex-wrap gap-1">{status?.asn_path?.length ? status.asn_path.map((asn) => <Badge key={asn} color="gray" variant="soft">{asn}</Badge>) : <span className="text-gray-400">-</span>}</div>{status?.route_path?.length ? <details className="mt-2 text-xs text-gray-500"><summary className="cursor-pointer">查看完整路径</summary><div className="mt-2 max-h-48 overflow-auto whitespace-pre font-mono leading-5">{status.route_path.join("\n")}</div></details> : null}{status?.last_error && <div className="mt-2 max-w-xs text-xs text-red-600">{status.last_error}</div>}</div></td>
                             <td data-label="最后探测" className="p-3 text-gray-600"><div className="return-route-cell-pair"><span>{formatTime(status?.last_checked_at)}</span><div className="mt-1 text-xs text-gray-400">每 {Math.round(task.interval / 60)} 分钟</div></div></td>
                             <td data-label="操作" className="p-3"><Flex justify="start" gap="1" className="admin-card-actions"><IconButton variant="ghost" title={probing ? "探测中" : "立即探测"} disabled={probing || !task.enabled} onClick={() => runNow(task.id)}>{probing ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}</IconButton><RouteTaskDialog task={task} nodes={nodes} onSaved={refreshTasksAfterChange}><IconButton variant="ghost" title="编辑"><Pencil size={16} /></IconButton></RouteTaskDialog><IconButton variant="ghost" color="red" title="删除" onClick={() => remove(task)}><Trash2 size={16} /></IconButton></Flex></td>
@@ -693,7 +1113,7 @@ function ReturnRouteContent() {
                 <Field label="实际线路">
                   <Select.Root value={recordQuery.actual_line || "all"} onValueChange={(actual_line) => updateRecordQuery({ actual_line: actual_line === "all" ? "" : actual_line })}><Select.Trigger className="w-full" /><Select.Content><Select.Item value="all">全部</Select.Item>{allLineOptions.map((line) => <Select.Item key={line} value={line}>{line}</Select.Item>)}</Select.Content></Select.Root>
                 </Field>
-                <div className="flex items-end"><Button variant="soft" color="gray" disabled={!recordQuery.keyword && recordQuery.range === "24h" && !recordQuery.kind && !recordQuery.carrier && !recordQuery.region && !recordQuery.expected_line && !recordQuery.actual_line} onClick={() => setRecordQuery((current) => ({ ...current, page: 1, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" }))}>重置筛选</Button></div>
+                <div className="flex items-end"><Button variant="soft" disabled={!recordQuery.keyword && recordQuery.range === "24h" && !recordQuery.kind && !recordQuery.carrier && !recordQuery.region && !recordQuery.expected_line && !recordQuery.actual_line} onClick={() => setRecordQuery((current) => ({ ...current, page: 1, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" }))}>重置筛选</Button></div>
               </div>
 
               {recordLoading ? <Loading text="" /> : recordData.events.length === 0 ? <div className="rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] p-10 text-center text-sm text-gray-500">暂无符合条件的监测记录</div> : (
@@ -803,5 +1223,5 @@ function RuleStat({ label, value, mono = false }: { label: string; value: string
 }
 
 export default function ReturnRoutePage() {
-  return <NodeDetailsProvider><ReturnRouteContent /></NodeDetailsProvider>;
+  return <ReturnRouteContent />;
 }

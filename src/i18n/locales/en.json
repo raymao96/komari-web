@@ -333,6 +333,8 @@
         "resetDayRequired": "Set a traffic reset day in the server editor first"
       },
       "description": "Review node connectivity, network details, groups, notes, and billing in one place. Drag rows to set the global display order.",
+      "installCommandCopyDenied": "The browser denied clipboard access. Check this site's permissions and try again",
+      "installCommandCopyUnconfirmed": "The browser could not confirm the copy. Copy the command manually from the field above",
       "installCommandSaveFailed": "Failed to save installation command settings",
       "installCommandSaved": "Deployment command copied",
       "invalidMonthRotate": "The traffic reset day must be between 0 and 31",
@@ -993,7 +995,10 @@
       "page_description": "Configure auto discovery, GeoIP, and other global behavior.",
       "admin_default_page_size": "Default list pagination",
       "admin_default_page_size_description": "Set the default number of items shown per page across all paginated lists. The value is applied when a list page is opened again.",
-      "admin_default_page_size_invalid": "Enter an integer between {{min}} and {{max}}"
+      "admin_default_page_size_invalid": "Enter an integer between {{min}} and {{max}}",
+      "interface_motion": "Interface motion",
+      "reduce_motion": "Reduce motion",
+      "reduce_motion_description": "Disable page, tab, and sidebar transitions and switch views immediately."
     },
     "geoip": {
       "enable_description": "Display node geographic locations",
@@ -1587,9 +1592,6 @@
     "author": "Author",
     "confirm_delete": "Confirm Delete Theme",
     "dark": "Dark",
-    "default_description": "System default theme",
-    "default_no_config": "The default theme has no configurable options.",
-    "default_preview": "No preview for default theme",
     "default_theme": "Default Theme",
     "delete_failed": "Theme deletion failed",
     "delete_success": "Theme deleted successfully",
@@ -1703,7 +1705,8 @@
     "restore_failed": "Failed to restore the backup. Please try again.",
     "restore_413": "Backup upload failed (413). Increase the upload size limit in your CDN or reverse proxy such as Nginx (for example, client_max_body_size), or manually upload the backup to ./data/backup.zip and restart the service.",
     "complete": "Complete installation",
-    "completed": "Installation has already been completed. Please return to sign in.",
+    "completed": "Installation is complete. Opening the public dashboard shortly.",
+    "completed_title": "Installation complete",
     "failed": "Installation failed. Please try again.",
     "connection_error": "Unable to connect to the server",
     "username_required": "Enter a username.",

@@ -1,4 +1,10 @@
-export type DashboardSessionKind = "settings" | "summary" | "charts";
+export type DashboardSessionKind = "settings" | "summary" | "charts" | "view";
+
+export type DashboardViewState = {
+  scrollTop: number;
+  moduleId?: string;
+  moduleOffset?: number;
+};
 
 type DashboardSessionRecord<T> = {
   key: string;

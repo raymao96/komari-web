@@ -10,6 +10,8 @@ const brandSource = readFileSync(
   "src/components/KomariLiteBrand.tsx",
   "utf8",
 );
+const globalStyles = readFileSync("src/global.css", "utf8");
+const appSource = readFileSync("src/main.tsx", "utf8");
 
 test("admin branding keeps Lite smaller and green on desktop and mobile", () => {
   assert.match(source, /<KomariLiteBrand size=\{isMobile \? "sm" : "md"\} \/>/);
@@ -69,6 +71,19 @@ test("mobile navigation uses a partial overlay without hiding the page", () => {
     source,
     /backgroundColor: "var\(--accent-3\)"[\s\S]{0,100}display: isMobile && sidebarOpen \? "none"/,
   );
+});
+
+test("admin shell owns the viewport while the mobile drawer locks only main content", () => {
+  assert.match(source, /initial: "auto minmax\(0, 1fr\)"/);
+  assert.match(source, /md: "auto minmax\(0, 1fr\)"/);
+  assert.match(source, /height: "var\(--app-viewport-height, 100vh\)"/);
+  assert.match(source, /width: "100%",\s+overflow: "hidden",\s+overscrollBehavior: "none"/);
+  assert.match(source, /key="mobile-sidebar-backdrop"[\s\S]*className="[^"]*touch-none/);
+  assert.match(source, /data-admin-scroll-container[\s\S]*overflowY: isMobile && sidebarOpen \? "hidden" : "auto"/);
+  assert.match(source, /overflowY: "auto",\s+overflowX: "hidden",\s+overscrollBehaviorY: "contain"/);
+  assert.match(globalStyles, /--app-viewport-height: 100vh/);
+  assert.match(globalStyles, /@supports \(height: 100dvh\)[\s\S]*--app-viewport-height: 100dvh/);
+  assert.match(appSource, /minHeight: "var\(--app-viewport-height, 100vh\)"/);
 });
 
 test("mobile navigation label is localized in every admin language", () => {

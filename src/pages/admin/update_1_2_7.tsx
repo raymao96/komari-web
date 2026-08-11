@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Callout,
-  Checkbox,
   Container,
   Dialog,
   Flex,
@@ -12,6 +11,7 @@ import {
   Text,
   TextField,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertTriangle,
   ArrowRight,
@@ -628,7 +628,7 @@ const Upgrade127 = () => {
                   onCheckedChange={(checked) =>
                     setConfirmSQLite(checked === true)
                   }
-                  mt="1"
+                  className="mt-1"
                 />
                 <span>
                   <Text as="div" size="2">
@@ -657,7 +657,7 @@ const Upgrade127 = () => {
                   onCheckedChange={(checked) =>
                     setConfirmLarge(checked === true)
                   }
-                  mt="1"
+                  className="mt-1"
                 />
                 <span>
                   <Text as="div" size="2">

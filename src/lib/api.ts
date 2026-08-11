@@ -9,6 +9,7 @@ export interface SettingsResponse {
   sitename: string;
   description: string;
   admin_default_page_size: number;
+  reduce_motion: boolean;
   cors_origin_check_enabled: boolean;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
@@ -24,6 +25,7 @@ const createDefaultSettings = (): SettingsResponse => ({
   sitename: "",
   description: "",
   admin_default_page_size: 10,
+  reduce_motion: false,
   cors_origin_check_enabled: true,
   geo_ip_enabled: false,
   geo_ip_provider: "",
@@ -233,6 +235,11 @@ function useSettingsController() {
 type SettingsContextValue = ReturnType<typeof useSettingsController>;
 
 const SettingsContext = React.createContext<SettingsContextValue | null>(null);
+
+export function useReduceMotionPreference(): boolean {
+  const context = React.useContext(SettingsContext);
+  return Boolean(context?.settings.reduce_motion);
+}
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const value = useSettingsController();

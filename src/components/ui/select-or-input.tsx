@@ -4,6 +4,7 @@ import { TextField } from "@radix-ui/themes";
 import { ChevronDown } from "lucide-react";
 
 type Primitive = string | number;
+const FLOATING_CONTENT_EXIT_MS = 140;
 
 export type SelectOption<T extends Primitive = string> = {
   label: string;
@@ -115,8 +116,40 @@ export function SelectOrInput<T extends Primitive = string>(
   );
 
   const [open, setOpen] = React.useState(false);
+  const [listMounted, setListMounted] = React.useState(false);
   const [showAllOptions, setShowAllOptions] = React.useState(false);
   const [highlightIndex, setHighlightIndex] = React.useState<number>(-1);
+  const closeTimerRef = React.useRef<number | null>(null);
+
+  const openList = React.useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setListMounted(true);
+    setOpen(true);
+  }, []);
+
+  const closeList = React.useCallback(() => {
+    setOpen(false);
+    setShowAllOptions(false);
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setListMounted(false);
+      closeTimerRef.current = null;
+    }, FLOATING_CONTENT_EXIT_MS);
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const allowCustom = (allowCustomInput ?? true) === true;
 
@@ -155,10 +188,9 @@ export function SelectOrInput<T extends Primitive = string>(
       if (!opt || opt.disabled) return;
       const v = getValue(opt);
       commit(v, opt);
-      setOpen(false);
-      setShowAllOptions(false);
+      closeList();
     },
-    [displayed, getValue, commit]
+    [closeList, displayed, getValue, commit]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,13 +198,13 @@ export function SelectOrInput<T extends Primitive = string>(
     if (!isControlled) setInnerValue(v);
     onChange?.(v);
     setShowAllOptions(false);
-    if (!open) setOpen(true);
+    if (!open) openList();
     setHighlightIndex(0);
   };
 
   const handleFocus: React.FocusEventHandler<HTMLInputElement> = (e) => {
     setShowAllOptions(false);
-    setOpen(true);
+    openList();
     onFocus?.(e);
   };
 
@@ -185,7 +217,7 @@ export function SelectOrInput<T extends Primitive = string>(
     onKeyDown?.(e);
     if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       setShowAllOptions(true);
-      setOpen(true);
+      openList();
       e.preventDefault();
       return;
     }
@@ -204,20 +236,17 @@ export function SelectOrInput<T extends Primitive = string>(
         selectAt(highlightIndex);
       } else if (allowCustom) {
         commit(inputValue);
-        setOpen(false);
-        setShowAllOptions(false);
+        closeList();
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
-      setOpen(false);
-      setShowAllOptions(false);
+      closeList();
     }
   };
 
   const toggleAllOptions = () => {
     if (open && showAllOptions) {
-      setOpen(false);
-      setShowAllOptions(false);
+      closeList();
       return;
     }
     const selectedIndex = normalizedOptions.findIndex(
@@ -225,7 +254,7 @@ export function SelectOrInput<T extends Primitive = string>(
     );
     setShowAllOptions(true);
     setHighlightIndex(selectedIndex >= 0 ? selectedIndex : 0);
-    setOpen(true);
+    openList();
   };
 
   // Scroll highlighted into view
@@ -245,15 +274,14 @@ export function SelectOrInput<T extends Primitive = string>(
       const target = ev.target as Node | null;
       if (!containerRef.current) return;
       if (target && containerRef.current.contains(target)) return;
-      setOpen(false);
-      setShowAllOptions(false);
+      closeList();
     };
     document.addEventListener("mousedown", onDocDown, { capture: true });
     return () =>
       document.removeEventListener("mousedown", onDocDown, {
         capture: true,
       } as any);
-  }, [open]);
+  }, [closeList, open]);
 
   // Build ARIA ids
   const listId = React.useId();
@@ -300,10 +328,12 @@ export function SelectOrInput<T extends Primitive = string>(
           </button>
         </TextField.Slot>
       </TextField.Root>
-      {open && (
+      {listMounted && (
         <div
+          data-side="bottom"
+          data-state={open ? "open" : "closed"}
           className={cn(
-            "absolute left-0 right-0 z-50 mt-1 rounded-md border bg-accent-1 text-popover-foreground shadow-md",
+            "admin-select-or-input-content absolute left-0 right-0 z-50 mt-1 rounded-md border bg-accent-1 text-popover-foreground shadow-md data-[state=closed]:pointer-events-none data-[state=closed]:opacity-0",
             "max-h-60 overflow-auto",
             listClassName
           )}
@@ -331,10 +361,10 @@ export function SelectOrInput<T extends Primitive = string>(
                     aria-selected={isActive}
                     data-disabled={isDisabled || undefined}
                     className={cn(
-                      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden font-semibold",
+                      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-normal outline-hidden transition-colors duration-150",
                       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                       isActive
-                        ? "bg-accent-10 text-accent-foreground"
+                        ? "bg-accent-9 text-[var(--accent-contrast)]"
                         : "hover:bg-accent hover:text-accent-foreground",
                       optionClassName
                     )}

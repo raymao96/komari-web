@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { motion } from "motion/react";
+import { useReduceMotionPreference } from "@/lib/api";
 
 export type AdminNodeStatusFilter = "all" | "online" | "offline";
 
@@ -18,6 +20,7 @@ export default function AdminNodeStatusSummary({
   onValueChange,
 }: AdminNodeStatusSummaryProps) {
   const { t } = useTranslation();
+  const reduceMotion = useReduceMotionPreference();
   const offline = Math.max(0, total - online);
   const items = [
     {
@@ -46,16 +49,31 @@ export default function AdminNodeStatusSummary({
       className="grid w-full grid-cols-3 overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] md:w-auto"
     >
       {items.map(({ label, count, color, filter }, index) => (
-        <button
+        <motion.button
           key={filter}
           type="button"
-          className={`flex h-10 items-center justify-center gap-2 px-3 text-left transition-colors hover:bg-[var(--accent-a2)] disabled:cursor-not-allowed disabled:opacity-60 md:min-w-28 md:px-4 ${
+          className={`relative isolate flex h-10 items-center justify-center gap-2 px-3 text-left transition-[color,box-shadow] duration-150 hover:bg-[var(--accent-a2)] disabled:cursor-not-allowed disabled:opacity-60 md:min-w-28 md:px-4 ${
             index > 0 ? "border-l border-[var(--gray-a5)]" : ""
-          } ${value === filter ? "bg-[var(--accent-a3)]" : ""}`}
+          }`}
           aria-pressed={value === filter}
           disabled={filter !== "all" && !available}
           onClick={() => onValueChange(filter)}
+          whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+          transition={{ duration: reduceMotion ? 0 : 0.12 }}
         >
+          {value === filter ? (
+            <motion.span
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 bg-[var(--accent-a3)] shadow-[inset_0_-2px_0_var(--accent-a7)]"
+              layoutId={reduceMotion ? undefined : "admin-node-status-highlight"}
+              initial={false}
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : { type: "spring", stiffness: 420, damping: 34 }
+              }
+            />
+          ) : null}
           <span
             className="size-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: color }}
@@ -68,7 +86,7 @@ export default function AdminNodeStatusSummary({
               {label}
             </span>
           </span>
-        </button>
+        </motion.button>
       ))}
     </div>
   );

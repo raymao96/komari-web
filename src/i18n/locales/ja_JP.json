@@ -301,6 +301,8 @@
         "resetDayRequired": "先にサーバー編集でトラフィックのリセット日を設定してください"
       },
       "description": "ノードの接続、ネットワーク、グループ、備考、請求情報をまとめて確認し、ドラッグで全体の表示順を変更できます。",
+      "installCommandCopyDenied": "ブラウザーがクリップボードへのアクセスを拒否しました。サイトの権限を確認して再試行してください",
+      "installCommandCopyUnconfirmed": "ブラウザーでコピーを確認できませんでした。上のコマンド欄から手動でコピーしてください",
       "installCommandSaveFailed": "インストールコマンド設定の保存に失敗しました",
       "installCommandSaved": "インストールコマンド設定を保存しました",
       "invalidMonthRotate": "トラフィックのリセット日は 0～31 で指定してください",
@@ -891,7 +893,10 @@
       "page_description": "自動検出、GeoIP、その他の全体動作を設定します。",
       "admin_default_page_size": "リストの既定ページ件数",
       "admin_default_page_size_description": "ページ分けされたすべてのリストで、1ページに表示する既定件数を設定します。リストを開き直したときに反映されます。",
-      "admin_default_page_size_invalid": "{{min}} から {{max}} までの整数を入力してください"
+      "admin_default_page_size_invalid": "{{min}} から {{max}} までの整数を入力してください",
+      "interface_motion": "画面のモーション",
+      "reduce_motion": "モーションを減らす",
+      "reduce_motion_description": "ページ、タブ、サイドバーの切り替えアニメーションを無効にします。"
     },
     "geoip": {
       "enable_description": "ノードの地理位置情報を表示します",
@@ -1485,9 +1490,6 @@
     "author": "著者",
     "confirm_delete": "テーマを削除しますか？",
     "dark": "ダークテーマ",
-    "default_description": "システムのデフォルトテーマ",
-    "default_no_config": "デフォルトテーマには設定オプションがありません。",
-    "default_preview": "デフォルトテーマのプレビューはありません",
     "default_theme": "デフォルトテーマ",
     "delete_failed": "テーマの削除に失敗しました",
     "delete_success": "テーマの削除に成功しました",
@@ -1601,7 +1603,8 @@
     "restore_failed": "バックアップの復元に失敗しました。もう一度お試しください。",
     "restore_413": "バックアップのアップロードに失敗しました（413）。CDN または Nginx などのリバースプロキシのアップロード上限（例: client_max_body_size）を増やすか、バックアップを ./data/backup.zip に手動でアップロードしてサービスを再起動してください。",
     "complete": "インストールを完了",
-    "completed": "インストールは完了しています。ログインに戻ってください。",
+    "completed": "インストールが完了しました。まもなく公開ダッシュボードを開きます。",
+    "completed_title": "インストール完了",
     "failed": "インストールに失敗しました。もう一度お試しください。",
     "connection_error": "サーバーに接続できません",
     "username_required": "ユーザー名を入力してください。",

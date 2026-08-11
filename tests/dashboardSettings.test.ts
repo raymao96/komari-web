@@ -27,6 +27,10 @@ const dashboardPanelsSource = readFileSync(
   new URL("../src/components/admin/DashboardPanels.tsx", import.meta.url),
   "utf8",
 );
+const globalCssSource = readFileSync(
+  new URL("../src/global.css", import.meta.url),
+  "utf8",
+);
 
 test("overview preset exactly matches the default dashboard modules", () => {
   const settings = dashboardSettingsForPreset("overview");
@@ -60,6 +64,14 @@ test("formal dashboard stretches paired cards to equal row height", () => {
     adminDashboardSource,
     /\["return_route", "alerts"\][\s\S]+?className="min-w-0 \[&>\*\]:h-full"/,
   );
+});
+
+test("alert overview columns follow the configured card span", () => {
+  assert.match(adminDashboardSource, /data-dashboard-span=\{span\}/);
+  assert.match(adminDashboardSource, /data-dashboard-span="3"/);
+  assert.match(globalCssSource, /\.dashboard-alert-grid\s*\{[\s\S]*?repeat\(2,/);
+  assert.match(globalCssSource, /\[data-dashboard-span="3"\] \.dashboard-alert-grid\s*\{[\s\S]*?repeat\(3,/);
+  assert.match(globalCssSource, /\[data-dashboard-span="6"\] \.dashboard-alert-grid\s*\{[\s\S]*?repeat\(6,/);
 });
 
 test("traffic charts fill tall narrow grid cards without shrinking text", () => {

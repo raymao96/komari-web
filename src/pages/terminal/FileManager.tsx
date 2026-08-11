@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button, Dialog, IconButton, TextField } from "@radix-ui/themes";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatBytes } from "@/utils/unitHelper";
 
 export type FileEntry = {
@@ -664,8 +665,8 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       </div>
 
       <div className="remote-file-options">
-        <label><input type="checkbox" checked={showHidden} onChange={(event) => setShowHidden(event.target.checked)} /> 显示隐藏文件</label>
-        <label><input type="checkbox" checked={overwrite} onChange={(event) => setOverwrite(event.target.checked)} /> 覆盖同名文件</label>
+        <label><Checkbox checked={showHidden} onCheckedChange={(checked) => setShowHidden(checked === true)} /> 显示隐藏文件</label>
+        <label><Checkbox checked={overwrite} onCheckedChange={(checked) => setOverwrite(checked === true)} /> 覆盖同名文件</label>
       </div>
 
       {transferLabel && <div className="remote-transfer-status">{transferLabel}</div>}
@@ -708,7 +709,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
                   }
                 }}
               >
-                <td><input type="checkbox" checked={selected.has(entry.path)} disabled={entry.protected} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()} onChange={() => toggleSelected(entry)} /></td>
+                <td><Checkbox checked={selected.has(entry.path)} disabled={entry.protected} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()} onCheckedChange={() => toggleSelected(entry)} aria-label={`选择 ${entry.name}`} /></td>
                 <td title={entry.protected ? "SQLite 数据库已受保护" : undefined}>
                   {entry.protected ? <LockKeyhole size={15} /> : entry.directory ? <Folder size={15} /> : <FileIcon size={15} />}
                   <span>{entry.name}</span>

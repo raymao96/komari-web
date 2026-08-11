@@ -3,7 +3,6 @@ import { lazy } from "react";
 import { Navigate, type RouteObject } from "react-router-dom";
 import React from "react";
 
-const Index = lazy(() => import("./pages/Index"));
 const importAdminLayout = () => import("./pages/admin/_layout");
 const importAdminDashboard = () => import("./pages/admin/dashboard");
 let adminLayoutModule: ReturnType<typeof importAdminLayout> | undefined;
@@ -17,22 +16,51 @@ export const preloadAdminEntry = () => {
   void loadAdminDashboard();
 };
 
+const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
+  "/admin": loadAdminDashboard,
+  "/admin/servers": () => import("./pages/admin"),
+  "/admin/ping": () => import("./pages/admin/pingTask"),
+  "/admin/return-route": () => import("./pages/admin/returnRoute"),
+  "/admin/logs": () => import("./pages/admin/log"),
+  "/admin/exec": () => import("./pages/admin/exec"),
+  "/admin/terminal": () => import("./pages/admin/terminal"),
+  "/admin/theme_managed": () => import("./pages/admin/theme_managed.tsx"),
+  "/admin/theme_raw": () => import("./pages/admin/theme_raw.tsx"),
+  "/admin/market/themes": () => import("./pages/admin/market/themes"),
+  "/admin/settings/site": () => import("./pages/admin/settings/site"),
+  "/admin/settings/dashboard": () => import("./pages/admin/settings/dashboard"),
+  "/admin/settings/theme": () => import("./pages/admin/settings/theme"),
+  "/admin/settings/custom": () => import("./pages/admin/settings/custom"),
+  "/admin/settings/notification": () => import("./pages/admin/settings/notification"),
+  "/admin/settings/general": () => import("./pages/admin/settings/general"),
+  "/admin/settings/xtermjs": () => import("./pages/admin/settings/xtermjs"),
+  "/admin/settings/reverse-proxy": () => import("./pages/admin/settings/reverse-proxy"),
+  "/admin/settings/metrics": () => import("./pages/admin/settings/metrics"),
+  "/admin/settings/account-security": () => import("./pages/admin/settings/account-security"),
+  "/admin/notification/offline": () => import("./pages/admin/notification/offline"),
+  "/admin/notification/load": () => import("./pages/admin/notification/load"),
+  "/admin/notification/general": () => import("./pages/admin/notification/general"),
+  "/admin/notification/traffic-report": () => import("./pages/admin/notification/traffic_report"),
+  "/admin/notification/ping-loss": () => import("./pages/admin/notification/ping_loss"),
+};
+
+export const preloadAdminRoute = async (target: string): Promise<void> => {
+  const pathname = target.split(/[?#]/, 1)[0].replace(/\/$/, "") || "/admin";
+  const preload = adminRoutePreloaders[pathname];
+  if (preload) await preload();
+};
+
+export const preloadAdminRoutes = async (): Promise<void> => {
+  await Promise.allSettled(
+    Array.from(new Set(Object.values(adminRoutePreloaders))).map((preload) => preload()),
+  );
+};
+
 const AdminLayout = lazy(loadAdminLayout);
 const AdminDashboard = lazy(loadAdminDashboard);
 const NotFound = lazy(() => import("./pages/404"));
 
 export const routes: RouteObject[] = [
-  {
-    path: "/",
-    element: React.createElement(lazy(() => import("./pages/_layout"))),
-    children: [
-      { index: true, element: React.createElement(Index) },
-      {
-        path: "instance/:uuid",
-        element: React.createElement(lazy(() => import("./pages/instance"))),
-      },
-    ],
-  },
   {
     path: "/admin/update/1.2.7",
     element: React.createElement(

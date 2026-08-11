@@ -1,25 +1,18 @@
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
-import {
-  NodeDetailsProvider,
-  useNodeDetails,
-} from "@/contexts/NodeDetailsContext";
-import {
-  PingTaskProvider,
-  usePingTask,
-  type PingTask,
-} from "@/contexts/PingTaskContext";
+import { useNodeDetails } from "@/contexts/NodeDetailsContext";
+import { usePingTask, type PingTask } from "@/contexts/PingTaskContext";
 import {
   Box,
   Button,
-  Checkbox,
   Dialog,
   Flex,
   Select,
   Tabs,
   TextField,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -27,15 +20,7 @@ import { CheckCircle2, Radar, Search, Server } from "lucide-react";
 import { TaskView } from "./pingTask_Task";
 import { ServerView } from "./pingTask_Server";
 
-const PingTask = () => {
-  return (
-    <PingTaskProvider>
-      <NodeDetailsProvider>
-        <InnerLayout />
-      </NodeDetailsProvider>
-    </PingTaskProvider>
-  );
-};
+const PingTask = () => <InnerLayout />;
 
 const InnerLayout = () => {
   const { pingTasks, isLoading, error } = usePingTask();

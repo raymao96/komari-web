@@ -11,6 +11,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDownIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { useReduceMotionPreference } from "@/lib/api";
 
 interface SettingCardProps {
   title?: string | React.ReactNode;
@@ -761,6 +762,7 @@ export function SettingCardCollapse({
   bordless?: boolean;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
+  const reduceMotion = useReduceMotionPreference();
 
   return (
     <SettingCard
@@ -777,9 +779,13 @@ export function SettingCardCollapse({
           aria-controls="collapsible-content"
         >
           <motion.div
-            initial={{ rotate: 0, scale: 1 }}
+            initial={reduceMotion ? false : { rotate: 0, scale: 1 }}
             animate={{ rotate: open ? 180 : 0, scale: open ? 1.1 : 1 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.25, ease: [0.4, 0, 0.2, 1] }
+            }
           >
             <ChevronDownIcon />
           </motion.div>
@@ -789,11 +795,15 @@ export function SettingCardCollapse({
         {open && (
           <motion.div
             className="w-full p-0 md:p-1" // Ensures the content takes full width
-            layout // Smoothly handles height changes
-            initial={{ height: 0, opacity: 0, y: -10 }}
+            layout={!reduceMotion}
+            initial={reduceMotion ? false : { height: 0, opacity: 0, y: -10 }}
             animate={{ height: "auto", opacity: 1, y: 0 }}
             exit={{ height: 0, opacity: 0, y: -10 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.25, ease: [0.4, 0, 0.2, 1] }
+            }
             style={{ overflow: "hidden" }} // Prevents content clipping during animation
             id="collapsible-content"
           >

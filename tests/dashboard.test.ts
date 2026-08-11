@@ -9,6 +9,11 @@ import {
   shortDashboardDay,
   type DashboardData,
 } from "../src/utils/dashboard.ts";
+import {
+  dashboardAlertCategoryPath,
+  dashboardAlertDetailPath,
+  formatBillingAlertStatus,
+} from "../src/utils/adminAlertFilters.ts";
 
 const sample = {
   servers: { total: 4, online: 3, offline: 1, offline_nodes: [] },
@@ -89,4 +94,34 @@ test("reserves enough chart space for complete traffic labels on desktop and mob
   assert.equal(dashboardTrafficAxisWidth([]), 68);
   assert.ok(dashboardTrafficAxisWidth([sixDigitGigabytes]) >= 88);
   assert.ok(dashboardTrafficAxisWidth([Number.MAX_VALUE]) <= 104);
+});
+
+test("dashboard alert links preserve category and exact target filters", () => {
+  assert.equal(dashboardAlertCategoryPath("offline"), "/admin/servers?alert=offline");
+  assert.equal(
+    dashboardAlertCategoryPath("latency_loss"),
+    "/admin/notification/ping-loss?state=active",
+  );
+  assert.equal(
+    dashboardAlertCategoryPath("return_route"),
+    "/admin/return-route?state=switched",
+  );
+  assert.equal(
+    dashboardAlertDetailPath("latency_loss", {
+      title: "loss",
+      node_uuid: "00000000-0000-4000-8000-000000000014",
+      task_id: 7,
+    }),
+    "/admin/notification/ping-loss?node=00000000-0000-4000-8000-000000000014&task=7",
+  );
+  assert.equal(
+    dashboardAlertDetailPath("return_route", { title: "route", task_id: 9 }),
+    "/admin/return-route?task=9",
+  );
+});
+
+test("billing alert labels distinguish overdue and upcoming states", () => {
+  const now = Date.parse("2026-08-08T00:00:00Z");
+  assert.equal(formatBillingAlertStatus("2026-08-11T00:00:00Z", "zh-CN", now), "3 天后到期");
+  assert.equal(formatBillingAlertStatus("2026-08-07T12:00:00Z", "zh-CN", now), "已到期 1 天");
 });

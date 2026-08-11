@@ -3,6 +3,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  --app-viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
+}
+
 @theme inline {
   --color-accent-1: var(--accent-1);
   --color-accent-2: var(--accent-2);
@@ -397,6 +407,20 @@ body, * {
 }
 
 @media (max-width: 767px) {
+  .km-theme-preview-actions {
+    display: grid !important;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch !important;
+  }
+
+  .km-theme-preview-actions > *,
+  .km-theme-preview-actions .rt-Button {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+
   .admin-deployment-delivery {
     gap: 0.5rem;
   }
@@ -892,5 +916,317 @@ body, * {
 
   .km-theme-config-scroll-button {
     display: none;
+  }
+}
+.dashboard-alert-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-active-filter {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.625rem !important;
+}
+
+.admin-active-filter .rt-CalloutIcon,
+.admin-active-filter .rt-CalloutText {
+  align-self: center;
+}
+
+.admin-active-filter .rt-Button {
+  min-height: 1.625rem;
+  height: 1.625rem;
+  padding-inline: 0.45rem;
+}
+
+[data-admin-shell] .rt-TabsList[data-admin-tab-motion-ready="true"] {
+  position: relative;
+}
+
+[data-admin-shell] .rt-TabsList[data-admin-tab-motion-ready="true"]::after {
+  position: absolute;
+  z-index: 2;
+  bottom: 0;
+  left: 0;
+  width: var(--admin-tab-highlight-width, 0px);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent-9);
+  content: "";
+  pointer-events: none;
+  transform: translate3d(var(--admin-tab-highlight-x, 0px), 0, 0);
+  transition:
+    width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width, transform;
+}
+
+[data-admin-shell] .rt-TabsTrigger[data-state="active"]::before {
+  opacity: 0;
+}
+
+[data-admin-shell] .rt-TabsTrigger[data-state="active"] {
+  background-color: transparent;
+}
+
+[data-admin-shell] .rt-TabsTrigger {
+  position: relative;
+  z-index: 1;
+}
+
+[data-admin-shell] .rt-TabsTriggerInner {
+  border-radius: var(--radius-2);
+  background-color: transparent !important;
+  outline: none !important;
+  transition:
+    color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) {
+  [data-admin-shell] .rt-TabsTrigger:hover .rt-TabsTriggerInner {
+    background-color: var(--gray-a3) !important;
+  }
+
+  [data-admin-shell] .rt-TabsTrigger:focus-visible:hover .rt-TabsTriggerInner {
+    background-color: var(--accent-a3) !important;
+  }
+}
+
+[data-admin-shell] .rt-TabsTrigger:focus-visible {
+  outline: 2px solid var(--accent-a7);
+  outline-offset: 1px;
+}
+
+[data-admin-shell] .rt-CheckboxRoot::before {
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+[data-admin-shell] [data-slot="checkbox"] {
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+html[data-admin-shell-active="true"] .rt-SelectItem,
+html[data-admin-shell-active="true"] .rt-BaseMenuItem {
+  font-weight: var(--font-weight-regular);
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+@keyframes admin-floating-content-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--admin-floating-x, 0), var(--admin-floating-y, -4px), 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes admin-floating-content-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(var(--admin-floating-x, 0), var(--admin-floating-y, -4px), 0) scale(0.985);
+  }
+}
+
+html[data-admin-shell-active="true"] :is(.rt-SelectContent, .rt-DropdownMenuContent, .rt-PopoverContent, .admin-select-or-input-content)[data-side="top"] {
+  --admin-floating-x: 0;
+  --admin-floating-y: 4px;
+}
+
+html[data-admin-shell-active="true"] :is(.rt-SelectContent, .rt-DropdownMenuContent, .rt-PopoverContent, .admin-select-or-input-content)[data-side="right"] {
+  --admin-floating-x: -4px;
+  --admin-floating-y: 0;
+}
+
+html[data-admin-shell-active="true"] :is(.rt-SelectContent, .rt-DropdownMenuContent, .rt-PopoverContent, .admin-select-or-input-content)[data-side="bottom"] {
+  --admin-floating-x: 0;
+  --admin-floating-y: -4px;
+}
+
+html[data-admin-shell-active="true"] :is(.rt-SelectContent, .rt-DropdownMenuContent, .rt-PopoverContent, .admin-select-or-input-content)[data-side="left"] {
+  --admin-floating-x: 4px;
+  --admin-floating-y: 0;
+}
+
+html[data-admin-shell-active="true"] :is(.rt-SelectContent, .rt-DropdownMenuContent, .rt-PopoverContent, .admin-select-or-input-content)[data-state="open"] {
+  animation: admin-floating-content-enter 180ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+html[data-admin-shell-active="true"] :is(.rt-SelectContent, .rt-DropdownMenuContent, .rt-PopoverContent, .admin-select-or-input-content)[data-state="closed"] {
+  animation: admin-floating-content-exit 140ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+[data-admin-shell] .rt-SwitchRoot::before {
+  transition:
+    background-position 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    filter 120ms ease;
+}
+
+[data-admin-shell] .rt-SwitchThumb {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms ease;
+  will-change: transform;
+}
+
+[data-admin-shell] .rt-SwitchRoot:active .rt-SwitchThumb[data-state="unchecked"] {
+  transform: scale(0.92);
+}
+
+[data-admin-shell] .rt-SwitchRoot:active .rt-SwitchThumb[data-state="checked"] {
+  transform: translateX(var(--switch-thumb-translate-x)) scale(0.92);
+}
+
+[data-admin-shell] .rt-Button,
+[data-admin-shell] .rt-IconButton {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    filter 120ms ease,
+    opacity 160ms ease,
+    transform 120ms ease-out;
+}
+
+[data-admin-shell] .rt-Button:active:not([data-disabled], [data-state="open"]),
+[data-admin-shell] .rt-IconButton:active:not([data-disabled], [data-state="open"]) {
+  filter: none;
+  transform: translateY(1px) scale(0.985);
+}
+
+@media (pointer: coarse) {
+  [data-admin-shell] .rt-Button:active:not([data-state="open"]),
+  [data-admin-shell] .rt-IconButton:active:not([data-state="open"]) {
+    outline: none;
+  }
+}
+
+[data-admin-shell] .rt-TabsTrigger,
+[data-admin-shell] .rt-SegmentedControlItem,
+[data-admin-shell] button[aria-pressed],
+[data-admin-shell] a[href^="/admin"] {
+  transition:
+    color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 120ms ease-out;
+}
+
+[data-admin-shell] .rt-TabsTrigger:active,
+[data-admin-shell] .rt-SegmentedControlItem:active,
+[data-admin-shell] button[aria-pressed]:active,
+[data-admin-shell] a[href^="/admin"]:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+@keyframes admin-dialog-overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes admin-dialog-overlay-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes admin-dialog-content-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes admin-dialog-content-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.96);
+  }
+}
+
+html[data-admin-shell-active="true"] .rt-BaseDialogOverlay::before {
+  background-color: var(--black-a5);
+}
+
+html[data-admin-shell-active="true"] .rt-BaseDialogContent {
+  box-shadow:
+    0 10px 28px -14px var(--black-a4),
+    0 2px 8px -5px var(--black-a3);
+}
+
+html[data-admin-shell-active="true"] .rt-BaseDialogOverlay[data-state="open"]::before {
+  animation: admin-dialog-overlay-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+html[data-admin-shell-active="true"] .rt-BaseDialogOverlay[data-state="closed"]::before {
+  animation: admin-dialog-overlay-exit 220ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+html[data-admin-shell-active="true"] .rt-BaseDialogContent[data-state="open"] {
+  animation: admin-dialog-content-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transform-origin: 50% 50%;
+}
+
+html[data-admin-shell-active="true"] .rt-BaseDialogContent[data-state="closed"] {
+  animation: admin-dialog-content-exit 220ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform-origin: 50% 50%;
+}
+
+html[data-reduce-motion="true"] [data-admin-shell] .rt-TabsContent,
+html[data-reduce-motion="true"] [data-admin-shell] [role="tabpanel"],
+html[data-reduce-motion="true"] [data-admin-shell] .rt-TabsTrigger,
+html[data-reduce-motion="true"] [data-admin-shell] .rt-SegmentedControlItem,
+html[data-reduce-motion="true"] [data-admin-shell] button[aria-pressed],
+html[data-reduce-motion="true"] [data-admin-shell] a[href^="/admin"],
+html[data-reduce-motion="true"] [data-admin-shell] .rt-CheckboxRoot::before,
+html[data-reduce-motion="true"] [data-admin-shell] [data-slot="checkbox"],
+html[data-reduce-motion="true"] [data-admin-shell] .rt-SwitchRoot::before,
+html[data-reduce-motion="true"] [data-admin-shell] .rt-SwitchThumb,
+html[data-reduce-motion="true"] [data-admin-shell] .rt-Button,
+html[data-reduce-motion="true"] [data-admin-shell] .rt-IconButton,
+html[data-reduce-motion="true"] .km-theme-config-tabs-list,
+html[data-reduce-motion="true"] .rt-SelectContent,
+html[data-reduce-motion="true"] .rt-DropdownMenuContent,
+html[data-reduce-motion="true"] .rt-PopoverContent,
+html[data-reduce-motion="true"] .admin-select-or-input-content,
+html[data-reduce-motion="true"] .rt-BaseDialogOverlay::before,
+html[data-reduce-motion="true"] .rt-BaseDialogContent {
+  animation: none !important;
+  scroll-behavior: auto;
+  transition: none !important;
+  transform: none !important;
+}
+
+@media (min-width: 768px) {
+  [data-dashboard-span="3"] .dashboard-alert-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  [data-dashboard-span="6"] .dashboard-alert-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }

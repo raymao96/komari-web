@@ -28,14 +28,15 @@ const PingTaskContext = React.createContext<PingTaskContextType | undefined>(
   undefined
 );
 
-export const PingTaskProvider: React.FC<{ children: React.ReactNode }> = ({
+const PingTaskProviderValue: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [pingTasks, setPingTasks] = React.useState<PingTask[] | null>(null);
-  const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const refresh = () => {
+  const refresh = React.useCallback(() => {
+    setIsLoading(true);
     setError(null);
     fetch("/api/admin/ping")
       .then((response) => {
@@ -57,19 +58,30 @@ export const PingTaskProvider: React.FC<{ children: React.ReactNode }> = ({
       .finally(() => {
         setIsLoading(false);
       });
-  };
-
-  React.useEffect(() => {
-    setIsLoading(true);
-
-    refresh();
-    setIsLoading(false);
   }, []);
 
+  React.useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const value = React.useMemo(
+    () => ({ pingTasks, isLoading, error, refresh }),
+    [error, isLoading, pingTasks, refresh],
+  );
+
   return (
-    <PingTaskContext.Provider value={{ pingTasks, isLoading, error, refresh }}>
+    <PingTaskContext.Provider value={value}>
       {children}
     </PingTaskContext.Provider>
+  );
+};
+
+export const PingTaskProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const inherited = React.useContext(PingTaskContext);
+  return inherited ? <>{children}</> : (
+    <PingTaskProviderValue>{children}</PingTaskProviderValue>
   );
 };
 

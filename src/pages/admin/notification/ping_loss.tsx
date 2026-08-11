@@ -1,5 +1,6 @@
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AdminActiveFilter from "@/components/admin/AdminActiveFilter";
 import { AdminSelectionCount } from "@/components/admin/AdminSelectionCount";
 import {
   AdminPagination,
@@ -27,7 +28,6 @@ import {
   Badge,
   Box,
   Button,
-  Checkbox,
   Dialog,
   Flex,
   IconButton,
@@ -36,6 +36,7 @@ import {
   Tabs,
   TextField,
 } from "@radix-ui/themes";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Pencil,
   Plus,
@@ -45,6 +46,7 @@ import {
 } from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 type PingLossNotification = {
@@ -57,6 +59,7 @@ type PingLossNotification = {
   minimum_samples: number;
   cooldown_seconds: number;
   last_notified?: string | null;
+  alert_active?: boolean;
   task?: PingTask;
 };
 
@@ -195,6 +198,7 @@ const PingLossPage = () => (
 
 const PingLossContent = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const { nodeDetail, isLoading: nodesLoading, error: nodesError } =
     useNodeDetails();
   const { pingTasks, isLoading: tasksLoading, error: tasksError } =
@@ -205,6 +209,9 @@ const PingLossContent = () => {
   const [search, setSearch] = React.useState("");
   const [view, setView] = React.useState<ViewMode>("task");
   const [selected, setSelected] = React.useState<string[]>([]);
+  const routeState = searchParams.get("state")?.trim() || "";
+  const routeNode = searchParams.get("node")?.trim() || "";
+  const routeTask = Number(searchParams.get("task") || 0);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -228,6 +235,14 @@ const PingLossContent = () => {
     () => buildAlertTargets(pingTasks || [], nodeDetail, rules),
     [pingTasks, nodeDetail, rules],
   );
+  const routeFilteredTargets = React.useMemo(
+    () => targets.filter((target) => (
+      (!routeState || routeState !== "active" || target.rule?.alert_active === true)
+      && (!routeNode || target.client === routeNode)
+      && (!routeTask || target.taskId === routeTask)
+    )),
+    [routeNode, routeState, routeTask, targets],
+  );
 
   React.useEffect(() => {
     const validKeys = new Set(targets.map((target) => target.key));
@@ -237,7 +252,7 @@ const PingLossContent = () => {
   const filteredTargets = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
     const filtered = keyword
-      ? targets.filter((target) =>
+      ? routeFilteredTargets.filter((target) =>
           [
             target.clientName,
             target.client,
@@ -246,9 +261,24 @@ const PingLossContent = () => {
             target.task.type,
           ].some((value) => String(value || "").toLowerCase().includes(keyword)),
         )
-      : targets;
+      : routeFilteredTargets;
     return sortTargets(filtered, view);
-  }, [targets, search, view]);
+  }, [routeFilteredTargets, search, view]);
+
+  const activeFilterLabel = React.useMemo(() => {
+    if (routeNode || routeTask) {
+      const target = targets.find((item) => (
+        (!routeNode || item.client === routeNode) && (!routeTask || item.taskId === routeTask)
+      ));
+      return [target?.clientName || routeNode, target?.task.name || (routeTask ? `#${routeTask}` : "")]
+        .filter(Boolean)
+        .join(" · ");
+    }
+    if (routeState === "active") {
+      return t("admin_dashboard.alert_latency_loss");
+    }
+    return "";
+  }, [routeNode, routeState, routeTask, t, targets]);
 
   const selectedTargets = React.useMemo(() => {
     const selectedSet = new Set(selected);
@@ -302,6 +332,10 @@ const PingLossContent = () => {
           {t("notification.ping_loss.full_title")}
         </AdminPageTitle>
       </Flex>
+
+      {activeFilterLabel ? (
+        <AdminActiveFilter label={activeFilterLabel} clearTo="/admin/notification/ping-loss" />
+      ) : null}
 
       <Tabs.Root value={view} onValueChange={(value) => setView(value as ViewMode)}>
         <div className="w-full overflow-x-auto pb-1">

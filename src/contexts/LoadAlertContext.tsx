@@ -4,6 +4,7 @@ export interface LoadAlert {
   id?: number;
   name?: string;
   clients?: string[];
+  default_on?: boolean;
   metric?: "cpu" | "ram" | "disk" | "net_in" | "net_out";
   threshold?: number;
   ratio?: number;

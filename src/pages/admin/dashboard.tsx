@@ -50,6 +50,11 @@ import {
   type DashboardModuleId,
 } from "@/utils/dashboardSettings";
 import { formatBytes } from "@/utils/unitHelper";
+import {
+  readDashboardSession,
+  writeDashboardSession,
+  type DashboardViewState,
+} from "@/utils/dashboardSession";
 
 const moduleGridClass: Record<number, string> = {
   1: "md:col-span-1",
@@ -81,6 +86,15 @@ export default function AdminDashboard() {
     () => packDashboardModules(visibleModules, moduleSpans, settings.preset !== "custom"),
     [moduleSpans, settings.preset, visibleModules],
   );
+  const viewKey = React.useMemo(
+    () => settings.preset === "overview"
+      ? "overview"
+      : `${settings.preset}:${packedModules.map(({ id, span }) => `${id}:${span}`).join(",")}`,
+    [packedModules, settings.preset],
+  );
+  const dashboardRootRef = React.useRef<HTMLDivElement>(null);
+  const navigationAnchorRef = React.useRef<Omit<DashboardViewState, "scrollTop"> | null>(null);
+  const restoredViewKeyRef = React.useRef<string | null>(null);
 
   const [data, setData] = React.useState<DashboardData | null>(() => getDashboardSnapshot(summaryKey, accountKey));
   const [charts, setCharts] = React.useState<DashboardChartsData | null>(() => getDashboardChartsSnapshot(chartKey, accountKey));
@@ -168,6 +182,79 @@ export default function AdminDashboard() {
     summaryKey,
     summarySections.length,
   ]);
+
+  const saveDashboardView = React.useCallback((anchor = navigationAnchorRef.current) => {
+    const root = dashboardRootRef.current;
+    const container = root?.closest<HTMLElement>("[data-admin-scroll-container]");
+    if (!container) return;
+    writeDashboardSession<DashboardViewState>("view", accountKey, viewKey, {
+      scrollTop: container.scrollTop,
+      ...(anchor ?? {}),
+    });
+  }, [accountKey, viewKey]);
+
+  const rememberClickedModule = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest("a[href]")) return;
+    const moduleElement = target.closest<HTMLElement>("[data-dashboard-module]");
+    const container = dashboardRootRef.current?.closest<HTMLElement>("[data-admin-scroll-container]");
+    if (!moduleElement || !container) return;
+    const anchor = {
+      moduleId: moduleElement.dataset.dashboardModule,
+      moduleOffset: moduleElement.getBoundingClientRect().top - container.getBoundingClientRect().top,
+    };
+    navigationAnchorRef.current = anchor;
+    saveDashboardView(anchor);
+  }, [saveDashboardView]);
+
+  React.useLayoutEffect(() => {
+    if (settingsLoading || restoredViewKeyRef.current === viewKey) return;
+    restoredViewKeyRef.current = viewKey;
+    const snapshot = readDashboardSession<DashboardViewState>("view", accountKey, viewKey);
+    const root = dashboardRootRef.current;
+    const container = root?.closest<HTMLElement>("[data-admin-scroll-container]");
+    if (!snapshot || !root || !container) return;
+
+    let animationFrame = 0;
+    let frameCount = 0;
+    let stableFrames = 0;
+    let previousHeight = -1;
+    const restore = () => {
+      frameCount++;
+      const moduleElement = snapshot.moduleId
+        ? root.querySelector<HTMLElement>(`[data-dashboard-module="${snapshot.moduleId}"]`)
+        : null;
+      if (moduleElement && Number.isFinite(snapshot.moduleOffset)) {
+        const currentOffset = moduleElement.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        container.scrollTop = Math.max(0, container.scrollTop + currentOffset - (snapshot.moduleOffset ?? 0));
+      } else {
+        container.scrollTop = Math.max(0, snapshot.scrollTop);
+      }
+
+      if (container.scrollHeight === previousHeight) stableFrames++;
+      else stableFrames = 0;
+      previousHeight = container.scrollHeight;
+      if (stableFrames < 2 && frameCount < 12) {
+        animationFrame = window.requestAnimationFrame(restore);
+      }
+    };
+    animationFrame = window.requestAnimationFrame(restore);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [accountKey, settingsLoading, viewKey]);
+
+  React.useEffect(() => {
+    const saveBeforePageHide = () => saveDashboardView();
+    const saveWhenHidden = () => {
+      if (document.visibilityState === "hidden") saveDashboardView();
+    };
+    window.addEventListener("pagehide", saveBeforePageHide);
+    document.addEventListener("visibilitychange", saveWhenHidden);
+    return () => {
+      saveDashboardView();
+      window.removeEventListener("pagehide", saveBeforePageHide);
+      document.removeEventListener("visibilitychange", saveWhenHidden);
+    };
+  }, [saveDashboardView]);
 
   const locale = i18n.resolvedLanguage || i18n.language || "zh-CN";
   const dailyChartData = React.useMemo(
@@ -306,7 +393,7 @@ export default function AdminDashboard() {
           : <Skeleton className="h-[286px] w-full" />;
       case "alerts":
         return data
-          ? <AlertOverviewPanel data={data} locale={locale} />
+          ? <AlertOverviewPanel data={data} locale={locale} accountKey={accountKey} />
           : <Skeleton className="h-[210px] w-full" />;
       case "storage_detail":
         return data
@@ -322,25 +409,32 @@ export default function AdminDashboard() {
     <>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {(["server_status", "traffic_summary", "storage_summary"] as const).map((module) => (
-          <div key={module} className="min-w-0">{renderModule(module)}</div>
+          <div key={module} data-dashboard-module={module} className="min-w-0">{renderModule(module)}</div>
         ))}
       </div>
-      <div className="min-w-0">{renderModule("latency_trend")}</div>
+      <div data-dashboard-module="latency_trend" className="min-w-0">{renderModule("latency_trend")}</div>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {(["traffic_trend", "billing_trend"] as const).map((module) => (
-          <div key={module} className="min-w-0 [&>*]:h-full">{renderModule(module)}</div>
+          <div key={module} data-dashboard-module={module} className="min-w-0 [&>*]:h-full">{renderModule(module)}</div>
         ))}
       </div>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {(["return_route", "alerts"] as const).map((module) => (
-          <div key={module} className="min-w-0 [&>*]:h-full">{renderModule(module)}</div>
+          <div
+            key={module}
+            data-dashboard-module={module}
+            data-dashboard-span="3"
+            className="min-w-0 [&>*]:h-full"
+          >
+            {renderModule(module)}
+          </div>
         ))}
       </div>
     </>
   );
 
   return (
-    <div className="flex flex-col gap-3 p-0 md:p-4">
+    <div ref={dashboardRootRef} onClickCapture={rememberClickedModule} className="flex flex-col gap-3 p-0 md:p-4">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <AdminPageTitle description={t("admin_dashboard.subtitle")}>
           {t("admin_dashboard.title")}
@@ -380,7 +474,12 @@ export default function AdminDashboard() {
       ) : settings.preset === "overview" ? formalLayout : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
           {packedModules.map(({ id, span }) => (
-            <div key={id} className={`min-w-0 [&>*]:h-full ${moduleGridClass[span]}`}>
+            <div
+              key={id}
+              data-dashboard-module={id}
+              data-dashboard-span={span}
+              className={`min-w-0 [&>*]:h-full ${moduleGridClass[span]}`}
+            >
               {renderModule(id)}
             </div>
           ))}

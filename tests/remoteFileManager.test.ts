@@ -8,6 +8,13 @@ const source = readFileSync(
   "utf8",
 );
 
+test("file-manager checkboxes use the shared system control", () => {
+  assert.match(source, /import \{ Checkbox \} from "@\/components\/ui\/checkbox"/);
+  assert.doesNotMatch(source, /<input type="checkbox"/);
+  assert.match(source, /<Checkbox checked=\{showHidden\}/);
+  assert.match(source, /<Checkbox checked=\{selected\.has\(entry\.path\)\}/);
+});
+
 test("the existing multi-selection context menu can download selected files", () => {
   assert.match(source, /<Download size=\{15\} \/>下载所选文件/);
   assert.match(

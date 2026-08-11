@@ -96,3 +96,25 @@ test("deployment actions keep stable button content while a request is pending",
   assert.doesNotMatch(source, /aria-disabled=\{Boolean\(profileAction\)\}/);
   assert.doesNotMatch(source, /savingProfile/);
 });
+
+test("Agent command copy uses the Edge-compatible clipboard fallback", () => {
+  assert.match(source, /import \{ writeClipboardText \} from "@\/utils\/clipboard"/);
+  const copyStart = source.indexOf("writeClipboardText(generateCommand())");
+  const saveStart = source.indexOf("const response = await fetch(", copyStart);
+  assert.ok(copyStart >= 0 && saveStart > copyStart);
+  assert.match(source, /\(value\) => \(\{ ok: true as const, value \}\)/);
+  assert.match(source, /copyResult\.value\.confirmed/);
+  assert.match(source, /installCommandCopyDenied/);
+  assert.match(source, /installCommandCopyUnconfirmed/);
+  assert.doesNotMatch(source, /navigator\.clipboard\.writeText\(generateCommand\(\)\)/);
+});
+
+test("mobile deployment copy shows an inline confirmed or failed result", () => {
+  assert.match(source, /const isMobile = useIsMobile\(\)/);
+  assert.match(source, /copyFeedback, setCopyFeedback/);
+  assert.match(source, /isMobile && copyFeedback/);
+  assert.match(source, /copyFeedback\.kind === "success"/);
+  assert.match(source, /role="status"/);
+  assert.match(source, /aria-live="polite"/);
+  assert.match(source, /commandTextAreaRef\.current\?\.select\(\)/);
+});
