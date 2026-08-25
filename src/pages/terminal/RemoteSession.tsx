@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Terminal } from "@xterm/xterm";
@@ -709,18 +710,18 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
         </main>
 
         <Dialog.Root open={otpOpen} onOpenChange={(open) => { if (!open) setOtpOpen(false); }}>
-          <Dialog.Content maxWidth="400px">
+          <AppDialogContent maxWidth="400px">
             <Dialog.Title>双重身份验证</Dialog.Title>
             <Dialog.Description>请输入身份验证应用生成的动态口令。本次验证在 10 分钟内有效。</Dialog.Description>
             <TextField.Root type="text" inputMode="numeric" autoFocus value={otpInput} onChange={(event) => setOtpInput(event.target.value.replace(/\D/g, ""))} onKeyDown={(event) => {
               if (event.key === "Enter" && otpInput) { setOtpCode(otpInput); setOtpOpen(false); }
             }} />
             <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setOtpOpen(false)}>取消</Button><Button disabled={!otpInput} onClick={() => { setOtpCode(otpInput); setOtpOpen(false); }}>连接</Button></div>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
 
         <Dialog.Root open={manualPasteOpen} onOpenChange={setManualPasteOpen}>
-          <Dialog.Content maxWidth="440px">
+          <AppDialogContent maxWidth="440px">
             <Dialog.Title>粘贴到终端</Dialog.Title>
             <TextArea autoFocus value={manualPasteText} onChange={(event) => setManualPasteText(event.target.value)} rows={7} />
             <div className="remote-dialog-actions">
@@ -733,7 +734,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
                 }
               }}>插入终端</Button>
             </div>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
 
         {contextMenu && (

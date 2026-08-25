@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 
 import { toast } from "sonner";
@@ -312,7 +313,7 @@ const InnerLayout = () => {
                         <Dialog.Trigger>
                           <Button>{t("account_settings.unbind_sso", { provider: displayName })}</Button>
                         </Dialog.Trigger>
-                        <Dialog.Content>
+                        <AppDialogContent>
                           <Dialog.Title>
                             {t("account_settings.confirm_unbind")}
                           </Dialog.Title>
@@ -329,7 +330,7 @@ const InnerLayout = () => {
                               {t("account_settings.confirm_unbind")}
                             </Button>
                           </Flex>
-                        </Dialog.Content>
+                        </AppDialogContent>
                       </Dialog.Root>
                     ) : (
                       <Button onClick={handleSSOAuth}>
@@ -423,7 +424,7 @@ const TwoFactorDisabled = () => {
             <Button className="w-full sm:w-auto">{t("account.enable_2fa")}</Button>
           </div>
         </Dialog.Trigger>
-        <Dialog.Content>
+        <AppDialogContent>
           <Dialog.Title>{t("account.enable_2fa")}</Dialog.Title>
           <Flex direction="column" gap="2">
             <label>{t("account.2fa_qr_code_hint")}</label>
@@ -448,7 +449,7 @@ const TwoFactorDisabled = () => {
               </Button>
             </form>
           </Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
     </Flex>
   );
@@ -505,7 +506,7 @@ const TwoFactorEnabled = () => {
               {t("account.disable_2fa")}
             </Button>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("account.disable_2fa")}</Dialog.Title>
             <Dialog.Description>
               {t("account.disable_2fa_confirmation")}
@@ -530,7 +531,7 @@ const TwoFactorEnabled = () => {
                 {t("common.confirm")}
               </Button>
             </Flex>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
       </div>
     </Flex>

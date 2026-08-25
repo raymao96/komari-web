@@ -2,31 +2,54 @@
 import { lazy } from "react";
 import { Navigate, type RouteObject } from "react-router-dom";
 import React from "react";
+import {
+  expandAdminPreloadTargets,
+  LIKELY_ADMIN_ROUTES,
+  normalizeAdminPathname,
+} from "./utils/adminPreload";
 
 const importAdminLayout = () => import("./pages/admin/_layout");
 const importAdminDashboard = () => import("./pages/admin/dashboard");
+const importAdminServers = () => import("./pages/admin");
+const importAdminPing = () => import("./pages/admin/pingTask");
+const importAdminReturnRoute = () => import("./pages/admin/returnRoute");
+const importAdminSettingsLayout = () =>
+  import("./pages/admin/settings/_layout");
 let adminLayoutModule: ReturnType<typeof importAdminLayout> | undefined;
 let adminDashboardModule: ReturnType<typeof importAdminDashboard> | undefined;
+let adminServersModule: ReturnType<typeof importAdminServers> | undefined;
+let adminPingModule: ReturnType<typeof importAdminPing> | undefined;
+let adminReturnRouteModule: ReturnType<typeof importAdminReturnRoute> | undefined;
+let adminSettingsLayoutModule: ReturnType<
+  typeof importAdminSettingsLayout
+> | undefined;
 const loadAdminLayout = () => (adminLayoutModule ??= importAdminLayout());
 const loadAdminDashboard = () =>
   (adminDashboardModule ??= importAdminDashboard());
+const loadAdminServers = () => (adminServersModule ??= importAdminServers());
+const loadAdminPing = () => (adminPingModule ??= importAdminPing());
+const loadAdminReturnRoute = () =>
+  (adminReturnRouteModule ??= importAdminReturnRoute());
+const loadAdminSettingsLayout = () =>
+  (adminSettingsLayoutModule ??= importAdminSettingsLayout());
 
-export const preloadAdminEntry = () => {
+export const preloadAdminEntry = (pathname: string) => {
   void loadAdminLayout();
-  void loadAdminDashboard();
+  if (pathname === "/admin") void loadAdminDashboard();
 };
 
 const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin": loadAdminDashboard,
-  "/admin/servers": () => import("./pages/admin"),
-  "/admin/ping": () => import("./pages/admin/pingTask"),
-  "/admin/return-route": () => import("./pages/admin/returnRoute"),
+  "/admin/servers": loadAdminServers,
+  "/admin/ping": loadAdminPing,
+  "/admin/return-route": loadAdminReturnRoute,
   "/admin/logs": () => import("./pages/admin/log"),
   "/admin/exec": () => import("./pages/admin/exec"),
   "/admin/terminal": () => import("./pages/admin/terminal"),
   "/admin/theme_managed": () => import("./pages/admin/theme_managed.tsx"),
   "/admin/theme_raw": () => import("./pages/admin/theme_raw.tsx"),
   "/admin/market/themes": () => import("./pages/admin/market/themes"),
+  "/admin/settings": loadAdminSettingsLayout,
   "/admin/settings/site": () => import("./pages/admin/settings/site"),
   "/admin/settings/dashboard": () => import("./pages/admin/settings/dashboard"),
   "/admin/settings/theme": () => import("./pages/admin/settings/theme"),
@@ -45,19 +68,29 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
 };
 
 export const preloadAdminRoute = async (target: string): Promise<void> => {
-  const pathname = target.split(/[?#]/, 1)[0].replace(/\/$/, "") || "/admin";
-  const preload = adminRoutePreloaders[pathname];
-  if (preload) await preload();
+  const pathname = normalizeAdminPathname(target);
+  await Promise.all(
+    expandAdminPreloadTargets(pathname).map((path) => {
+      const preload = adminRoutePreloaders[path];
+      return preload ? preload() : Promise.resolve();
+    }),
+  );
 };
 
-export const preloadAdminRoutes = async (): Promise<void> => {
-  await Promise.allSettled(
-    Array.from(new Set(Object.values(adminRoutePreloaders))).map((preload) => preload()),
-  );
+export const preloadAdminRoutes = async (
+  targets: readonly string[] = LIKELY_ADMIN_ROUTES,
+): Promise<void> => {
+  for (const target of targets) {
+    await preloadAdminRoute(target);
+  }
 };
 
 const AdminLayout = lazy(loadAdminLayout);
 const AdminDashboard = lazy(loadAdminDashboard);
+const AdminServers = lazy(loadAdminServers);
+const AdminPing = lazy(loadAdminPing);
+const AdminReturnRoute = lazy(loadAdminReturnRoute);
+const AdminSettingsLayout = lazy(loadAdminSettingsLayout);
 const NotFound = lazy(() => import("./pages/404"));
 
 export const routes: RouteObject[] = [
@@ -84,7 +117,7 @@ export const routes: RouteObject[] = [
       { index: true, element: React.createElement(AdminDashboard) },
       {
         path: "servers",
-        element: React.createElement(lazy(() => import("./pages/admin"))),
+        element: React.createElement(AdminServers),
       },
       {
         path: "theme_managed",
@@ -120,9 +153,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: "settings",
-        element: React.createElement(
-          lazy(() => import("./pages/admin/settings/_layout"))
-        ),
+        element: React.createElement(AdminSettingsLayout),
         children: [
           {
             path: "site",
@@ -230,15 +261,11 @@ export const routes: RouteObject[] = [
       },
       {
         path: "ping",
-        element: React.createElement(
-          lazy(() => import("./pages/admin/pingTask"))
-        ),
+        element: React.createElement(AdminPing),
       },
       {
         path: "return-route",
-        element: React.createElement(
-          lazy(() => import("./pages/admin/returnRoute"))
-        ),
+        element: React.createElement(AdminReturnRoute),
       },
       {
         path: "logs",

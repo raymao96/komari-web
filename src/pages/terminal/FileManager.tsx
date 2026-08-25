@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import {
   forwardRef,
   useEffect,
@@ -771,31 +772,31 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       )}
 
       <Dialog.Root open={createKind !== null} onOpenChange={(open) => !open && setCreateKind(null)}>
-        <Dialog.Content maxWidth="380px">
+        <AppDialogContent maxWidth="380px">
           <Dialog.Title>{createKind === "folder" ? "新建文件夹" : "新建文件"}</Dialog.Title>
           <TextField.Root autoFocus value={createName} onChange={(event) => setCreateName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void createEntry()} />
           <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setCreateKind(null)}>取消</Button><Button onClick={() => void createEntry()}>创建</Button></div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={renameEntry !== null} onOpenChange={(open) => !open && setRenameEntry(null)}>
-        <Dialog.Content maxWidth="380px">
+        <AppDialogContent maxWidth="380px">
           <Dialog.Title>重命名</Dialog.Title>
           <TextField.Root autoFocus value={renameName} onChange={(event) => setRenameName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void rename()} />
           <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setRenameEntry(null)}>取消</Button><Button onClick={() => void rename()}>保存</Button></div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <Dialog.Content maxWidth="420px">
+        <AppDialogContent maxWidth="420px">
           <Dialog.Title>删除所选项目</Dialog.Title>
           <Dialog.Description>将永久删除 {actionableEntries.length} 个项目，文件夹会连同内容一起删除。</Dialog.Description>
           <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setDeleteOpen(false)}>取消</Button><Button color="red" onClick={() => void removeSelected()}>删除</Button></div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={pendingOverwriteFiles !== null} onOpenChange={(open) => !open && setPendingOverwriteFiles(null)}>
-        <Dialog.Content maxWidth="430px">
+        <AppDialogContent maxWidth="430px">
           <Dialog.Title>覆盖同名文件</Dialog.Title>
           <Dialog.Description>所选文件中存在与当前目录同名的文件。继续后将覆盖同名文件，其余文件正常上传。</Dialog.Description>
           <div className="remote-dialog-actions">
@@ -806,7 +807,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
               void uploadFiles(files, true);
             }}>覆盖并上传</Button>
           </div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
     </section>
   );

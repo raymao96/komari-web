@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import LanguageSwitch from "@/components/Language";
 import Loading from "@/components/loading";
 import {
@@ -100,7 +101,7 @@ const AddButton = () => {
           <PlusIcon size="16" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content className="remote-command-dialog">
+      <AppDialogContent className="remote-command-dialog">
         <Dialog.Title>{t("common.add")}</Dialog.Title>
         <form onSubmit={handleAddCommand}>
           <Flex direction="column" gap="2">
@@ -127,7 +128,7 @@ const AddButton = () => {
             </Button>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };
@@ -157,7 +158,7 @@ const DeleteButton = ({ id }: { id: number }) => {
           <Trash2Icon size="16" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>{t("common.delete")}</Dialog.Title>
         <Dialog.Description>{t("common.confirm_delete")}</Dialog.Description>
         <Flex justify="end" gap="2" className="mt-4">
@@ -168,7 +169,7 @@ const DeleteButton = ({ id }: { id: number }) => {
             {t("common.delete")}
           </Button>
         </Flex>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };
@@ -211,7 +212,7 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
           <Edit2Icon size="16" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>{t("common.edit")}</Dialog.Title>
         <form onSubmit={handleUpdate}>
           <Flex direction="column" gap="2">
@@ -238,7 +239,7 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
             </Flex>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };

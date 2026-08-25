@@ -100,6 +100,17 @@ export default function GeneralSettings() {
           await updateSettingsWithToast({ geo_ip_enabled: checked }, t);
         }}
       />
+      <SettingCardSwitch
+        title={t("settings.general.auto_order_new_clients")}
+        description={t("settings.general.auto_order_new_clients_description")}
+        defaultChecked={Boolean(settings.auto_order_new_clients_by_region)}
+        onChange={async (checked) => {
+          await updateSettingsWithToast(
+            { auto_order_new_clients_by_region: checked },
+            t,
+          );
+        }}
+      />
       <SettingCardSelect
         title={t("settings.geoip.provider_title")}
         description={t("settings.geoip.provider_description")}

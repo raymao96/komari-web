@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { Checkbox } from "@/components/ui/checkbox";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { AdminSelectionCount } from "@/components/admin/AdminSelectionCount";
@@ -23,7 +24,7 @@ import {
   type OfflineNotification,
 } from "@/contexts/NotificationContext";
 import React from "react";
-import { Pencil, Search } from "lucide-react";
+import { Pencil, Search, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   Badge,
@@ -51,6 +52,7 @@ const NotificationEditForm = ({
   onSubmit,
   loading,
   onCancel,
+  statusLabel,
 }: {
   initialValues: { enable: boolean; cooldown: number; grace_period: number };
   onSubmit: (values: {
@@ -60,8 +62,10 @@ const NotificationEditForm = ({
   }) => void;
   loading?: boolean;
   onCancel?: () => void;
+  statusLabel?: string;
 }) => {
   const { t } = useTranslation();
+  const formId = React.useId();
   const [enabled, setEnabled] = React.useState(initialValues.enable);
   // const [cooldown, setCooldown] = React.useState(initialValues.cooldown);
   const [grace, setGrace] = React.useState(initialValues.grace_period);
@@ -71,36 +75,46 @@ const NotificationEditForm = ({
         e.preventDefault();
         onSubmit({ enable: enabled, cooldown: 3000, grace_period: grace });
       }}
-      className="flex flex-col gap-2"
+      className="mt-4 flex flex-col gap-5"
     >
-      <label htmlFor="status">{t("common.status")}</label>
-      <Switch
-        id="status"
-        name="status"
-        checked={enabled}
-        onCheckedChange={setEnabled}
-      />
+      <div className="flex items-center justify-between gap-4">
+        <label htmlFor={`${formId}-status`} className="font-medium">
+          {statusLabel ?? t("common.status")}
+        </label>
+        <Switch
+          id={`${formId}-status`}
+          name="status"
+          checked={enabled}
+          onCheckedChange={setEnabled}
+        />
+      </div>
       {/* <label htmlFor="cooldown">{t("notification.offline.cooldown")}</label>
       <TextField.Root
         type="number"
-        min={0}
+        min={1}
         value={cooldown}
         onChange={e => setCooldown(Number(e.target.value))}
         id="cooldown"
         name="cooldown"
       /> */}
-      <label htmlFor="grace_period" className="flex items-center gap-2">
-        {t("notification.offline.grace_period")}<Tips>{t("notification.offline.grace_period_tip")}</Tips>
-      </label>
-      <TextField.Root
-        type="number"
-        min={0}
-        value={grace}
-        onChange={(e) => setGrace(Number(e.target.value))}
-        id="grace_period"
-        name="grace_period"
-      />
-      <Flex gap="2" justify="end" className="mt-4">
+      <div className="grid gap-2">
+        <label
+          htmlFor={`${formId}-grace-period`}
+          className="flex items-center gap-2 font-medium"
+        >
+          {t("notification.offline.grace_period")}
+          <Tips>{t("notification.offline.grace_period_tip")}</Tips>
+        </label>
+        <TextField.Root
+          type="number"
+          min={0}
+          value={grace}
+          onChange={(e) => setGrace(Number(e.target.value))}
+          id={`${formId}-grace-period`}
+          name="grace_period"
+        />
+      </div>
+      <Flex gap="2" justify="end" className="mt-2">
         {onCancel && (
           <Dialog.Close>
             <Button
@@ -138,6 +152,17 @@ const InnerLayout = () => {
   const { t } = useTranslation();
   const [batchLoading, setBatchLoading] = React.useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
+  const [defaultDialogOpen, setDefaultDialogOpen] = React.useState(false);
+  const [defaultSaving, setDefaultSaving] = React.useState(false);
+  const [defaultConfig, setDefaultConfig] = React.useState({
+    enabled: false,
+    grace_period: 180,
+  });
+  const [defaultForm, setDefaultForm] = React.useState({
+    enable: false,
+    cooldown: 1800,
+    grace_period: 180,
+  });
   const [batchForm, setBatchForm] = React.useState({
     enable: true,
     cooldown: 1800,
@@ -164,6 +189,58 @@ const InnerLayout = () => {
       return;
     }
     setSelected((current) => Array.from(new Set([...current, ...filteredNodeIds])));
+  };
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/notification/offline/default", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(data?.message || response.statusText || "Request failed");
+        }
+        return data?.data;
+      })
+      .then((value) => {
+        if (cancelled) return;
+        setDefaultConfig({
+          enabled: value?.enabled === true,
+          grace_period: Number(value?.grace_period) || 180,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveDefaultConfig = (values: {
+    enable: boolean;
+    grace_period: number;
+  }) => {
+    const next = {
+      enabled: values.enable,
+      grace_period: values.grace_period,
+    };
+    setDefaultSaving(true);
+    fetch("/api/admin/notification/offline/default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(next),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(data?.message || response.statusText || "Request failed");
+        }
+        setDefaultConfig(next);
+        toast.success(t("common.updated_successfully"));
+        setDefaultDialogOpen(false);
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => setDefaultSaving(false));
   };
 
   // 批量修改
@@ -235,16 +312,17 @@ const InnerLayout = () => {
             />
           }
         />
-        <div className="order-first flex min-h-10 items-center justify-between gap-3 px-1 md:justify-end">
+        <div className="order-first flex min-w-0 flex-col gap-2 px-1 md:flex-row md:items-center md:justify-end">
           <AdminSelectionCount
             count={selectedFilteredCount}
             total={filteredNodeIds.length}
             className="shrink-0 text-sm text-muted-foreground md:hidden"
           />
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 md:justify-end">
             <Button
               type="button"
               variant="soft"
+              className="shrink-0"
               disabled={filteredNodeIds.length === 0}
               onClick={toggleSelectAll}
             >
@@ -254,6 +332,7 @@ const InnerLayout = () => {
               <Dialog.Trigger>
                 <Button
                   variant="soft"
+                  className="shrink-0"
                   onClick={() => {
                     const first = offlineNotification.find(
                       (n) => n.client === selectedFilteredIds[0]
@@ -269,7 +348,7 @@ const InnerLayout = () => {
                   {t("notification.offline.batch_edit")}
                 </Button>
               </Dialog.Trigger>
-              <Dialog.Content>
+              <AppDialogContent>
                 <Dialog.Title>{t("notification.offline.batch_edit")}</Dialog.Title>
                 <NotificationEditForm
                   initialValues={batchForm}
@@ -277,11 +356,11 @@ const InnerLayout = () => {
                   onSubmit={handleBatchEdit}
                   onCancel={() => setBatchDialogOpen(false)}
                 />
-              </Dialog.Content>
+              </AppDialogContent>
             </Dialog.Root>
             <TextField.Root
               type="text"
-              className="min-w-0 flex-1 md:w-64 md:flex-none"
+              className="order-last min-w-0 w-full basis-full sm:order-none sm:w-64 sm:basis-auto sm:flex-none"
               placeholder={t("common.search")}
               value={search}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -292,6 +371,38 @@ const InnerLayout = () => {
                 <Search size={16} />
               </TextField.Slot>
             </TextField.Root>
+            <Dialog.Root open={defaultDialogOpen} onOpenChange={setDefaultDialogOpen}>
+              <Dialog.Trigger>
+                <Button
+                  type="button"
+                  variant="soft"
+                  className="shrink-0"
+                  onClick={() => {
+                    setDefaultForm({
+                      enable: defaultConfig.enabled,
+                      cooldown: 1800,
+                      grace_period: defaultConfig.grace_period,
+                    });
+                  }}
+                >
+                  <Settings2 size={16} />
+                  {t("notification.offline.default_config")}
+                </Button>
+              </Dialog.Trigger>
+              <AppDialogContent
+                title={t("notification.offline.default_config")}
+                description={t("notification.offline.default_config_description")}
+                maxWidth="560px"
+              >
+                <NotificationEditForm
+                  initialValues={defaultForm}
+                  loading={defaultSaving}
+                  statusLabel={t("notification.offline.default_config_enabled")}
+                  onSubmit={saveDefaultConfig}
+                  onCancel={() => setDefaultDialogOpen(false)}
+                />
+              </AppDialogContent>
+            </Dialog.Root>
           </div>
         </div>
       </div>
@@ -449,7 +560,7 @@ const ActionButtons = ({
             </span>
           </Button>
         </Dialog.Trigger>
-        <Dialog.Content>
+        <AppDialogContent>
           <Dialog.Title>{t("common.edit")}</Dialog.Title>
           <NotificationEditForm
             initialValues={{
@@ -495,7 +606,7 @@ const ActionButtons = ({
             }}
             onCancel={() => setEditOpen(false)}
           />
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
     </Flex>
   );

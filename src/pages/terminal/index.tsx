@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, IconButton, TextField, Theme } from "@radix-ui/themes";
 import { Plus, Server, X } from "lucide-react";
@@ -337,7 +338,7 @@ export default function TerminalWorkspace() {
       </div>
 
       <Dialog.Root open={pickerOpen} onOpenChange={setPickerOpen}>
-        <Dialog.Content className="remote-server-picker-dialog" maxWidth="1040px">
+        <AppDialogContent className="remote-server-picker-dialog" maxWidth="1040px">
           <Dialog.Title>打开远程服务器</Dialog.Title>
           <Dialog.Description>可重复选择同一台服务器，每个标签都会建立独立的终端与文件会话。</Dialog.Description>
           <RemoteNodePicker
@@ -351,11 +352,11 @@ export default function TerminalWorkspace() {
             <Button variant="soft" onClick={() => setPickerOpen(false)}>取消</Button>
             <Button disabled={!pickerUUID || !online.has(pickerUUID)} onClick={() => { openNode(pickerUUID); setPickerOpen(false); }}>打开</Button>
           </div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={authorization === "required"}>
-        <Dialog.Content maxWidth="400px">
+        <AppDialogContent maxWidth="400px">
           <Dialog.Title>双重身份验证</Dialog.Title>
           <Dialog.Description>请输入身份验证应用生成的动态口令。本次验证在 10 分钟内有效。</Dialog.Description>
           <TextField.Root
@@ -375,18 +376,18 @@ export default function TerminalWorkspace() {
             }}>取消</Button>
             <Button disabled={!otpInput} onClick={() => void authorizeRemote(otpInput)}>验证并进入</Button>
           </div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={authorization === "error"}>
-        <Dialog.Content maxWidth="400px">
+        <AppDialogContent maxWidth="400px">
           <Dialog.Title>无法进入远程管理</Dialog.Title>
           <Dialog.Description>{otpError || "远程管理权限验证失败"}</Dialog.Description>
           <div className="remote-dialog-actions"><Button onClick={() => {
             setAuthorization("checking");
             void authorizeRemote();
           }}>重试</Button></div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
     </Theme>

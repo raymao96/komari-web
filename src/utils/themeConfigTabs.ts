@@ -4,7 +4,15 @@ export interface ThemeConfigTabField {
   key?: string;
   name?: I18nText;
   help?: I18nText;
-  type?: "title" | "switch" | "select" | "number" | "string" | "richtext";
+  type?:
+    | "title"
+    | "switch"
+    | "select"
+    | "number"
+    | "string"
+    | "richtext"
+    | "nodes"
+    | "pingtasks";
   default?: unknown;
   options?: string;
   optionLabels?: Record<string, I18nText>;

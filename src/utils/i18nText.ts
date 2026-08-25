@@ -7,32 +7,20 @@ export function resolveI18nText(
   if (text === undefined || text === null) return undefined;
   if (typeof text === "string") return text;
 
-  const dict = text;
-  const lang = (language || "").trim();
-  if (!lang) {
-    const first = Object.values(dict)[0];
-    return first;
+  const entries = Object.entries(text).filter(
+    ([, value]) => typeof value === "string" && value.trim() !== "",
+  );
+  if (entries.length === 0) return undefined;
+
+  const normalize = (value: string) =>
+    value.trim().replace(/_/g, "-").toLowerCase();
+  const languageKey = normalize(language || "");
+  const base = languageKey.split("-")[0];
+  const candidates = [languageKey, base, "en", "en-us"].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const match = entries.find(([key]) => normalize(key) === candidate);
+    if (match) return match[1];
   }
-
-  // Try exact match first (e.g. zh-CN)
-  if (dict[lang] !== undefined) return dict[lang];
-
-  // Try base language (e.g. zh)
-  const base = lang.split(/[-_]/)[0];
-  if (base && dict[base] !== undefined) return dict[base];
-
-  // Case-insensitive fallback
-  const lowerLang = lang.toLowerCase();
-  for (const [k, v] of Object.entries(dict)) {
-    if (k.toLowerCase() === lowerLang) return v;
-  }
-  if (base) {
-    const lowerBase = base.toLowerCase();
-    for (const [k, v] of Object.entries(dict)) {
-      if (k.toLowerCase() === lowerBase) return v;
-    }
-  }
-
-  // Last resort: first value
-  return Object.values(dict)[0];
+  return entries[0][1];
 }

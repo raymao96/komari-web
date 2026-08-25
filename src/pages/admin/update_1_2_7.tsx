@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -586,7 +587,7 @@ const Upgrade127 = () => {
       />
 
       <Dialog.Root open={cleanupOpen} onOpenChange={setCleanupOpen}>
-        <Dialog.Content maxWidth="480px">
+        <AppDialogContent maxWidth="480px">
           <Dialog.Title>{t(`${I18N_PREFIX}.cleanup_title`)}</Dialog.Title>
           <Dialog.Description>
             {t(`${I18N_PREFIX}.cleanup_confirm`, {
@@ -604,11 +605,11 @@ const Upgrade127 = () => {
               {t(`${I18N_PREFIX}.confirm_cleanup`)}
             </Button>
           </Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={startOpen} onOpenChange={setStartOpen}>
-        <Dialog.Content maxWidth="520px">
+        <AppDialogContent maxWidth="520px">
           <Dialog.Title>{t(`${I18N_PREFIX}.start_title`)}</Dialog.Title>
           <Dialog.Description>
             {t(`${I18N_PREFIX}.start_description`)}
@@ -688,7 +689,7 @@ const Upgrade127 = () => {
               {t(`${I18N_PREFIX}.confirm_start`)}
             </Button>
           </Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
     </main>
   );

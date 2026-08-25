@@ -32,6 +32,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AppDialogContent from "@/components/AppDialogContent";
+import ThemePreviewImage from "@/components/ThemePreviewImage";
+import { themePreviewSrc } from "@/utils/themePreviewImage";
 import {
   AdminPagination,
   useAdminPagination,
@@ -347,7 +350,7 @@ export default function ThemeMarketPage() {
       ) : (
         <div className="space-y-3">
         <Grid columns={{ initial: "1", sm: "2", lg: "3", xl: "4" }} gap="4">
-          {pageItems.map((theme) => {
+          {pageItems.map((theme, index) => {
             const key = `${theme.source_id}:${theme.short}`;
             const installedVersion = installed.get(theme.short);
             const isInstalled = Boolean(installedVersion);
@@ -361,18 +364,18 @@ export default function ThemeMarketPage() {
                 onClick={() => setSelectedTheme(theme)}
               >
                 <Box className="aspect-video bg-gray-3 overflow-hidden relative">
-                  {theme.preview ? (
-                    <img
-                      src={theme.preview}
-                      alt={displayText(theme.name)}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                      onError={(event) => { event.currentTarget.style.display = "none"; }}
-                    />
-                  ) : (
-                    <Flex align="center" justify="center" className="h-full"><ImageIcon size={40} /></Flex>
-                  )}
+                  <ThemePreviewImage
+                    src={themePreviewSrc(theme.preview, { card: true })}
+                    alt={displayText(theme.name)}
+                    loading="eager"
+                    fetchPriority={index < 8 ? "high" : "low"}
+                    referrerPolicy="no-referrer"
+                    containerClassName="w-full h-full"
+                    imageClassName="w-full h-full"
+                    fit="cover"
+                    fallbackLabel={t("theme.preview_unavailable", "Preview unavailable")}
+                    iconSize={40}
+                  />
                   {isActive && <Badge className="absolute top-2 right-2" color="green" variant="solid">{t("theme.active", "Active")}</Badge>}
                 </Box>
                 <Flex direction="column" gap="3" p="4">
@@ -444,9 +447,11 @@ export default function ThemeMarketPage() {
       )}
 
       <Dialog.Root open={Boolean(selectedTheme)} onOpenChange={(open) => { if (!open) setSelectedTheme(null); }}>
-        <Dialog.Content maxWidth="820px">
-          <Dialog.Title>{selectedTheme ? displayText(selectedTheme.name) : ""}</Dialog.Title>
-          <Dialog.Description className="sr-only">{selectedTheme ? displayText(selectedTheme.description) : ""}</Dialog.Description>
+        <AppDialogContent
+          maxWidth="820px"
+          title={selectedTheme ? displayText(selectedTheme.name) : ""}
+          visuallyHiddenDescription={selectedTheme ? displayText(selectedTheme.description) : ""}
+        >
           {selectedTheme && (() => {
             const key = `${selectedTheme.source_id}:${selectedTheme.short}`;
             const installedVersion = installed.get(selectedTheme.short);
@@ -457,11 +462,17 @@ export default function ThemeMarketPage() {
             return (
               <>
                 <Box className="aspect-video bg-gray-3 overflow-hidden mt-4">
-                  {selectedTheme.preview ? (
-                    <img src={selectedTheme.preview} alt={displayText(selectedTheme.name)} referrerPolicy="no-referrer" className="w-full h-full object-contain" />
-                  ) : (
-                    <Flex align="center" justify="center" className="h-full"><ImageIcon size={56} /></Flex>
-                  )}
+                  <ThemePreviewImage
+                    src={themePreviewSrc(selectedTheme.preview)}
+                    alt={displayText(selectedTheme.name)}
+                    loading="eager"
+                    referrerPolicy="no-referrer"
+                    containerClassName="w-full h-full"
+                    imageClassName="w-full h-full"
+                    fit="contain"
+                    fallbackLabel={t("theme.preview_unavailable", "Preview unavailable")}
+                    iconSize={56}
+                  />
                 </Box>
                 <Flex direction="column" gap="2" mt="4">
                   <Text size="2" color="gray">{displayText(selectedTheme.description)}</Text>
@@ -502,13 +513,15 @@ export default function ThemeMarketPage() {
               </>
             );
           })()}
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={sourcesOpen} onOpenChange={setSourcesOpen}>
-        <Dialog.Content maxWidth="760px">
-          <Dialog.Title>{t("market.manage_sources", "Manage sources")}</Dialog.Title>
-          <Dialog.Description className="sr-only">{t("market.manage_sources", "Manage sources")}</Dialog.Description>
+        <AppDialogContent
+          maxWidth="760px"
+          title={t("market.manage_sources", "Manage sources")}
+          visuallyHiddenDescription={t("market.manage_sources", "Manage sources")}
+        >
           <Flex direction="column" gap="3" mt="4">
             {sources.length === 0 ? (
               <Text color="gray">{t("market.no_sources", "No sources configured")}</Text>
@@ -547,15 +560,15 @@ export default function ThemeMarketPage() {
             </Flex>
           </Flex>
           <Flex justify="end" mt="5"><Dialog.Close><Button variant="soft">{t("common.close", "Close")}</Button></Dialog.Close></Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={Boolean(themeToUninstall)} onOpenChange={(open) => { if (!open) setThemeToUninstall(null); }}>
-        <Dialog.Content maxWidth="420px">
-          <Dialog.Title>{t("market.uninstall", "Uninstall")}</Dialog.Title>
-          <Dialog.Description>
-            {t("market.uninstall_confirm", "Uninstall {{name}}?", { name: themeToUninstall ? displayText(themeToUninstall.name) : "" })}
-          </Dialog.Description>
+        <AppDialogContent
+          maxWidth="420px"
+          title={t("market.uninstall", "Uninstall")}
+          description={t("market.uninstall_confirm", "Uninstall {{name}}?", { name: themeToUninstall ? displayText(themeToUninstall.name) : "" })}
+        >
           <Flex justify="end" gap="2" mt="4">
             <Dialog.Close><Button variant="soft" color="gray">{t("common.cancel", "Cancel")}</Button></Dialog.Close>
             <Button
@@ -571,15 +584,15 @@ export default function ThemeMarketPage() {
               {t("market.uninstall", "Uninstall")}
             </Button>
           </Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={Boolean(sourceToDelete)} onOpenChange={(open) => { if (!open) setSourceToDelete(null); }}>
-        <Dialog.Content maxWidth="420px">
-          <Dialog.Title>{t("common.delete", "Delete")}</Dialog.Title>
-          <Dialog.Description>
-            {t("market.delete_source_confirm", "Delete source {{name}}?", { name: sourceToDelete?.name })}
-          </Dialog.Description>
+        <AppDialogContent
+          maxWidth="420px"
+          title={t("common.delete", "Delete")}
+          description={t("market.delete_source_confirm", "Delete source {{name}}?", { name: sourceToDelete?.name })}
+        >
           <Flex justify="end" gap="2" mt="4">
             <Dialog.Close><Button variant="soft" color="gray">{t("common.cancel", "Cancel")}</Button></Dialog.Close>
             <Button
@@ -594,7 +607,7 @@ export default function ThemeMarketPage() {
               {t("common.delete", "Delete")}
             </Button>
           </Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
     </Box>
   );

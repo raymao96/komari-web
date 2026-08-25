@@ -23,7 +23,12 @@ interface ThemeConfigResponse {
 }
 
 const ThemeManaged: React.FC = () => {
-  const { publicInfo, refresh } = usePublicInfo();
+  const {
+    publicInfo,
+    isLoading: publicInfoLoading,
+    error: publicInfoError,
+    refresh,
+  } = usePublicInfo();
   const theme = publicInfo?.theme;
   const themeSettings = publicInfo?.theme_settings || {}; // 当前值
   const { t, i18n } = useTranslation();
@@ -33,7 +38,7 @@ const ThemeManaged: React.FC = () => {
     i18n.language ||
     (typeof navigator !== "undefined" ? navigator.language : "");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState<ThemeFieldBase[]>([]);
   const [values, setValues] = useState<Record<string, any>>({});
@@ -44,10 +49,22 @@ const ThemeManaged: React.FC = () => {
   // 拉取主题配置
   useEffect(() => {
     async function load() {
+      if (publicInfoLoading || (!publicInfo && !publicInfoError)) {
+        setLoading(true);
+        return;
+      }
+      if (publicInfoError) {
+        setError(publicInfoError);
+        setLoading(false);
+        setFirstLoading(false);
+        return;
+      }
       if (!theme) {
         setFields([]);
         setValues({});
         setThemeDisplayName("");
+        setLoading(false);
+        setFirstLoading(false);
         return;
       }
       setLoading(true);
@@ -93,7 +110,7 @@ const ThemeManaged: React.FC = () => {
       }
     }
     load();
-  }, [currentLanguage, theme, themeSettings, t]);
+  }, [currentLanguage, publicInfo, publicInfoError, publicInfoLoading, theme, themeSettings, t]);
 
   const handleValueChange = (key: string, val: any) => {
     setValues((v) => ({ ...v, [key]: val }));

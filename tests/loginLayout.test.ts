@@ -40,7 +40,8 @@ test("standalone login renders the complete favicon without a decorative frame",
 test("public and restricted login dialogs reuse the same identity header", () => {
   assert.equal((loginSource.match(/<LoginIdentityHeader dialog \/>/g) ?? []).length, 1);
   assert.equal((restrictedLoginSource.match(/<LoginIdentityHeader dialog \/>/g) ?? []).length, 1);
-  assert.match(loginSource, /<Dialog\.Content maxWidth="420px">/);
+  assert.match(loginSource, /<AppDialogContent maxWidth="420px">/);
+  assert.match(restrictedLoginSource, /<AppDialogContent[\s\S]{0,120}maxWidth="420px"/);
 });
 
 test("login fields use localized placeholders and matching unadorned inputs", () => {

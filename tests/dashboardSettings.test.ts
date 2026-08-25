@@ -108,6 +108,21 @@ test("every built-in preset packs complete six-column rows", () => {
   }
 });
 
+test("dashboard first paint does not wait for charts or settings", () => {
+  assert.doesNotMatch(
+    adminDashboardSource,
+    /if \(settingsLoading\) return;/,
+  );
+  assert.match(
+    adminDashboardSource,
+    /const initialDataPending = summarySections\.length > 0 && loading && !data;/,
+  );
+  assert.doesNotMatch(
+    adminDashboardSource,
+    /chartSections\.length > 0 && !charts && !chartsError/,
+  );
+});
+
 test("low resource preset avoids historical chart requests", () => {
   const settings = dashboardSettingsForPreset("lite");
   assert.deepEqual(dashboardChartSections(settings), []);

@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import {
   quotePowerShellArg,
   quoteShellArg,
@@ -1185,7 +1186,7 @@ const Header = ({
               {t("admin.nodeTable.addNode")}
             </Button>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("admin.nodeTable.addNode")}</Dialog.Title>
             <TextField.Root
               ref={inputRef}
@@ -1203,7 +1204,7 @@ const Header = ({
               settings={settings}
               loading={settingsLoading}
             />
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
         </Flex>
       </div>
@@ -1745,7 +1746,7 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
           <Gauge size="18" className={loading ? "animate-pulse" : undefined} />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
+      <AppDialogContent maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
         <Dialog.Title>{t("admin.nodeTable.trafficCalibration.title")}</Dialog.Title>
         <Dialog.Description>
           <Trans
@@ -1858,7 +1859,7 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
             </Flex>
           </Flex>
         )}
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -1920,7 +1921,7 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
       >
         <RotateCw size={18} />
       </IconButton>
-      <Dialog.Content maxWidth="440px">
+      <AppDialogContent maxWidth="440px">
         <Dialog.Title>
           {t("admin.nodeTable.rotateToken", "重置 Token")}
         </Dialog.Title>
@@ -1969,7 +1970,7 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
               : t("admin.nodeTable.confirmRotateToken", "确认重置")}
           </Button>
         </Flex>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -2004,7 +2005,7 @@ function DeleteButton({ node }: { node: NodeDetail }) {
           <Trash2Icon size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content className="admin-install-dialog">
+      <AppDialogContent className="admin-install-dialog">
         <Dialog.Title>{t("delete")}</Dialog.Title>
         <Dialog.Description>
           <Text as="span" weight="bold">{node.name}</Text>{" "}
@@ -2018,7 +2019,7 @@ function DeleteButton({ node }: { node: NodeDetail }) {
             {t("admin.nodeTable.confirmDelete")}
           </Button>
         </Flex>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -2561,7 +2562,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           <Download size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>
           {t("admin.nodeTable.installCommand", "一键部署指令")}
         </Dialog.Title>
@@ -3208,7 +3209,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
             )}
           </Flex>
         </div>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -3335,7 +3336,7 @@ function EditButton({ node }: { node: NodeDetail }) {
           <Pencil size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>{t("admin.nodeEdit.editInfo", "编辑信息")}</Dialog.Title>
         <div className="flex flex-col gap-4">
           <div>
@@ -3553,7 +3554,7 @@ function EditButton({ node }: { node: NodeDetail }) {
               : t("save", "保存")}
           </Button>
         </Flex>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -3640,7 +3641,7 @@ function DetailView({ node, online }: { node: NodeDetail; online: boolean }) {
           </span>
         </button>
       </Dialog.Trigger>
-      <Dialog.Content
+      <AppDialogContent
         ref={dialogContentRef}
         tabIndex={-1}
         onOpenAutoFocus={(event) => {
@@ -3720,7 +3721,7 @@ function DetailView({ node, online }: { node: NodeDetail; online: boolean }) {
             <Button variant="soft">{t("admin.nodeDetail.done", "完成")}</Button>
           </Dialog.Close>
         </Flex>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -3794,7 +3795,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
           <CircleDollarSign size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>{t("admin.nodeTable.billing", "账单")}</Dialog.Title>
         <form onSubmit={handleSave}>
           <Flex direction="column" gap="2">
@@ -3885,7 +3886,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
             </Button>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }

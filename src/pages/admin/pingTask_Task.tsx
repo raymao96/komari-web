@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
 import {
   Table,
@@ -390,7 +391,7 @@ const Row = ({
               <Pencil size="16" />
             </IconButton>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("common.edit")}</Dialog.Title>
             <form onSubmit={handleEdit} className="flex flex-col gap-2">
               <label>{t("common.name")}</label>
@@ -472,7 +473,7 @@ const Row = ({
                 </Button>
               </Flex>
             </form>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
         {/* 删除按钮 */}
         <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -481,7 +482,7 @@ const Row = ({
               <Trash size="16" />
             </IconButton>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("common.delete")}</Dialog.Title>
             <Flex gap="2" justify="end" className="mt-4">
               <Dialog.Close>
@@ -503,7 +504,7 @@ const Row = ({
                 {t("common.delete")}
               </Button>
             </Flex>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
         </div>
       </TableCell>

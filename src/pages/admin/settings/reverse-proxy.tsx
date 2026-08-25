@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { SettingCard } from "@/components/admin/SettingCard";
@@ -869,7 +870,7 @@ function CloudflareTunnelPanel() {
           }
         }}
       >
-        <Dialog.Content maxWidth="520px">
+        <AppDialogContent maxWidth="520px">
           <Dialog.Title>
             {t(
               "settings.reverse_proxy.stop_dialog_title",
@@ -953,7 +954,7 @@ function CloudflareTunnelPanel() {
               )}
             </Button>
           </Flex>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
     </Flex>
   );

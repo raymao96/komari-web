@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import {
   Table,
   TableBody,
@@ -183,7 +184,7 @@ const ServerRow: React.FC<{
                 <MoreHorizontal size={16} />
               </IconButton>
             </Dialog.Trigger>
-            <Dialog.Content maxWidth="450px">
+            <AppDialogContent maxWidth="450px">
               <Dialog.Title>
                 {t("common.server")} - {nodeName}
               </Dialog.Title>
@@ -228,7 +229,7 @@ const ServerRow: React.FC<{
                   {t("common.save")}
                 </Button>
               </Flex>
-            </Dialog.Content>
+            </AppDialogContent>
           </Dialog.Root>
         </div>
       </TableCell>

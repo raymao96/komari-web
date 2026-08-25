@@ -17,11 +17,9 @@ import "./i18n/config";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { Suspense } from "react";
 import { useRoutes } from "react-router-dom";
-import { preloadAdminEntry, preloadAdminRoutes, routes } from "./routes";
+import { preloadAdminEntry, preloadAdminRoute, routes } from "./routes";
 import Loading from "./components/loading";
 import { PublicInfoProvider } from "./contexts/PublicInfoContext";
-import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
-import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { Toaster } from "./components/ui/sonner";
 import { RPC2Provider } from "./contexts/RPC2Context";
@@ -31,35 +29,57 @@ import { useAccount } from "./contexts/AccountContext";
 import FullPageLoading from "./components/FullPageLoading";
 import DocumentTitle from "./components/DocumentTitle";
 import AccountPreferenceSync from "./components/AccountPreferenceSync";
+import {
+  getIdleAdminWarmupTargets,
+  scheduleIdleAdminWarmup,
+} from "./utils/adminPreload";
+import { prefetchAdminDashboard } from "./utils/dashboardPrefetch";
 
 const AdminRoutePreloader = () => {
   const { account } = useAccount();
 
   React.useEffect(() => {
     if (!account?.logged_in) return;
-
-    let idleHandle: number | undefined;
-    let fallbackHandle: number | undefined;
-    const preloadWhenIdle = () => {
-      if ("requestIdleCallback" in window) {
-        idleHandle = window.requestIdleCallback(() => void preloadAdminRoutes(), {
-          timeout: 2000,
-        });
-        return;
+    const accountKey = account.uuid || account.username || "authenticated";
+    const pathname = window.location.pathname.replace(/\/$/, "") || "/";
+    if (pathname === "/admin") {
+      void prefetchAdminDashboard(accountKey).catch(() => undefined);
+    }
+    const connection = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
       }
-      fallbackHandle = Number(globalThis.setTimeout(() => void preloadAdminRoutes(), 800));
+    ).connection;
+    const targets = getIdleAdminWarmupTargets(
+      window.location.pathname,
+      connection,
+    );
+    if (targets.length === 0) return;
+
+    let stopWarmup: (() => void) | undefined;
+    const startWarmup = () => {
+      stopWarmup = scheduleIdleAdminWarmup({
+        targets,
+        preload: preloadAdminRoute,
+        timers: {
+          requestIdleCallback: window.requestIdleCallback?.bind(window),
+          cancelIdleCallback: window.cancelIdleCallback?.bind(window),
+          setTimeout: (callback, delay) =>
+            Number(globalThis.setTimeout(callback, delay)),
+          clearTimeout: (handle) => globalThis.clearTimeout(handle),
+        },
+      });
     };
 
     if (document.readyState === "complete") {
-      preloadWhenIdle();
+      startWarmup();
     } else {
-      window.addEventListener("load", preloadWhenIdle, { once: true });
+      window.addEventListener("load", startWarmup, { once: true });
     }
 
     return () => {
-      window.removeEventListener("load", preloadWhenIdle);
-      if (idleHandle !== undefined) window.cancelIdleCallback(idleHandle);
-      if (fallbackHandle !== undefined) globalThis.clearTimeout(fallbackHandle);
+      window.removeEventListener("load", startWarmup);
+      stopWarmup?.();
     };
   }, [account?.logged_in]);
 
@@ -77,7 +97,7 @@ const App = () => {
 		currentPath === "/install" ||
 		currentPath === "/database-recovery";
 	if (isAdminRoute) {
-		preloadAdminEntry();
+		preloadAdminEntry(currentPath);
 	}
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -153,8 +173,6 @@ const App = () => {
 				  >
 					{routing}
 				  </Suspense>
-				  <PWAInstallPrompt />
-				  <PWAUpdatePrompt />
 				</NodeListProvider>
 			  </PublicInfoProvider>
 			</RPC2Provider>

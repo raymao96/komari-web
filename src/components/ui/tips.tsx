@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import React, { useState } from "react";
 import { Info } from "lucide-react";
 import { Popover, Dialog, Box } from "@radix-ui/themes";
@@ -48,12 +49,12 @@ const Tips: React.FC<TipsProps & React.HTMLAttributes<HTMLDivElement>> = ({
               {trigger ?? <Info color={color} size={size} />}
             </div>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <div className="flex flex-col gap-2">
               {/* <label className="text-xl font-bold">Tips</label> */}
               <div>{children}</div>
             </div>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
       ) : (
         <Popover.Root open={isOpen} onOpenChange={setIsOpen}>

@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
@@ -17,6 +18,7 @@ import {
   LoadAlertProvider,
   useLoadAlert,
   type LoadAlert,
+  type CurrentLoadAlert,
 } from "@/contexts/LoadAlertContext";
 import {
   NodeDetailsProvider,
@@ -24,15 +26,28 @@ import {
 } from "@/contexts/NodeDetailsContext";
 
 import {
+  Badge,
   Button,
+  Callout,
   Dialog,
+  DropdownMenu,
   Flex,
   IconButton,
   Select,
+  Tabs,
   TextField,
 } from "@radix-ui/themes";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MoreHorizontal, Pencil, Trash } from "lucide-react";
+import {
+  BellOff,
+  BellRing,
+  CircleAlert,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Trash,
+} from "lucide-react";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -48,38 +63,199 @@ const LoadPage = () => {
 };
 
 const InnerLayout = () => {
-  const { loadAlerts, isLoading, error } = useLoadAlert();
+  const {
+    loadAlerts,
+    currentAlerts,
+    isLoading,
+    currentLoading,
+    error,
+    currentError,
+    refreshCurrent,
+  } = useLoadAlert();
   const { isLoading: nodeDetailLoading, error: nodeDetailError } =
     useNodeDetails();
+  const { nodeDetail } = useNodeDetails();
   const { t } = useTranslation();
-  const sortedAlerts = React.useMemo(
-    () => (loadAlerts || []).slice().sort((a, b) => (b.id ?? 0) - (a.id ?? 0)),
-    [loadAlerts],
+  const [view, setView] = React.useState<"configuration" | "current">(
+    "configuration",
   );
-  const { page, setPage, pageItems, pageSize, setPageSize } =
+  const [search, setSearch] = React.useState("");
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const sortedAlerts = React.useMemo(
+    () =>
+      (loadAlerts || [])
+        .filter((alert) => {
+          if (!normalizedSearch) return true;
+          const clientText = (alert.clients || [])
+            .map((uuid) => `${uuid} ${nodeDetail.find((node) => node.uuid === uuid)?.name || ""}`)
+            .join(" ");
+          return `${alert.name || ""} ${alert.metric || ""} ${clientText}`
+            .toLocaleLowerCase()
+            .includes(normalizedSearch);
+        })
+        .slice()
+        .sort((a, b) => (b.id ?? 0) - (a.id ?? 0)),
+    [loadAlerts, nodeDetail, normalizedSearch],
+  );
+  const sortedCurrentAlerts = React.useMemo(
+    () =>
+      (currentAlerts || [])
+        .filter((alert) => {
+          if (!normalizedSearch) return true;
+          const status = alert.silenced
+            ? t("notification.load.silenced")
+            : t("notification.load.not_silenced");
+          const node = nodeDetail.find((item) => item.uuid === alert.client);
+          return `${alert.notification_name} ${alert.client_name} ${alert.client} ${node?.ipv4 || ""} ${node?.ipv6 || ""} ${alert.metric} ${status}`
+            .toLocaleLowerCase()
+            .includes(normalizedSearch);
+        })
+        .slice()
+        .sort((a, b) => {
+          const left = a.active_since ? new Date(a.active_since).getTime() : 0;
+          const right = b.active_since ? new Date(b.active_since).getTime() : 0;
+          return right - left;
+        }),
+    [currentAlerts, nodeDetail, normalizedSearch, t],
+  );
+  const configurationPagination =
     useAdminPagination(sortedAlerts);
-  if (isLoading || nodeDetailLoading) {
+  const currentPagination = useAdminPagination(sortedCurrentAlerts);
+
+  React.useEffect(() => {
+    if (view !== "current") return;
+    void refreshCurrent().catch(() => {
+      toast.error(t("notification.load.current_fetch_failed"));
+    });
+    const timer = window.setInterval(() => {
+      void refreshCurrent().catch(() => undefined);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [refreshCurrent, t, view]);
+
+  if ((isLoading && loadAlerts === null) || nodeDetailLoading) {
     return <Loading />;
   }
-  if (error || nodeDetailError) {
+  if ((error && loadAlerts === null) || nodeDetailError) {
     return <div>{error || nodeDetailError}</div>;
   }
   return (
-    <Flex direction="column" gap="4" className="p-0 md:p-4">
-      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-end">
-        <AdminPageTitle
-          description={t(
-            "notification.load.description",
-            "配置 CPU、内存、负载等资源告警规则，并指定适用节点。",
-          )}
-        >
-          {t("notification.load.title")}
-        </AdminPageTitle>
-        <AddButton />
-      </div>
+    <Flex direction="column" gap="4" className="w-full min-w-0 p-0 md:p-4">
+      <AdminPageTitle
+        description={t(
+          "notification.load.description",
+          "配置 CPU、内存、负载等资源告警规则，并指定适用节点。",
+        )}
+      >
+        {t("notification.load.title")}
+      </AdminPageTitle>
 
-      <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
-        <div className="overflow-x-auto">
+      {error ? (
+        <Callout.Root color="red" role="alert">
+          <Callout.Icon>
+            <CircleAlert size={16} />
+          </Callout.Icon>
+          <Callout.Text>{error}</Callout.Text>
+        </Callout.Root>
+      ) : null}
+
+      <Tabs.Root value={view} onValueChange={(value) => setView(value as typeof view)}>
+        <div className="w-full overflow-x-auto pb-1">
+          <Tabs.List className="w-max min-w-full">
+            <Tabs.Trigger value="configuration" className="min-w-[8rem] flex-1">
+              {t("notification.load.configuration")}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="current" className="min-w-[8rem] flex-1">
+              {t("notification.load.current_alerts")}
+            </Tabs.Trigger>
+          </Tabs.List>
+        </div>
+        <Tabs.Content value="configuration" className="admin-tab-panel pt-3">
+          <LoadListToolbar search={search} onSearchChange={setSearch} showAdd />
+          <LoadConfigurationTable
+            alerts={configurationPagination.pageItems}
+            total={sortedAlerts.length}
+            pagination={configurationPagination}
+          />
+        </Tabs.Content>
+        <Tabs.Content value="current" className="admin-tab-panel pt-3">
+          <LoadListToolbar search={search} onSearchChange={setSearch} />
+          {currentError ? (
+            <Callout.Root color="red" className="mb-3" role="alert">
+              <Callout.Icon>
+                <CircleAlert size={16} />
+              </Callout.Icon>
+              <Callout.Text>{currentError}</Callout.Text>
+            </Callout.Root>
+          ) : null}
+          <CurrentLoadAlertsTable
+            alerts={currentPagination.pageItems}
+            total={sortedCurrentAlerts.length}
+            pagination={currentPagination}
+            loading={currentLoading && currentAlerts === null}
+          />
+          <div className="mt-4 border-l-2 border-[var(--accent-8)] pl-3 text-sm leading-6 text-muted-foreground">
+            <span
+              dangerouslySetInnerHTML={{ __html: t("notification.load.silence_tips") }}
+            />
+          </div>
+        </Tabs.Content>
+      </Tabs.Root>
+    </Flex>
+  );
+};
+
+const LoadListToolbar = ({
+  search,
+  onSearchChange,
+  showAdd = false,
+}: {
+  search: string;
+  onSearchChange: (value: string) => void;
+  showAdd?: boolean;
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="mb-3 flex min-w-0 items-center justify-end gap-2">
+      <TextField.Root
+        className="min-w-0 flex-1 sm:max-w-64"
+        value={search}
+        placeholder={t("common.search")}
+        onChange={(event) => onSearchChange(event.target.value)}
+      >
+        <TextField.Slot>
+          <Search size={16} />
+        </TextField.Slot>
+      </TextField.Root>
+      {showAdd ? <AddButton /> : null}
+    </div>
+  );
+};
+
+type PaginationState<T> = {
+  page: number;
+  setPage: (page: number) => void;
+  pageItems: T[];
+  pageSize: number;
+  setPageSize: (pageSize: number) => void;
+};
+
+const LoadConfigurationTable = ({
+  alerts,
+  total,
+  pagination,
+}: {
+  alerts: LoadAlert[];
+  total: number;
+  pagination: PaginationState<LoadAlert>;
+}) => {
+  const { t } = useTranslation();
+  if (total === 0) {
+    return <EmptyState>{t("notification.load.empty_configuration")}</EmptyState>;
+  }
+  return (
+    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+      <div className="overflow-x-auto">
         <Table className="admin-responsive-table admin-primary-first-table min-w-[840px]">
           <TableHeader>
             <TableHead>{t("common.name")}</TableHead>
@@ -91,22 +267,195 @@ const InnerLayout = () => {
             <TableHead>{t("common.action")}</TableHead>
           </TableHeader>
           <TableBody>
-            {pageItems.map((alert) => (
-                <Row key={alert.id} alert={alert} />
-              ))}
+            {alerts.map((alert) => <Row key={alert.id} alert={alert} />)}
           </TableBody>
         </Table>
-        </div>
-        <AdminPagination
-          page={page}
-          total={sortedAlerts.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          showSummary={false}
-        />
       </div>
-    </Flex>
+      <AdminPagination
+        page={pagination.page}
+        total={total}
+        pageSize={pagination.pageSize}
+        onPageChange={pagination.setPage}
+        onPageSizeChange={pagination.setPageSize}
+        showSummary={false}
+      />
+    </div>
+  );
+};
+
+const EmptyState = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex min-h-36 items-center justify-center rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] px-4 text-sm text-muted-foreground">
+    {children}
+  </div>
+);
+
+const CurrentLoadAlertsTable = ({
+  alerts,
+  total,
+  pagination,
+  loading,
+}: {
+  alerts: CurrentLoadAlert[];
+  total: number;
+  pagination: PaginationState<CurrentLoadAlert>;
+  loading: boolean;
+}) => {
+  const { t } = useTranslation();
+  if (loading) return <Loading />;
+  if (total === 0) {
+    return <EmptyState>{t("notification.load.no_current_alerts")}</EmptyState>;
+  }
+  return (
+    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+      <div className="overflow-x-auto">
+        <Table className="admin-responsive-table admin-primary-first-table min-w-[940px]">
+          <TableHeader>
+            <TableHead>{t("common.name")}</TableHead>
+            <TableHead>{t("common.server")}</TableHead>
+            <TableHead>{t("loadAlert.metric")}</TableHead>
+            <TableHead>{t("notification.load.current_value")}</TableHead>
+            <TableHead>{t("common.threshold")}</TableHead>
+            <TableHead>{t("notification.load.triggered_at")}</TableHead>
+            <TableHead>{t("notification.load.silence_status")}</TableHead>
+            <TableHead>{t("common.action")}</TableHead>
+          </TableHeader>
+          <TableBody>
+            {alerts.map((alert) => (
+              <CurrentLoadAlertRow
+                key={`${alert.notification_id}:${alert.client}`}
+                alert={alert}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <AdminPagination
+        page={pagination.page}
+        total={total}
+        pageSize={pagination.pageSize}
+        onPageChange={pagination.setPage}
+        onPageSizeChange={pagination.setPageSize}
+        showSummary={false}
+      />
+    </div>
+  );
+};
+
+const formatLoadValue = (metric: string, value: number) => {
+  const unit = metric === "net_in" || metric === "net_out" ? " Mbps" : "%";
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)}${unit}`;
+};
+
+const CurrentLoadAlertRow = ({ alert }: { alert: CurrentLoadAlert }) => {
+  const { t } = useTranslation();
+  const { refreshCurrent } = useLoadAlert();
+  const { nodeDetail } = useNodeDetails();
+  const [saving, setSaving] = React.useState(false);
+  const node = nodeDetail.find((item) => item.uuid === alert.client);
+  const clientName = alert.client_name || node?.name || alert.client;
+  const clientAddress = node?.ipv4?.trim() || node?.ipv6?.trim() || "";
+  const setSilence = async (mode: "off" | "24h" | "3d" | "7d" | "forever") => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin/notification/load/silence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notification_id: alert.notification_id,
+          client: alert.client,
+          mode,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || t("common.error"));
+      }
+      toast.success(
+        t(mode === "off" ? "notification.load.unsilenced_success" : "notification.load.silenced_success"),
+      );
+      await refreshCurrent();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const silenceLabel = alert.silenced_forever
+    ? t("notification.load.silenced_forever")
+    : alert.silenced && alert.silenced_until
+      ? t("notification.load.silenced_until", {
+          time: new Date(alert.silenced_until).toLocaleString(),
+        })
+      : t("notification.load.not_silenced");
+
+  return (
+    <TableRow>
+      <TableCell data-label={t("common.name")}>
+        <span className="font-medium">{alert.notification_name}</span>
+      </TableCell>
+      <TableCell data-label={t("common.server")}>
+        <div className="min-w-0">
+          <div className="truncate">{clientName}</div>
+          {clientAddress ? (
+            <div className="truncate text-xs text-muted-foreground">{clientAddress}</div>
+          ) : null}
+        </div>
+      </TableCell>
+      <TableCell data-label={t("loadAlert.metric")}>{alert.metric.toUpperCase()}</TableCell>
+      <TableCell data-label={t("notification.load.current_value")} className="tabular-nums">
+        {formatLoadValue(alert.metric, alert.latest_value)}
+      </TableCell>
+      <TableCell data-label={t("common.threshold")} className="tabular-nums">
+        {formatLoadValue(alert.metric, alert.threshold)}
+      </TableCell>
+      <TableCell data-label={t("notification.load.triggered_at")} className="whitespace-nowrap text-sm">
+        {alert.active_since ? new Date(alert.active_since).toLocaleString() : "-"}
+      </TableCell>
+      <TableCell data-label={t("notification.load.silence_status")}>
+        <Badge color={alert.silenced ? "orange" : "red"} variant="soft">
+          {silenceLabel}
+        </Badge>
+      </TableCell>
+      <TableCell data-label={t("common.action")}>
+        <div className="admin-card-actions flex items-center gap-2">
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              <IconButton
+                type="button"
+                variant="soft"
+                color={alert.silenced ? "orange" : "gray"}
+                disabled={saving}
+                title={t("notification.load.silence_action")}
+                aria-label={t("notification.load.silence_action")}
+              >
+                {alert.silenced ? <BellOff size={16} /> : <BellRing size={16} />}
+              </IconButton>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end">
+              {alert.silenced ? (
+                <DropdownMenu.Item onSelect={() => void setSilence("off")}>
+                  <BellRing size={15} />
+                  {t("notification.load.unsilence")}
+                </DropdownMenu.Item>
+              ) : null}
+              <DropdownMenu.Item onSelect={() => void setSilence("24h")}>
+                {t("notification.load.silence_24h")}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onSelect={() => void setSilence("3d")}>
+                {t("notification.load.silence_3d")}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onSelect={() => void setSilence("7d")}>
+                {t("notification.load.silence_7d")}
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item color="orange" onSelect={() => void setSilence("forever")}>
+                {t("notification.load.silence_forever")}
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 };
 
@@ -254,7 +603,7 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
               <Pencil size="16" />
             </IconButton>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("common.edit")}</Dialog.Title>
             <form onSubmit={handleEdit} className="flex flex-col gap-2">
               <label>{t("common.name")}</label>
@@ -349,7 +698,7 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
                 </Button>
               </Flex>
             </form>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
         {/* 删除按钮 */}
         <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -358,7 +707,7 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
               <Trash size="16" />
             </IconButton>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("common.delete")}</Dialog.Title>
             <Flex gap="2" justify="end" className="mt-4">
               <Dialog.Close>
@@ -380,7 +729,7 @@ const Row = ({ alert }: { alert: LoadAlert }) => {
                 {t("common.delete")}
               </Button>
             </Flex>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
         </div>
       </TableCell>
@@ -451,9 +800,12 @@ const AddButton: React.FC = () => {
   return (
     <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
       <Dialog.Trigger>
-        <Button className="w-full sm:w-auto">{t("common.add")}</Button>
+        <Button className="w-full sm:w-auto">
+          <Plus size={16} />
+          {t("common.add")}
+        </Button>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>{t("common.add")}</Dialog.Title>
         <form onSubmit={handleSubmit}>
           <Flex direction="column" justify="end" gap="2" className="font-bold">
@@ -532,7 +884,7 @@ const AddButton: React.FC = () => {
             </div>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };

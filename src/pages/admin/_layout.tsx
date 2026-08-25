@@ -1,4 +1,5 @@
-import { Outlet } from "react-router-dom";
+import AppDialogContent from "@/components/AppDialogContent";
+import { useOutlet } from "react-router-dom";
 
 import AdminPanelBar from "../../components/admin/AdminPanelBar";
 import LoginDialog from "../../components/Login";
@@ -8,7 +9,7 @@ import {
   updateSettingsWithToast,
   useSettings,
 } from "@/lib/api";
-import { Button, Callout, Dialog, Flex } from "@radix-ui/themes";
+import { Button, Callout, Dialog, Flex, Spinner } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CircleAlert, RefreshCw } from "lucide-react";
@@ -18,6 +19,7 @@ import { resolveAdminAuthView } from "@/utils/adminAuth";
 import FullPageLoading from "@/components/FullPageLoading";
 import { NodeDetailsProvider } from "@/contexts/NodeDetailsContext";
 import { PingTaskProvider } from "@/contexts/PingTaskContext";
+import AdminRouteViewport from "@/components/admin/AdminRouteViewport";
 
 const AuthStatusScreen = ({
   failed = false,
@@ -54,27 +56,57 @@ const AuthStatusScreen = ({
   );
 };
 
+const AdminRouteLoading = () => (
+  <Flex
+    data-admin-route-pending="true"
+    align="center"
+    justify="center"
+    role="status"
+    aria-label="页面加载中"
+    style={{ minHeight: "min(20rem, 55vh)" }}
+  >
+    <Spinner size="3" />
+  </Flex>
+);
+
 const AdminAuthenticatedContent = () => {
-  const { settings, loading } = useSettings();
+  const outlet = useOutlet();
+  const { settings, loading, error, setSettings } = useSettings();
   const lang = readStoredLanguage() || "en";
   const [open, setOpen] = useState(false);
+  const [accepting, setAccepting] = useState(false);
 
   useEffect(() => {
-    if (loading) {
+    if (loading || error || settings.eula_accepted !== false) {
       setOpen(false);
-    } else if (
-      settings &&
-      !settings.eula_accepted &&
-      normalizeLanguage(lang).startsWith("zh")
-    ) {
+      return;
+    }
+    if (normalizeLanguage(lang).startsWith("zh")) {
       setOpen(true);
     }
-  }, [loading, settings, lang]);
+  }, [loading, error, settings.eula_accepted, lang]);
+
+  const acceptEula = async () => {
+    if (accepting) return;
+    setAccepting(true);
+    try {
+      await updateSettingsWithToast(
+        { eula_accepted: true },
+        (key) => key,
+      );
+      setSettings((current) => ({ ...current, eula_accepted: true }));
+      setOpen(false);
+    } catch {
+      setOpen(true);
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   return (
     <>
       <Dialog.Root open={open}>
-        <Dialog.Content>
+        <AppDialogContent>
           <Dialog.Title>法律声明与合规指引</Dialog.Title>
           <div className="flex flex-col gap-2">
             <div className="max-h-[70vh] overflow-y-auto space-y-4">
@@ -90,21 +122,23 @@ const AdminAuthenticatedContent = () => {
               </Button>
               <Button
                 variant="solid"
-                onClick={() => {
-                  setOpen(false);
-                  updateSettingsWithToast(
-                    { eula_accepted: true },
-                    (key) => key,
-                  );
-                }}
+                disabled={accepting}
+                onClick={() => void acceptEula()}
               >
                 我已详细阅读并接受
               </Button>
             </div>
           </div>
-        </Dialog.Content>
+        </AppDialogContent>
       </Dialog.Root>
-      <AdminPanelBar content={<Outlet />} />
+      <AdminPanelBar
+        content={
+          <AdminRouteViewport
+            fallback={<AdminRouteLoading />}
+            outlet={outlet}
+          />
+        }
+      />
     </>
   );
 };

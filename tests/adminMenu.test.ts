@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   APPEARANCE_MENU_PATH,
   buildAdminMenuItems,
+  syncSubMenuForLocation,
   toggleSingleSubMenu,
 } from "../src/utils/adminMenu.ts";
 import type { MenuItem } from "../src/types/menu.ts";
@@ -19,6 +20,7 @@ const adminPanelSource = readFileSync(
 const routesSource = readFileSync(new URL("../src/routes.ts", import.meta.url), "utf8");
 const mainSource = readFileSync(new URL("../src/main.tsx", import.meta.url), "utf8");
 const adminLayoutSource = readFileSync(new URL("../src/pages/admin/_layout.tsx", import.meta.url), "utf8");
+const settingsAPISource = readFileSync(new URL("../src/lib/api.ts", import.meta.url), "utf8");
 const pingTaskContextSource = readFileSync(new URL("../src/contexts/PingTaskContext.tsx", import.meta.url), "utf8");
 const pingTaskPageSource = readFileSync(new URL("../src/pages/admin/pingTask.tsx", import.meta.url), "utf8");
 const returnRoutePageSource = readFileSync(new URL("../src/pages/admin/returnRoute.tsx", import.meta.url), "utf8");
@@ -143,6 +145,48 @@ test("keeps only one sidebar group expanded", () => {
   );
 });
 
+test("keeps the monitoring group open across rapid standalone navigation", () => {
+  let openSubMenus = { "/admin/monitoring": true };
+
+  for (const pathname of [
+    "/admin/servers",
+    "/admin/ping",
+    "/admin/return-route",
+  ]) {
+    const next = syncSubMenuForLocation(
+      openSubMenus,
+      menuConfig.menu,
+      pathname,
+    );
+    assert.equal(next, openSubMenus);
+    openSubMenus = next;
+  }
+});
+
+test("does not match a sibling route that only shares a child prefix", () => {
+  const monitoringOpen = { "/admin/monitoring": true };
+
+  assert.equal(
+    syncSubMenuForLocation(
+      monitoringOpen,
+      menuConfig.menu,
+      "/admin/ping-history",
+    ),
+    monitoringOpen,
+  );
+});
+
+test("switches to the submenu containing the current nested route", () => {
+  assert.deepEqual(
+    syncSubMenuForLocation(
+      { "/admin/monitoring": true },
+      menuConfig.menu,
+      "/admin/settings/site",
+    ),
+    { "/admin/settings": true },
+  );
+});
+
 test("does not create an implicit second grid column on mobile", () => {
   assert.match(adminPanelSource, /className="md:col-span-2"/);
   assert.doesNotMatch(adminPanelSource, /className="col-span-2"/);
@@ -190,6 +234,20 @@ test("admin route changes keep the main content out of a composited animation la
   assert.doesNotMatch(adminPanelSource, /onClickCapture=/);
   assert.match(adminPanelSource, /url\.pathname !== "\/admin"/);
   assert.match(adminPanelSource, /anchor\.dataset\.adminReloadDocument/);
+});
+
+test("EULA acceptance closes only after settings persist successfully", () => {
+  assert.match(settingsAPISource, /return \{[\s\S]*setSettings,[\s\S]*updateSetting/);
+  assert.match(
+    adminLayoutSource,
+    /loading \|\| error \|\| settings\.eula_accepted !== false/,
+  );
+  assert.match(
+    adminLayoutSource,
+    /await updateSettingsWithToast\([\s\S]*setSettings\([\s\S]*setOpen\(false\)/,
+  );
+  assert.match(adminLayoutSource, /catch \{\s*setOpen\(true\)/);
+  assert.match(adminLayoutSource, /disabled=\{accepting\}/);
 });
 
 test("admin tabs and dialogs share the saved motion preference", () => {
@@ -274,7 +332,8 @@ test("admin command buttons use motion instead of abrupt active flashes", () => 
 
 test("prewarms admin routes and reuses shared monitoring data", () => {
   assert.match(routesSource, /export const preloadAdminRoutes/);
-  assert.match(mainSource, /requestIdleCallback\(\(\) => void preloadAdminRoutes\(\)/);
+  assert.match(mainSource, /scheduleIdleAdminWarmup/);
+  assert.match(mainSource, /getIdleAdminWarmupTargets/);
   assert.match(
     adminLayoutSource,
     /<NodeDetailsProvider>\s*<PingTaskProvider>\s*<AdminAuthenticatedContent \/>/,

@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
@@ -586,7 +587,7 @@ function MetricRetentionTable({
                 {t("settings.metrics.batch_edit")}
               </Button>
             </Dialog.Trigger>
-            <Dialog.Content maxWidth="640px">
+            <AppDialogContent maxWidth="640px">
               <Dialog.Title>{t("settings.metrics.batch_title")}</Dialog.Title>
               <Dialog.Description>
                 {t("settings.metrics.batch_description")}
@@ -651,7 +652,7 @@ function MetricRetentionTable({
                   </Button>
                 </Flex>
               </Flex>
-            </Dialog.Content>
+            </AppDialogContent>
           </Dialog.Root>
           <Button
             variant="ghost"

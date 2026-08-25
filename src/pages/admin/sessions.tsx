@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 import { toast } from "sonner";
 import {
@@ -121,7 +122,7 @@ export default function Sessions() {
           <Dialog.Trigger>
             <Button color="red">{t("sessions.delete_all")}</Button>
           </Dialog.Trigger>
-          <Dialog.Content>
+          <AppDialogContent>
             <Dialog.Title>{t("sessions.delete_all")}</Dialog.Title>
             <Dialog.Description>
               {t("sessions.delete_all_desc")}
@@ -136,7 +137,7 @@ export default function Sessions() {
                 </Button>
               </Dialog.Trigger>
             </Flex>
-          </Dialog.Content>
+          </AppDialogContent>
         </Dialog.Root>
       </div>
       <div className="w-full min-w-0 overflow-hidden rounded-md border border-[var(--gray-a5)]">
@@ -170,7 +171,7 @@ export default function Sessions() {
                           )}
                         </label>
                       </Dialog.Trigger>
-                      <Dialog.Content>
+                      <AppDialogContent>
                         <Dialog.Title>
                           {t("sessions.active_sessions")}
                         </Dialog.Title>
@@ -231,7 +232,7 @@ export default function Sessions() {
                             </Dialog.Trigger>
                           </Flex>
                         </Flex>
-                      </Dialog.Content>
+                      </AppDialogContent>
                     </Dialog.Root>
                   </TableCell>
                   <TableCell>{UserAgentHelper.format(s.user_agent, t)}</TableCell>
@@ -250,7 +251,7 @@ export default function Sessions() {
                           </Button>
                         </Dialog.Trigger>
                       )}
-                      <Dialog.Content>
+                      <AppDialogContent>
                         <Dialog.Title>
                           {t("sessions.confirm_delete")}
                         </Dialog.Title>
@@ -272,7 +273,7 @@ export default function Sessions() {
                             </Button>
                           </Dialog.Trigger>
                         </Flex>
-                      </Dialog.Content>
+                      </AppDialogContent>
                     </Dialog.Root>
                   </TableCell>
                 </TableRow>

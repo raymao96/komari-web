@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import AdminActiveFilter from "@/components/admin/AdminActiveFilter";
@@ -485,7 +486,7 @@ function RouteTaskDialog({
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Trigger>{children}</Dialog.Trigger>
-      <Dialog.Content maxWidth="760px">
+      <AppDialogContent maxWidth="760px">
         <Dialog.Title>{task?.id ? "编辑回程监测" : "新建回程监测"}</Dialog.Title>
         <Dialog.Description size="2" color="gray">
           从所选服务器探测到国内目标的逐跳路径，并在线路变化稳定后通知。
@@ -568,7 +569,7 @@ function RouteTaskDialog({
             <Button type="submit" loading={saving}>保存</Button>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -621,7 +622,7 @@ function RouteTaskBatchDialog({
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Trigger>{children}</Dialog.Trigger>
-      <Dialog.Content maxWidth="760px">
+      <AppDialogContent maxWidth="760px">
         <Dialog.Title>批量修改回程监测</Dialog.Title>
         <Dialog.Description size="2" color="gray">
           已选择 {tasks.length} 个任务。下列配置会同步更新，任务名称和各自的探测节点保持不变。
@@ -694,7 +695,7 @@ function RouteTaskBatchDialog({
             <Button type="submit" loading={saving}>保存到 {tasks.length} 个任务</Button>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }
@@ -727,7 +728,9 @@ function ReturnRouteContent() {
   const [recordQuery, setRecordQuery] = useState({ page: 1, page_size: defaultPageSize, keyword: "", range: "24h", kind: "", carrier: "", region: "", expected_line: "", actual_line: "" });
   const [taskData, setTaskData] = useState<TaskPage>(() => initialTaskSnapshot || { tasks: [], statuses: [], probing_task_ids: [], total: 0, page: 1, page_size: defaultPageSize });
   const [recordData, setRecordData] = useState<RecordPage>({ events: [], total: 0, page: 1, page_size: defaultPageSize });
-  const [summary, setSummary] = useState<SummaryData>(() => returnRouteSummarySnapshots.get(accountKey) || { tasks: 0, healthy: 0, switched: 0, recent_events: 0 });
+  const initialSummarySnapshot = returnRouteSummarySnapshots.get(accountKey);
+  const [summary, setSummary] = useState<SummaryData>(() => initialSummarySnapshot || { tasks: 0, healthy: 0, switched: 0, recent_events: 0 });
+  const [summaryLoading, setSummaryLoading] = useState(() => !initialSummarySnapshot);
   const [taskLoading, setTaskLoading] = useState(() => !initialTaskSnapshot);
   const hasRenderedTaskData = useRef(Boolean(initialTaskSnapshot));
   const [recordLoading, setRecordLoading] = useState(false);
@@ -739,6 +742,7 @@ function ReturnRouteContent() {
   const ruleFileInput = useRef<HTMLInputElement>(null);
 
   const loadSummary = useCallback(async (quiet = false) => {
+    if (!quiet && !returnRouteSummarySnapshots.has(accountKey)) setSummaryLoading(true);
     try {
       const data = await request("/summary");
       const next = { tasks: data?.tasks || 0, healthy: data?.healthy || 0, switched: data?.switched || 0, recent_events: data?.recent_events || 0 };
@@ -746,6 +750,8 @@ function ReturnRouteContent() {
       setSummary(next);
     } catch (error) {
       if (!quiet) toast.error(error instanceof Error ? error.message : "概览加载失败");
+    } finally {
+      if (!quiet) setSummaryLoading(false);
     }
   }, [accountKey]);
 
@@ -979,7 +985,10 @@ function ReturnRouteContent() {
   if (nodesLoading) return <Loading text="" />;
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4 p-0 md:p-4">
+    <div
+      data-admin-route-pending={taskLoading || summaryLoading ? "true" : undefined}
+      className="flex w-full min-w-0 flex-col gap-4 p-0 md:p-4"
+    >
       <AdminPageTitle
         description={t(
           "return_route.description",

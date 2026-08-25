@@ -79,6 +79,17 @@ test("theme tabs switch only the content below the stable page heading", () => {
   assert.match(globalStyles, /a\[href\^="\/admin"\]/);
   assert.doesNotMatch(tabsSource, /overflow-y-auto/);
   assert.doesNotMatch(tabsSource, /plugin/i);
+  assert.match(tabsSource, /case "nodes"/);
+  assert.match(tabsSource, /NodeSelectorDialog/);
+  assert.match(tabsSource, /case "pingtasks"/);
+  assert.match(tabsSource, /PingTaskSelectorDialog/);
+});
+
+test("installed themes resolve localized manifest text consistently", () => {
+  assert.match(themePageSource, /resolveI18nText/);
+  assert.match(themePageSource, /displayText\(theme\.name\)/);
+  assert.match(themePageSource, /displayText\(selectedTheme\?\.description\)/);
+  assert.match(themePageSource, /displayText\(importPreview\.theme\.author\)/);
 });
 
 test("mobile admin drawer stays above sticky theme category tabs", () => {

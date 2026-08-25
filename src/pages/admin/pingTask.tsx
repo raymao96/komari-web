@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
@@ -232,7 +233,7 @@ const AddButton: React.FC = () => {
       <Dialog.Trigger>
         <Button className="w-full sm:w-auto">{t("common.add")}</Button>
       </Dialog.Trigger>
-      <Dialog.Content>
+      <AppDialogContent>
         <Dialog.Title>{t("common.add")}</Dialog.Title>
         <form onSubmit={handleSubmit}>
           <Flex direction="column" justify="end" gap="2" className="font-bold">
@@ -297,7 +298,7 @@ const AddButton: React.FC = () => {
             </div>
           </Flex>
         </form>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };

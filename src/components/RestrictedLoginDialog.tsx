@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { useState } from "react";
 import { Button, Dialog, Text, TextField } from "@radix-ui/themes";
 import { LoaderCircle, LogIn } from "lucide-react";
@@ -70,7 +71,7 @@ export default function RestrictedLoginDialog({
 
   return (
     <Dialog.Root open={auth !== null && !auth.logged_in}>
-      <Dialog.Content
+      <AppDialogContent
         maxWidth="420px"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
@@ -162,7 +163,7 @@ export default function RestrictedLoginDialog({
             })}
           </Button>
         )}
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 }

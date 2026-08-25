@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 import { Dialog, Button, Flex } from "@radix-ui/themes";
 import NodeSelector from "./NodeSelector";
@@ -70,7 +71,7 @@ const NodeSelectorDialog: React.FC<NodeSelectorDialogProps> = ({
       <Dialog.Trigger>
         {children ? children : <Button>{title || t("common.select")}</Button>}
       </Dialog.Trigger>
-      <Dialog.Content style={{ maxWidth: 400 }}>
+      <AppDialogContent style={{ maxWidth: 400 }}>
         <Dialog.Title>{title || t("common.select")}</Dialog.Title>
         <Flex direction="column" gap="3">
           <Flex justify="between" align="center" gap="2">
@@ -106,7 +107,7 @@ const NodeSelectorDialog: React.FC<NodeSelectorDialogProps> = ({
             <Button onClick={handleOk}>{t("common.done")}</Button>
           </Flex>
         </Flex>
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };

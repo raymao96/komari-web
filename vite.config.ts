@@ -84,12 +84,14 @@ export default defineConfig(({ mode }) => {
           ],
         },
       })]),
-      visualizer({
-        open: false,
-        filename: "bundle-analysis.html",
-        gzipSize: true,
-        brotliSize: true,
-      }),
+      ...(process.env.ANALYZE === "1"
+        ? [visualizer({
+            open: false,
+            filename: "bundle-analysis.html",
+            gzipSize: true,
+            brotliSize: true,
+          })]
+        : []),
     ],
     define: {
       __BUILD_TIME__: JSON.stringify(buildTime),

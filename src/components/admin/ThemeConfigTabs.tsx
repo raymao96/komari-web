@@ -6,16 +6,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Box, Flex, Heading, Tabs } from "@radix-ui/themes";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Box, Button, Flex, Heading, Tabs } from "@radix-ui/themes";
+import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import {
+  SettingCard,
   SettingCardLongTextInput,
   SettingCardSelect,
   SettingCardShortTextInput,
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
+import NodeSelectorDialog from "@/components/NodeSelectorDialog";
+import PingTaskSelectorDialog from "@/components/PingTaskSelectorDialog";
 import type { I18nText } from "@/utils/i18nText";
 import {
   groupThemeConfigFields,
@@ -121,6 +124,56 @@ const ThemeConfigTabs = ({
     const description = resolveText(field.help);
 
     switch (field.type) {
+      case "nodes": {
+        const selected = (Array.isArray(value)
+          ? value
+          : parseSelectorValue(value)
+        ).map(String);
+        return (
+          <Box key={key} id={key}>
+            <SettingCard title={title} description={description}>
+              <SettingCard.Action>
+                <NodeSelectorDialog
+                  value={selected}
+                  onChange={(ids) => onValueChange(key, ids)}
+                  title={title}
+                >
+                  <Button variant="soft">
+                    <ListChecks size={16} />
+                    {t("common.selected", { count: selected.length })}
+                  </Button>
+                </NodeSelectorDialog>
+              </SettingCard.Action>
+            </SettingCard>
+          </Box>
+        );
+      }
+      case "pingtasks": {
+        const selected = (Array.isArray(value)
+          ? value
+          : parseSelectorValue(value)
+        )
+          .map(Number)
+          .filter((id) => Number.isInteger(id) && id > 0);
+        return (
+          <Box key={key} id={key}>
+            <SettingCard title={title} description={description}>
+              <SettingCard.Action>
+                <PingTaskSelectorDialog
+                  value={selected}
+                  onChange={(ids) => onValueChange(key, ids)}
+                  title={title}
+                >
+                  <Button variant="soft">
+                    <ListChecks size={16} />
+                    {t("common.selected", { count: selected.length })}
+                  </Button>
+                </PingTaskSelectorDialog>
+              </SettingCard.Action>
+            </SettingCard>
+          </Box>
+        );
+      }
       case "switch":
         return (
           <Box key={key} id={key}>
@@ -294,5 +347,15 @@ const ThemeConfigTabs = ({
     </Flex>
   );
 };
+
+function parseSelectorValue(value: unknown): unknown[] {
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export default ThemeConfigTabs;

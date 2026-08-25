@@ -32,3 +32,13 @@ test("completed installation reuses the full installation layout", () => {
   assert.match(source, /className="py-10 text-center sm:py-14"/);
   assert.doesNotMatch(source, /max-w-md text-center/);
 });
+
+test("install restore uses staged progress and an explicit restart countdown", () => {
+  assert.match(source, /phase_uploading/);
+  assert.match(source, /phase_processing/);
+  assert.match(source, /phase_restarting/);
+  assert.match(source, /phase_completed/);
+  assert.match(source, /setRestartCountdown\(5\)/);
+  assert.match(source, /phase_redirect_countdown/);
+  assert.doesNotMatch(source, /setRestoreProgress/);
+});

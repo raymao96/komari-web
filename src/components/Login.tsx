@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import * as React from "react";
 import {
   Button,
@@ -251,11 +252,11 @@ const LoginDialogContent = ({
       <Dialog.Trigger>
         {trigger || <Button>{t("login.title")}</Button>}
       </Dialog.Trigger>
-      <Dialog.Content maxWidth="420px">
+      <AppDialogContent maxWidth="420px">
         <LoginIdentityHeader dialog />
         {info ? <Text as="div" size="2" color="gray" mb="4">{info}</Text> : null}
         {loginForm}
-      </Dialog.Content>
+      </AppDialogContent>
     </Dialog.Root>
   );
 };

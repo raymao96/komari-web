@@ -3,6 +3,7 @@ import { Box, Flex, Skeleton } from "@radix-ui/themes";
 const SettingsPageSkeleton = () => (
   <Flex
     aria-label="设置加载中"
+    data-admin-route-pending="true"
     direction="column"
     gap="3"
     role="status"

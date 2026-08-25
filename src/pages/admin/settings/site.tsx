@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { useTranslation } from "react-i18next";
 import { Button, Dialog, Flex, Text } from "@radix-ui/themes";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
@@ -11,9 +12,19 @@ import {
 } from "@/components/admin/SettingCard";
 import { toast } from "sonner";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import UploadDialog from "@/components/UploadDialog";
+import { uploadArchive } from "@/utils/archiveUpload";
+import {
+  UPLOAD_COMPLETED_VISIBLE_MS,
+  UPLOAD_DIALOG_EXIT_MS,
+  createCompletedUploadState,
+  createProcessingUploadState,
+  delay,
+  type UploadProgressState,
+  withUploadProgressCopy,
+} from "@/utils/uploadProgress";
 
 export default function SiteSettings() {
   const { t } = useTranslation();
@@ -36,9 +47,35 @@ export default function SiteSettings() {
 
   // 恢复备份对话框与上传状态
   const [restoreOpen, setRestoreOpen] = useState(false);
-  const [restoring, setRestoring] = useState(false);
-  const [restoreProgress, setRestoreProgress] = useState(0);
-  const [restoreXhr, setRestoreXhr] = useState<XMLHttpRequest | null>(null);
+  const [restoreState, setRestoreState] = useState<UploadProgressState | null>(
+    null,
+  );
+  const restoreController = useRef<AbortController | null>(null);
+  const restoreStateRef = useRef<UploadProgressState | null>(null);
+  const restoreCopy = {
+    preparing: t("settings.site.phase_preparing", "Preparing backup"),
+    uploading: t("settings.site.phase_uploading", "Uploading backup"),
+    merging: t(
+      "settings.site.phase_processing",
+      "Restoring data on the server",
+    ),
+    processing: t(
+      "settings.site.phase_processing",
+      "Restoring data on the server",
+    ),
+    restarting: t("settings.site.phase_restarting", "Restarting service"),
+    completed: t("settings.site.phase_completed", "Backup restored"),
+    failed: t("settings.site.backup_restore_error", "Restore backup failed"),
+    nonCancelable: t(
+      "settings.site.phase_non_cancelable",
+      "Server processing has started and can no longer be canceled",
+    ),
+  };
+
+  const setTrackedRestoreState = (state: UploadProgressState | null) => {
+    restoreStateRef.current = state;
+    setRestoreState(state);
+  };
 
   const downloadBackup = async (scope: "full" | "config") => {
     const response = await fetch(`/api/admin/download/backup?scope=${scope}`);
@@ -73,81 +110,52 @@ export default function SiteSettings() {
       return;
     }
 
-    setRestoring(true);
-    setRestoreProgress(0);
-    const formData = new FormData();
-    formData.append("backup", file);
-
-    return new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      setRestoreXhr(xhr);
-
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          const percent = (e.loaded / e.total) * 100;
-          setRestoreProgress(Math.round(percent));
-        }
+    setTrackedRestoreState(null);
+    const controller = new AbortController();
+    restoreController.current = controller;
+    try {
+      await uploadArchive({
+        basePath: "/api/admin/upload",
+        purpose: "backup",
+        file,
+        signal: controller.signal,
+        onStateChange: (state) => {
+          const nextState =
+            state.stage === "merging"
+              ? createProcessingUploadState(state)
+              : state;
+          setTrackedRestoreState(withUploadProgressCopy(nextState, restoreCopy));
+        },
       });
-
-      xhr.addEventListener("load", () => {
-        try {
-          const ok = xhr.status >= 200 && xhr.status < 300;
-          const data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-          if (ok) {
-            if (data && data.status && data.status !== "success") {
-              // 服务器返回了非 success 状态
-              const msg =
-                data.message ||
-                t("settings.site.backup_restore_error", "恢复备份失败");
-              toast.error(msg);
-              reject(new Error(msg));
-            } else {
-              toast.success(t("account_settings.upload_success", "上传成功"));
-              setRestoreOpen(false);
-              setRestoreProgress(0);
-              resolve();
-            }
-          } else {
-            const msg =
-              (data && data.message) ||
-              t("settings.site.backup_restore_error", "恢复备份失败");
-            toast.error(msg);
-            reject(new Error(msg));
-          }
-        } catch (err) {
-          toast.error(t("settings.site.backup_restore_error", "恢复备份失败"));
-          reject(err as Error);
-        } finally {
-          setRestoring(false);
-          setRestoreXhr(null);
-        }
-      });
-
-      xhr.addEventListener("error", () => {
-        toast.error(t("settings.site.backup_restore_error", "恢复备份失败"));
-        setRestoring(false);
-        setRestoreProgress(0);
-        setRestoreXhr(null);
-        reject(new Error("Network error"));
-      });
-
-      xhr.addEventListener("abort", () => {
+      setTrackedRestoreState(
+        withUploadProgressCopy(
+          createCompletedUploadState(restoreStateRef.current),
+          restoreCopy,
+        ),
+      );
+      toast.success(t("account_settings.upload_success", "上传成功"));
+      await delay(UPLOAD_COMPLETED_VISIBLE_MS);
+      setRestoreOpen(false);
+      await delay(UPLOAD_DIALOG_EXIT_MS);
+      setTrackedRestoreState(null);
+    } catch (reason) {
+      if (reason instanceof DOMException && reason.name === "AbortError") {
+        setTrackedRestoreState(null);
+      } else {
         toast.error(
-          t("theme.upload_failed", "上传失败") + ": Upload cancelled",
+          reason instanceof Error
+            ? reason.message
+            : t("settings.site.backup_restore_error", "恢复备份失败"),
         );
-        setRestoring(false);
-        setRestoreProgress(0);
-        setRestoreXhr(null);
-        reject(new Error("Upload cancelled"));
-      });
-
-      xhr.open("POST", "/api/admin/upload/backup");
-      xhr.send(formData);
-    });
+      }
+    } finally {
+      restoreController.current = null;
+    }
   };
 
   const cancelRestore = () => {
-    if (restoreXhr) restoreXhr.abort();
+    restoreController.current?.abort();
+    setTrackedRestoreState(null);
   };
 
   if (loading) {
@@ -393,7 +401,7 @@ export default function SiteSettings() {
                   {t("settings.custom.favicon_default", "恢复默认")}
                 </Button>
               </Dialog.Trigger>
-              <Dialog.Content>
+              <AppDialogContent>
                 <Dialog.Title>
                   {t("settings.custom.favicon_default", "恢复默认")}
                 </Dialog.Title>
@@ -436,7 +444,7 @@ export default function SiteSettings() {
                     </Button>
                   </Dialog.Trigger>
                 </Flex>
-              </Dialog.Content>
+              </AppDialogContent>
             </Dialog.Root>
             <Button
               onClick={async () => {
@@ -507,15 +515,19 @@ export default function SiteSettings() {
       {/* 上传备份对话框 */}
       <UploadDialog
         open={restoreOpen}
-        onOpenChange={setRestoreOpen}
+        onOpenChange={(open) => {
+          setRestoreOpen(open);
+          if (!open && restoreState?.stage !== "completed") {
+            setTrackedRestoreState(null);
+          }
+        }}
         title={t("settings.site.backup_restore")}
         description={t("settings.site.backup_restore_description")}
         accept=".zip"
         dragDropText={t("theme.drag_drop")}
         clickToBrowseText={t("theme.or_click_to_browse")}
         hintText={t("theme.zip_files_only")}
-        uploading={restoring}
-        progress={restoreProgress}
+        uploadState={restoreState}
         cancelUploadLabel={t("common.cancel")}
         onCancelUpload={cancelRestore}
         onFileSelected={(file) => uploadBackup(file)}

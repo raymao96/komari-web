@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import { formatBytes } from "@/utils/unitHelper";
 import { getDatabaseRuntimeHealth } from "@/lib/databaseRuntime";
 import { Badge, Button, Dialog, Flex, Progress, Text } from "@radix-ui/themes";
@@ -680,7 +681,7 @@ export function DatabaseMaintenanceCard({
                     : t("settings.database.maintenance_button")}
                 </Button>
               </Dialog.Trigger>
-              <Dialog.Content maxWidth="520px">
+              <AppDialogContent maxWidth="520px">
                 <Dialog.Title>
                   {t("settings.database.confirm_title")}
                 </Dialog.Title>
@@ -714,7 +715,7 @@ export function DatabaseMaintenanceCard({
                     {t("settings.database.maintenance_button")}
                   </Button>
                 </Flex>
-              </Dialog.Content>
+              </AppDialogContent>
             </Dialog.Root>
           ) : null}
         </Flex>

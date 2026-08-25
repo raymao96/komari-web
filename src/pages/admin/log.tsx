@@ -1,3 +1,4 @@
+import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 import {
   Table,
@@ -102,7 +103,7 @@ const LogPage = () => {
                         {log.id}
                       </label>
                     </Dialog.Trigger>
-                    <Dialog.Content>
+                    <AppDialogContent>
                       <Dialog.Title>{t("log.title")}</Dialog.Title>
                       <Flex direction="column" gap="1">
                         <label className="font-bold">ID</label>
@@ -125,7 +126,7 @@ const LogPage = () => {
                           <Button variant="soft">{t("close")}</Button>
                         </Dialog.Close>
                       </Flex>
-                    </Dialog.Content>
+                    </AppDialogContent>
                   </Dialog.Root>
                 </TableCell>
                 <TableCell>{log.ip}</TableCell>
