@@ -1,4 +1,4 @@
-import { Box, Flex, Skeleton } from "@radix-ui/themes";
+import { Box, Flex, Skeleton } from "@/components/admin/ui";
 
 const SettingsPageSkeleton = () => (
   <Flex

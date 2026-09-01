@@ -4,12 +4,58 @@ import type {
   DashboardAlertLatest,
 } from "@/utils/dashboard";
 
-export const serverAlertKinds = new Set<DashboardAlertKind>([
-  "offline",
-  "resource",
-  "traffic",
-  "billing",
-]);
+export const serverListAlertKinds = ["resource", "traffic", "billing"] as const;
+export type ServerListAlertKind = (typeof serverListAlertKinds)[number];
+
+export function parseServerListAlertKind(
+  value: string | null | undefined,
+): ServerListAlertKind | "" {
+  return serverListAlertKinds.includes(value as ServerListAlertKind)
+    ? (value as ServerListAlertKind)
+    : "";
+}
+
+export function dashboardAlertNodeUuidSet(
+  items: Array<{ node_uuid?: string }> | null | undefined,
+): Set<string> {
+  const uuids = new Set<string>();
+  for (const item of items ?? []) {
+    if (item.node_uuid) uuids.add(item.node_uuid);
+  }
+  return uuids;
+}
+
+export function dashboardAlertCategoryPath(kind: DashboardAlertKind): string {
+  if (kind === "offline") return "/admin/servers?status=offline";
+  if (kind === "resource" || kind === "traffic" || kind === "billing") {
+    return `/admin/servers?alert=${kind}`;
+  }
+  if (kind === "latency_loss") return "/admin/notification/ping-loss?state=active";
+  if (kind === "return_route") return "/admin/return-route?state=switched";
+  return "/admin/servers";
+}
+
+export function dashboardAlertDetailPath(
+  kind: DashboardAlertKind,
+  alert?: DashboardAlertLatest,
+): string {
+  if (!alert) return dashboardAlertCategoryPath(kind);
+  if (kind === "latency_loss" && alert.node_uuid && alert.task_id) {
+    const params = new URLSearchParams({ node: alert.node_uuid, task: String(alert.task_id) });
+    return `/admin/notification/ping-loss?${params}`;
+  }
+  if (kind === "return_route" && alert.task_id) {
+    return `/admin/return-route?task=${encodeURIComponent(String(alert.task_id))}`;
+  }
+  if (alert.node_uuid) {
+    const uuid = encodeURIComponent(alert.node_uuid);
+    if (kind === "resource") return `/admin/servers/${uuid}?tab=metrics`;
+    if (kind === "billing") return `/admin/servers/${uuid}?tab=billing`;
+    if (kind === "traffic") return `/admin/servers/${uuid}?tab=overview`;
+    return `/admin/servers/${uuid}`;
+  }
+  return dashboardAlertCategoryPath(kind);
+}
 
 const ALERT_ITEMS_CACHE_TTL_MS = 30_000;
 const alertItemsCache = new Map<string, {
@@ -34,30 +80,6 @@ export function getDashboardAlertItemsSnapshot(
     return null;
   }
   return cached.response;
-}
-
-export function dashboardAlertCategoryPath(kind: DashboardAlertKind): string {
-  if (kind === "latency_loss") return "/admin/notification/ping-loss?state=active";
-  if (kind === "return_route") return "/admin/return-route?state=switched";
-  return `/admin/servers?alert=${encodeURIComponent(kind)}`;
-}
-
-export function dashboardAlertDetailPath(
-  kind: DashboardAlertKind,
-  alert?: DashboardAlertLatest,
-): string {
-  if (!alert) return dashboardAlertCategoryPath(kind);
-  if (kind === "latency_loss" && alert.node_uuid && alert.task_id) {
-    const params = new URLSearchParams({ node: alert.node_uuid, task: String(alert.task_id) });
-    return `/admin/notification/ping-loss?${params}`;
-  }
-  if (kind === "return_route" && alert.task_id) {
-    return `/admin/return-route?task=${encodeURIComponent(String(alert.task_id))}`;
-  }
-  if (alert.node_uuid) {
-    return `/admin/servers?node=${encodeURIComponent(alert.node_uuid)}`;
-  }
-  return dashboardAlertCategoryPath(kind);
 }
 
 export async function requestDashboardAlertItems(

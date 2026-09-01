@@ -1,16 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Flex, Text, TextField } from "@radix-ui/themes";
-import { ListChecks, Search } from "lucide-react";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import MuiButton from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
 
 import Flag from "@/components/Flag";
-import PriceTags from "@/components/PriceTags";
+import { CustomTags } from "@/components/PriceTags";
+import AdminNodeListFilters, {
+  type AdminNodeStatusValue,
+} from "@/components/admin/AdminNodeListFilters";
+import { AdminMobileCardStack, AdminMobileListCard } from "@/components/admin/AdminMobileListCard";
+import { AdminListShell } from "@/components/admin/AdminListShell";
+import { ADMIN_LIST_OUTLINE_SX } from "@/components/admin/adminListLayout";
 import {
   AdminPagination,
   useAdminPagination,
 } from "@/components/admin/AdminPagination";
+import { ListChecks } from "@/components/admin/muiIcons";
+import { Flex } from "@/components/admin/ui";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Table,
   TableBody,
@@ -20,12 +28,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { NodeDetail } from "@/contexts/NodeDetailsContext";
-import { useAdminNodeLiveData } from "@/hooks/use-admin-node-live-data";
-import { currencyForDisplay } from "@/lib/currency";
+import {
+  nodeOnlineState,
+  useAdminNodeLiveData,
+} from "@/hooks/use-admin-node-live-data";
 import {
   matchesRemoteExecNode,
   orderRemoteExecNodes,
 } from "@/utils/remoteExecNodes";
+import { getRegionCode } from "@/utils/regionHelper";
 import "./RemoteExecNodeSelector.css";
 
 type RemoteExecNodeSelectorProps = {
@@ -42,47 +53,41 @@ const compactIPv6 = (value: string) => {
     : value;
 };
 
-const getBillingDisplayTerms = (node: NodeDetail, t: TFunction) => {
-  const billingCycle = (() => {
-    if (node.billing_cycle >= 27 && node.billing_cycle <= 32) return t("common.monthly");
-    if (node.billing_cycle >= 87 && node.billing_cycle <= 95) return t("common.quarterly");
-    if (node.billing_cycle >= 175 && node.billing_cycle <= 185) return t("common.semi_annual");
-    if (node.billing_cycle >= 360 && node.billing_cycle <= 370) return t("common.annual");
-    if (node.billing_cycle >= 720 && node.billing_cycle <= 750) return t("common.biennial");
-    if (node.billing_cycle >= 1080 && node.billing_cycle <= 1150) return t("common.triennial");
-    if (node.billing_cycle >= 1800 && node.billing_cycle <= 1850) return t("common.quinquennial");
-    if (node.billing_cycle === -1) return t("common.once");
-    return `${node.billing_cycle} ${t("nodeCard.time_day")}`;
-  })();
-  const expirationDays = node.expired_at
-    ? Math.ceil((new Date(node.expired_at).getTime() - Date.now()) / 86_400_000)
-    : null;
-  const expiration = expirationDays === null || !Number.isFinite(expirationDays) || expirationDays > 36_500
-    ? t("common.long_term")
-    : expirationDays <= 0
-      ? t("common.expired")
-      : t("common.expired_in", { days: expirationDays });
-
-  return [currencyForDisplay(node.currency || ""), billingCycle, expiration];
-};
-
 export default function RemoteExecNodeSelector({
   nodes,
   value,
   onChange,
 }: RemoteExecNodeSelectorProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const { liveData, available } = useAdminNodeLiveData();
   const [query, setQuery] = useState("");
+  const [statusFilters, setStatusFilters] = useState<AdminNodeStatusValue[]>([]);
+  const [regionFilters, setRegionFilters] = useState<string[]>([]);
+  const [groupFilters, setGroupFilters] = useState<string[]>([]);
   const onlineSet = useMemo(
     () => new Set(liveData?.data.online ?? []),
     [liveData?.data.online],
   );
   const orderedNodes = useMemo(() => orderRemoteExecNodes(nodes), [nodes]);
   const filteredNodes = useMemo(
-    () => orderedNodes.filter((node) =>
-      matchesRemoteExecNode(node, query, getBillingDisplayTerms(node, t))),
-    [orderedNodes, query, t],
+    () =>
+      orderedNodes.filter((node) => {
+        const matchesSearch = matchesRemoteExecNode(node, query);
+        const isOnline = nodeOnlineState(available, onlineSet, node.uuid);
+        const matchesStatus =
+          statusFilters.length === 0 ||
+          isOnline === null ||
+          statusFilters.includes(isOnline ? "online" : "offline");
+        const matchesRegion =
+          regionFilters.length === 0 ||
+          regionFilters.includes(getRegionCode(node.region));
+        const nodeGroup = node.group?.trim() ? node.group.trim() : "__none__";
+        const matchesGroup =
+          groupFilters.length === 0 || groupFilters.includes(nodeGroup);
+        return matchesSearch && matchesStatus && matchesRegion && matchesGroup;
+      }),
+    [available, groupFilters, onlineSet, orderedNodes, query, regionFilters, statusFilters],
   );
   const {
     page,
@@ -94,7 +99,7 @@ export default function RemoteExecNodeSelector({
 
   useEffect(() => {
     setPage(1);
-  }, [query, setPage]);
+  }, [groupFilters, query, regionFilters, setPage, statusFilters]);
 
   const filteredIds = useMemo(
     () => filteredNodes.map((node) => node.uuid),
@@ -122,40 +127,90 @@ export default function RemoteExecNodeSelector({
   };
 
   return (
-    <div className="remote-exec-node-selector space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <TextField.Root
-          size="2"
-          className="w-full text-sm sm:max-w-md"
-          placeholder={t("exec.nodeSearchPlaceholder")}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        >
-          <TextField.Slot>
-            <Search size={16} />
-          </TextField.Slot>
-        </TextField.Root>
-        <Flex align="center" justify="between" gap="3" className="w-full sm:w-auto sm:justify-end">
-          <Text size="2" color="gray" className="tabular-nums">
-            {t("common.selected_total", { count: value.length, total: nodes.length })}
-          </Text>
-          <Button
-            type="button"
-            size="2"
-            variant="soft"
-            disabled={filteredIds.length === 0}
-            onClick={() => toggleFiltered(!allFilteredSelected)}
-          >
-            <ListChecks size={16} />
-            {allFilteredSelected ? t("common.deselect_all") : t("common.select_all")}
-          </Button>
-        </Flex>
-      </div>
+    <AdminListShell className="remote-exec-node-selector">
+      <AdminNodeListFilters
+        nodes={[...orderedNodes]}
+        onlineSet={onlineSet}
+        available={available}
+        resultCount={filteredNodes.length}
+        searchTerm={query}
+        onSearchTermChange={setQuery}
+        statusFilters={statusFilters}
+        onStatusFiltersChange={setStatusFilters}
+        regionFilters={regionFilters}
+        onRegionFiltersChange={setRegionFilters}
+        groupFilters={groupFilters}
+        onGroupFiltersChange={setGroupFilters}
+        searchPlaceholder={t("exec.nodeSearchPlaceholder")}
+        endAction={
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "center" }}>
+            <span className="tabular-nums text-sm text-muted-foreground">
+              {t("common.selected_total", { count: value.length, total: nodes.length })}
+            </span>
+            <MuiButton
+              type="button"
+              variant="outlined"
+              disabled={filteredIds.length === 0}
+              onClick={() => toggleFiltered(!allFilteredSelected)}
+              startIcon={<ListChecks size={16} />}
+              sx={ADMIN_LIST_OUTLINE_SX}
+            >
+              {allFilteredSelected ? t("common.deselect_all") : t("common.select_all")}
+            </MuiButton>
+          </Stack>
+        }
+      />
 
-      <div className="admin-responsive-table-wrap remote-exec-node-table-wrap overflow-x-auto overflow-y-hidden rounded-md border border-[var(--gray-a5)]">
-        {filteredNodes.length > 0 ? (
-          <>
-            <Table className="admin-responsive-table admin-selection-table remote-exec-node-table min-w-[980px] table-fixed text-sm">
+      {filteredNodes.length > 0 ? (
+        <>
+          {isMobile ? (
+            <AdminMobileCardStack>
+              {pageItems.map((node) => {
+                const selected = selectedSet.has(node.uuid);
+                const online = nodeOnlineState(available, onlineSet, node.uuid);
+                return (
+                  <div
+                    key={node.uuid}
+                    data-state={selected ? "selected" : undefined}
+                    aria-selected={selected}
+                    className="remote-exec-node-row"
+                    onClick={() => toggleNode(node.uuid)}
+                  >
+                    <AdminMobileListCard
+                      title={
+                        <RemoteExecNodeIdentity node={node} online={online} />
+                      }
+                      headerExtra={
+                        <Checkbox
+                          checked={selected}
+                          onClick={(event) => event.stopPropagation()}
+                          onCheckedChange={() => toggleNode(node.uuid)}
+                          aria-label={`${t("common.select")} ${node.name}`}
+                        />
+                      }
+                      cells={[
+                        [t("admin.nodeTable.network", "网络"), <RemoteExecNodeAddresses key="net" node={node} />],
+                        [t("common.group"), node.group || "--"],
+                        [t("common.remark"), node.remark || "--"],
+                        [
+                          t("admin.nodeTable.tags", "标签"),
+                          (node.tags || "").trim() ? (
+                            <Flex gap="1" wrap="wrap">
+                              <CustomTags tags={node.tags || ""} />
+                            </Flex>
+                          ) : (
+                            "--"
+                          ),
+                        ],
+                      ]}
+                    />
+                  </div>
+                );
+              })}
+            </AdminMobileCardStack>
+          ) : (
+          <div className="admin-responsive-table-wrap remote-exec-node-table-wrap overflow-x-auto overflow-y-hidden">
+            <Table container={false} className="admin-responsive-table admin-selection-table remote-exec-node-table min-w-[980px] table-fixed text-sm">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[5%] text-center">
@@ -165,20 +220,13 @@ export default function RemoteExecNodeSelector({
                   <TableHead className="w-[23%]">{t("terminal.ip_address")}</TableHead>
                   <TableHead className="w-[12%]">{t("common.group")}</TableHead>
                   <TableHead className="w-[18%]">{t("common.remark")}</TableHead>
-                  <TableHead className="w-[24%]">{t("admin.nodeTable.billing")}</TableHead>
+                  <TableHead className="w-[24%]">{t("admin.nodeTable.tags", "标签")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pageItems.map((node) => {
                   const selected = selectedSet.has(node.uuid);
-                  const online = onlineSet.has(node.uuid);
-                  const flag = node.region_override?.trim() || node.region?.trim() || "UN";
-                  const addresses = ([
-                    ["IPv4", node.ipv4?.trim()],
-                    ["IPv6", node.ipv6?.trim()],
-                  ] as const).filter(
-                    (entry): entry is readonly ["IPv4" | "IPv6", string] => Boolean(entry[1]),
-                  );
+                  const online = nodeOnlineState(available, onlineSet, node.uuid);
                   return (
                     <TableRow
                       key={node.uuid}
@@ -196,71 +244,105 @@ export default function RemoteExecNodeSelector({
                         />
                       </TableCell>
                       <TableCell className="overflow-hidden" data-label={t("admin.nodeTable.name")}>
-                        <div className="remote-exec-node-identity">
-                          <span className="remote-exec-node-flag">
-                            <Flag flag={flag} compact />
-                          </span>
-                          <div className="min-w-0">
-                            <strong title={node.name}>{node.name}</strong>
-                            {available ? (
-                              <span className={`remote-exec-node-status ${online ? "is-online" : "is-offline"}`}>
-                                <span aria-hidden="true" />
-                                {online ? t("nodeCard.online") : t("nodeCard.offline")}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
+                        <RemoteExecNodeIdentity node={node} online={online} />
                       </TableCell>
                       <TableCell data-label={t("terminal.ip_address")}>
-                        <div className="remote-exec-node-addresses">
-                          {addresses.length > 0 ? addresses.map(([type, address]) => (
-                            <div key={type} className="remote-exec-node-address" title={address || undefined}>
-                              <span>{type}</span>
-                              <code>{type === "IPv6" ? compactIPv6(address) : address}</code>
-                            </div>
-                          )) : <span className="text-muted-foreground">--</span>}
-                        </div>
+                        <RemoteExecNodeAddresses node={node} />
                       </TableCell>
-                      <TableCell data-label={t("common.group")}>
-                        <span className="block truncate font-normal text-muted-foreground" title={node.group || ""}>
+                      <TableCell className="min-w-0 overflow-hidden" data-label={t("common.group")}>
+                        <span className="admin-cell-clip font-normal text-muted-foreground" title={node.group || ""}>
                           {node.group || "--"}
                         </span>
                       </TableCell>
-                      <TableCell data-label={t("common.remark")}>
-                        <span className="block whitespace-normal break-words text-[13px] text-muted-foreground" title={node.remark || ""}>
+                      <TableCell className="min-w-0 overflow-hidden" data-label={t("common.remark")}>
+                        <span className="admin-cell-clip text-[13px] text-muted-foreground" title={node.remark || ""}>
                           {node.remark || "--"}
                         </span>
                       </TableCell>
-                      <TableCell data-label={t("admin.nodeTable.billing")}>
-                        <PriceTags
-                          className="[&_label]:!text-xs"
-                          price={node.price}
-                          billing_cycle={node.billing_cycle}
-                          expired_at={node.expired_at}
-                          currency={node.currency}
-                          tags={node.tags || ""}
-                        />
+                      <TableCell className="min-w-0 overflow-hidden" data-label={t("admin.nodeTable.tags", "标签")}>
+                        {(node.tags || "").trim() ? (
+                          <div className="admin-cell-clip-row" title={node.tags || ""}>
+                            <CustomTags tags={node.tags || ""} />
+                          </div>
+                        ) : (
+                          <span className="admin-cell-clip text-muted-foreground">--</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-            <AdminPagination
-              page={page}
-              total={filteredNodes.length}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              onPageSizeChange={setPageSize}
-              showSummary={false}
-            />
-          </>
-        ) : (
-          <div className="flex min-h-32 items-center justify-center px-4 py-8 text-sm text-[var(--gray-10)]">
-            {t("common.no_results")}
           </div>
-        )}
+          )}
+          <AdminPagination
+            page={page}
+            total={filteredNodes.length}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            showSummary={false}
+          />
+        </>
+      ) : (
+        <div className="km-admin-list-empty">
+          {t("common.no_results")}
+        </div>
+      )}
+    </AdminListShell>
+  );
+}
+
+function RemoteExecNodeIdentity({
+  node,
+  online,
+}: {
+  node: NodeDetail;
+  online: boolean | null;
+}) {
+  const { t } = useTranslation();
+  const flag = node.region_override?.trim() || node.region?.trim() || "UN";
+  return (
+    <div className="remote-exec-node-identity">
+      <span className="remote-exec-node-flag">
+        <Flag flag={flag} compact />
+      </span>
+      <div className="min-w-0">
+        <strong title={node.name}>{node.name}</strong>
+        <span
+          className={`remote-exec-node-status ${online ? "is-online" : "is-offline"}`}
+          aria-hidden={online === null || undefined}
+          style={online === null ? { visibility: "hidden" } : undefined}
+        >
+          <span aria-hidden="true" />
+          {online ? t("nodeCard.online") : t("nodeCard.offline")}
+        </span>
       </div>
+    </div>
+  );
+}
+
+function RemoteExecNodeAddresses({ node }: { node: NodeDetail }) {
+  const addresses = (
+    [
+      ["IPv4", node.ipv4?.trim()],
+      ["IPv6", node.ipv6?.trim()],
+    ] as const
+  ).filter(
+    (entry): entry is readonly ["IPv4" | "IPv6", string] => Boolean(entry[1]),
+  );
+  return (
+    <div className="remote-exec-node-addresses">
+      {addresses.length > 0 ? addresses.map(([type, address]) => (
+        <div
+          key={type}
+          className="remote-exec-node-address"
+          title={address || undefined}
+        >
+          <span>{type}</span>
+          <code>{type === "IPv6" ? compactIPv6(address) : address}</code>
+        </div>
+      )) : <span className="text-muted-foreground">--</span>}
     </div>
   );
 }

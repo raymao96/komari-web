@@ -1,10 +1,12 @@
+import Autocomplete from "@mui/material/Autocomplete";
+import Box from "@mui/material/Box";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
 import * as React from "react";
+
 import { cn } from "@/lib/utils";
-import { TextField } from "@radix-ui/themes";
-import { ChevronDown } from "lucide-react";
 
 type Primitive = string | number;
-const FLOATING_CONTENT_EXIT_MS = 140;
 
 export type SelectOption<T extends Primitive = string> = {
   label: string;
@@ -17,14 +19,10 @@ export type SelectOrInputProps<T extends Primitive = string> = {
   options: Array<SelectOption<T> | T>;
   value?: string;
   defaultValue?: string;
-  onChange?: (value: string, option?: SelectOption<T> | undefined) => void;
+  onChange?: (value: string, option?: SelectOption<T>) => void;
   placeholder?: string;
-  /**
-   * Whether to allow custom input (not in options). If provided, this takes precedence.
-   * Backward compatible: `allowCustomValue` is kept and will be used only when `allowCustomInput` is undefined.
-   */
   allowCustomInput?: boolean;
-  /** @deprecated Use `allowCustomInput` instead */
+  /** @deprecated Use `allowCustomInput` instead. */
   allowCustomValue?: boolean;
   className?: string;
   listClassName?: string;
@@ -35,21 +33,14 @@ export type SelectOrInputProps<T extends Primitive = string> = {
   getOptionValue?: (option: SelectOption<T>) => string;
   disabled?: boolean;
   name?: string;
-  type?: "number" | "search" | "time" | "text" | "hidden" | "date" | "datetime-local" | "email" | "month" | "password" | "tel" | "url" | "week" | undefined;
-  // Any other props are passed to the underlying input
+  type?: React.HTMLInputTypeAttribute;
 } & Omit<
   React.ComponentProps<"input">,
-  "value" | "defaultValue" | "onChange" | "placeholder" | "disabled"
+  "value" | "defaultValue" | "onChange" | "placeholder" | "disabled" | "type"
 >;
 
-/**
- * A combobox-like input: it stays an Input, and shows a floating options list when focused/typing.
- * - Type to filter options
- * - ArrowUp/Down to navigate, Enter to confirm, Escape/Blur to close
- * - Click outside closes the list
- */
 export function SelectOrInput<T extends Primitive = string>(
-  props: SelectOrInputProps<T>
+  props: SelectOrInputProps<T>,
 ) {
   const {
     options,
@@ -58,6 +49,7 @@ export function SelectOrInput<T extends Primitive = string>(
     onChange,
     placeholder,
     allowCustomInput,
+    allowCustomValue,
     className,
     listClassName,
     optionClassName,
@@ -66,325 +58,198 @@ export function SelectOrInput<T extends Primitive = string>(
     getOptionLabel,
     getOptionValue,
     disabled,
+    name,
+    type = "text",
+    id,
+    required,
+    readOnly,
+    autoComplete,
+    autoFocus,
+    inputMode,
+    spellCheck,
+    maxLength,
+    minLength,
+    pattern,
     onBlur,
     onFocus,
     onKeyDown,
-    type = "text",
-    name
-  } = props as SelectOrInputProps<T> & {
-    onBlur?: React.FocusEventHandler<HTMLInputElement>;
-    onFocus?: React.FocusEventHandler<HTMLInputElement>;
-    onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
-  };
+    style,
+    ...nativeInputProps
+  } = props;
 
-  // Normalize options to {label,value}
-  const normalizedOptions = React.useMemo<SelectOption<T>[]>(() => {
-    return options.map(
-      (opt): SelectOption<T> =>
-        typeof opt === "string" || typeof opt === "number"
-          ? { label: String(opt), value: opt as T }
-          : (opt as SelectOption<T>)
+  const normalizedOptions = React.useMemo<SelectOption<T>[]>(
+    () =>
+      options.map((option): SelectOption<T> => {
+        if (typeof option === "object") return option as SelectOption<T>;
+        return { label: String(option), value: option as T };
+      }),
+    [options],
+  );
+  const optionLabel = React.useCallback(
+    (option: SelectOption<T>) =>
+      getOptionLabel ? getOptionLabel(option) : option.label,
+    [getOptionLabel],
+  );
+  const optionValue = React.useCallback(
+    (option: SelectOption<T>) =>
+      getOptionValue ? getOptionValue(option) : String(option.value),
+    [getOptionValue],
+  );
+  const allowCustom = allowCustomInput ?? allowCustomValue ?? true;
+  const controlled = value !== undefined;
+  const [internalValue, setInternalValue] = React.useState(defaultValue ?? "");
+  const currentValue = controlled ? value : internalValue;
+
+  const selectedValue = React.useMemo<SelectOption<T> | string | null>(() => {
+    const matchingOption = normalizedOptions.find(
+      (option) => optionValue(option) === currentValue,
     );
-  }, [options]);
-
-  const getLabel = React.useCallback(
-    (opt: SelectOption<T>) => {
-      return getOptionLabel ? getOptionLabel(opt) : opt.label;
-    },
-    [getOptionLabel]
-  );
-  const getValue = React.useCallback(
-    (opt: SelectOption<T>) => {
-      if (getOptionValue) return getOptionValue(opt);
-      const v = opt.value;
-      return typeof v === "string" ? v : String(v);
-    },
-    [getOptionValue]
-  );
-
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const listRef = React.useRef<HTMLUListElement | null>(null);
-
-  const isControlled = value != null;
-  const [innerValue, setInnerValue] = React.useState<string>(
-    defaultValue ?? ""
-  );
-  const inputValue = isControlled ? (value as string) : innerValue;
-  const selectedOption = React.useMemo(
-    () => normalizedOptions.find((option) => getValue(option) === inputValue),
-    [getValue, inputValue, normalizedOptions],
-  );
-
-  const [open, setOpen] = React.useState(false);
-  const [listMounted, setListMounted] = React.useState(false);
-  const [showAllOptions, setShowAllOptions] = React.useState(false);
-  const [highlightIndex, setHighlightIndex] = React.useState<number>(-1);
-  const closeTimerRef = React.useRef<number | null>(null);
-
-  const openList = React.useCallback(() => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    setListMounted(true);
-    setOpen(true);
-  }, []);
-
-  const closeList = React.useCallback(() => {
-    setOpen(false);
-    setShowAllOptions(false);
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      setListMounted(false);
-      closeTimerRef.current = null;
-    }, FLOATING_CONTENT_EXIT_MS);
-  }, []);
-
-  React.useEffect(
-    () => () => {
-      if (closeTimerRef.current !== null) {
-        window.clearTimeout(closeTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  const allowCustom = (allowCustomInput ?? true) === true;
-
-  const filtered = React.useMemo(() => {
-    const text = (inputValue ?? "").trim().toLowerCase();
-    const base = normalizedOptions;
-    if (showAllOptions || !text) return base;
-    if (filter) return base.filter((o) => filter(o, inputValue));
-    return base.filter((o) => {
-      const lbl = getLabel(o).toLowerCase();
-      const val = getValue(o).toLowerCase();
-      return lbl.includes(text) || val.includes(text);
-    });
-  }, [normalizedOptions, inputValue, filter, getLabel, getValue, showAllOptions]);
+    if (matchingOption) return matchingOption;
+    return allowCustom && currentValue ? currentValue : null;
+  }, [allowCustom, currentValue, normalizedOptions, optionValue]);
+  const selectedOption =
+    typeof selectedValue === "string" ? null : selectedValue;
 
   const commit = React.useCallback(
-    (next: string, option?: SelectOption<T>) => {
-      if (!isControlled) setInnerValue(next);
-      onChange?.(next, option);
+    (nextValue: string, option?: SelectOption<T>) => {
+      if (!controlled) setInternalValue(nextValue);
+      onChange?.(nextValue, option);
     },
-    [isControlled, onChange]
+    [controlled, onChange],
   );
-
-  // Compute the options to display: if none matched and custom allowed, show current input as a creatable option
-  const displayed: SelectOption<T>[] = React.useMemo(() => {
-    if (filtered.length > 0) return filtered;
-    const text = (inputValue ?? "").trim();
-    if (!text) return [];
-    if (!allowCustom) return [];
-    return [{ label: text, value: text as unknown as T }];
-  }, [filtered, inputValue, allowCustom]);
-
-  const selectAt = React.useCallback(
-    (index: number) => {
-      const opt = displayed[index];
-      if (!opt || opt.disabled) return;
-      const v = getValue(opt);
-      commit(v, opt);
-      closeList();
-    },
-    [closeList, displayed, getValue, commit]
-  );
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    if (!isControlled) setInnerValue(v);
-    onChange?.(v);
-    setShowAllOptions(false);
-    if (!open) openList();
-    setHighlightIndex(0);
-  };
-
-  const handleFocus: React.FocusEventHandler<HTMLInputElement> = (e) => {
-    setShowAllOptions(false);
-    openList();
-    onFocus?.(e);
-  };
-
-  const handleBlur: React.FocusEventHandler<HTMLInputElement> = (e) => {
-    // We'll close on click outside handler; defer here to allow option click
-    onBlur?.(e);
-  };
-
-  const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
-    onKeyDown?.(e);
-    if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-      setShowAllOptions(true);
-      openList();
-      e.preventDefault();
-      return;
-    }
-    if (!open) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIndex((i) =>
-        Math.min((i < 0 ? -1 : i) + 1, Math.max(displayed.length - 1, 0))
-      );
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.max((i < 0 ? 0 : i) - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (highlightIndex >= 0 && highlightIndex < displayed.length) {
-        selectAt(highlightIndex);
-      } else if (allowCustom) {
-        commit(inputValue);
-        closeList();
-      }
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      closeList();
-    }
-  };
-
-  const toggleAllOptions = () => {
-    if (open && showAllOptions) {
-      closeList();
-      return;
-    }
-    const selectedIndex = normalizedOptions.findIndex(
-      (option) => getValue(option) === inputValue,
-    );
-    setShowAllOptions(true);
-    setHighlightIndex(selectedIndex >= 0 ? selectedIndex : 0);
-    openList();
-  };
-
-  // Scroll highlighted into view
-  React.useEffect(() => {
-    if (!listRef.current) return;
-    if (highlightIndex < 0) return;
-    const el = listRef.current.children[highlightIndex] as
-      | HTMLElement
-      | undefined;
-    if (el) el.scrollIntoView({ block: "nearest" });
-  }, [highlightIndex]);
-
-  // Click outside to close
-  React.useEffect(() => {
-    if (!open) return;
-    const onDocDown = (ev: MouseEvent) => {
-      const target = ev.target as Node | null;
-      if (!containerRef.current) return;
-      if (target && containerRef.current.contains(target)) return;
-      closeList();
-    };
-    document.addEventListener("mousedown", onDocDown, { capture: true });
-    return () =>
-      document.removeEventListener("mousedown", onDocDown, {
-        capture: true,
-      } as any);
-  }, [closeList, open]);
-
-  // Build ARIA ids
-  const listId = React.useId();
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
-      <TextField.Root
-        //role="combobox"
-        //aria-controls={open ? listId : undefined}
-        aria-expanded={open}
-        aria-autocomplete="list"
-        placeholder={placeholder}
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        type={type}
-        name={name}
-        //autoComplete="off"
-        //{...inputProps}
-      >
-        {selectedOption?.icon ? (
-          <TextField.Slot>{selectedOption.icon}</TextField.Slot>
-        ) : null}
-        <TextField.Slot side="right" className="pr-1">
-          <button
-            type="button"
-            aria-label="Show all options"
-            aria-expanded={open && showAllOptions}
-            disabled={disabled}
-            className="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={toggleAllOptions}
-          >
-            <ChevronDown
-              size={16}
-              className={cn(
-                "transition-transform duration-150",
-                open && showAllOptions && "rotate-180",
-              )}
-            />
-          </button>
-        </TextField.Slot>
-      </TextField.Root>
-      {listMounted && (
-        <div
-          data-side="bottom"
-          data-state={open ? "open" : "closed"}
-          className={cn(
-            "admin-select-or-input-content absolute left-0 right-0 z-50 mt-1 rounded-md border bg-accent-1 text-popover-foreground shadow-md data-[state=closed]:pointer-events-none data-[state=closed]:opacity-0",
-            "max-h-60 overflow-auto",
-            listClassName
-          )}
-          style={{ minWidth: 0 }}
-        >
-          <ul id={listId} ref={listRef} role="listbox" className="p-1">
-            {displayed.length === 0 ? (
-              allowCustom ? null : (
-                <li
-                  className={cn(
-                    "text-muted-foreground select-none rounded-sm px-2 py-1.5 text-sm"
-                  )}
+    <Autocomplete<SelectOption<T>, false, false, true>
+      className={cn(className)}
+      style={style}
+      options={normalizedOptions}
+      value={selectedValue}
+      disabled={disabled}
+      freeSolo
+      autoHighlight
+      autoSelect={allowCustom}
+      clearOnBlur={!allowCustom}
+      openOnFocus
+      clearOnEscape
+      noOptionsText={emptyText}
+      getOptionLabel={(option) =>
+        typeof option === "string" ? option : optionLabel(option)
+      }
+      getOptionDisabled={(option) => option.disabled === true}
+      isOptionEqualToValue={(option, selected) =>
+        typeof selected !== "string" && optionValue(option) === optionValue(selected)
+      }
+      filterOptions={(availableOptions, state) => {
+        const input = state.inputValue.trim();
+        if (!input) return availableOptions;
+        if (filter) {
+          return availableOptions.filter((option) => filter(option, input));
+        }
+        const keyword = input.toLocaleLowerCase();
+        return availableOptions.filter((option) =>
+          `${optionLabel(option)} ${optionValue(option)}`
+            .toLocaleLowerCase()
+            .includes(keyword),
+        );
+      }}
+      onInputChange={(_, nextInput, reason) => {
+        if (allowCustom && reason === "input") commit(nextInput);
+        if (reason === "clear") commit("");
+      }}
+      onChange={(_, nextValue) => {
+        if (nextValue === null) {
+          commit("");
+          return;
+        }
+        if (typeof nextValue === "string") {
+          if (allowCustom) commit(nextValue);
+          return;
+        }
+        commit(optionValue(nextValue), nextValue);
+      }}
+      classes={{
+        paper: cn("admin-select-or-input-content", listClassName),
+        option: cn(optionClassName),
+      }}
+      renderOption={(optionProps, option) => {
+        const { key, ...listItemProps } = optionProps;
+        return (
+          <li key={key} {...listItemProps}>
+            {option.icon ? (
+              <Box
+                component="span"
+                sx={{ display: "inline-flex", flexShrink: 0, alignItems: "center" }}
+              >
+                {option.icon}
+              </Box>
+            ) : null}
+            <span>{optionLabel(option)}</span>
+          </li>
+        );
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          id={id}
+          name={name}
+          type={type}
+          size="small"
+          required={required}
+          autoFocus={autoFocus}
+          placeholder={placeholder}
+          slotProps={{
+            ...params.slotProps,
+            input: {
+              ...params.slotProps.input,
+              startAdornment: selectedOption?.icon ? (
+                <InputAdornment
+                  position="start"
+                  sx={{ mr: 0.25, color: "text.secondary", lineHeight: 0 }}
                 >
-                  {emptyText}
-                </li>
-              )
-            ) : (
-              displayed.map((opt, idx) => {
-                const isActive = idx === highlightIndex;
-                const isDisabled = !!opt.disabled;
-                return (
-                  <li
-                    key={`${getValue(opt)}-${idx}`}
-                    role="option"
-                    aria-selected={isActive}
-                    data-disabled={isDisabled || undefined}
-                    className={cn(
-                      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-normal outline-hidden transition-colors duration-150",
-                      "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-                      isActive
-                        ? "bg-accent-9 text-[var(--accent-contrast)]"
-                        : "hover:bg-accent hover:text-accent-foreground",
-                      optionClassName
-                    )}
-                    onMouseEnter={() => setHighlightIndex(idx)}
-                    onMouseDown={(e) => {
-                      // prevent input blur before click handler
-                      e.preventDefault();
-                    }}
-                    onClick={() => selectAt(idx)}
-                  >
-                    {opt.icon}
-                    {getLabel(opt)}
-                  </li>
-                );
-              })
-            )}
-          </ul>
-        </div>
+                  {selectedOption.icon}
+                </InputAdornment>
+              ) : (
+                params.slotProps.input.startAdornment
+              ),
+            },
+            htmlInput: {
+              ...params.slotProps.htmlInput,
+              ...nativeInputProps,
+              name,
+              type,
+              readOnly,
+              autoComplete,
+              inputMode,
+              spellCheck,
+              maxLength,
+              minLength,
+              pattern,
+              onBlur: (event: React.FocusEvent<HTMLInputElement>) => {
+                params.slotProps.htmlInput.onBlur?.(event);
+                onBlur?.(event);
+              },
+              onFocus: (event: React.FocusEvent<HTMLInputElement>) => {
+                params.slotProps.htmlInput.onFocus?.(event);
+                onFocus?.(event);
+              },
+              onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+                params.slotProps.htmlInput.onKeyDown?.(event);
+                onKeyDown?.(event);
+              },
+            },
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              minHeight: 40,
+              py: 0,
+            },
+            "& .MuiAutocomplete-input": {
+              minWidth: "32px !important",
+            },
+          }}
+        />
       )}
-    </div>
+    />
   );
 }
 

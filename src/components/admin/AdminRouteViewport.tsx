@@ -22,13 +22,18 @@ const isRouteViewReady = (element: HTMLElement) =>
 const AdminRouteViewport = ({
   fallback,
   outlet,
+  onFirstReady,
 }: {
   fallback: React.ReactNode;
   outlet: React.ReactNode;
+  onFirstReady?: () => void;
 }) => {
   const location = useLocation();
   const incomingKey = getAdminRouteViewKey(location);
   const viewElements = React.useRef(new Map<string, HTMLDivElement>());
+  const firstReadyRef = React.useRef(false);
+  const onFirstReadyRef = React.useRef(onFirstReady);
+  onFirstReadyRef.current = onFirstReady;
   const [progressState, setProgressState] = React.useState<"hidden" | "visible" | "leaving">("hidden");
   const progressVisibleAt = React.useRef<number | null>(null);
   const [state, setState] = React.useState<RouteViewportState<React.ReactNode>>(() => ({
@@ -80,45 +85,59 @@ const AdminRouteViewport = ({
     const element = viewElements.current.get(pendingKey);
     if (!element) return;
 
-    let animationFrame = 0;
-    let readyFrames = 0;
     let stopped = false;
+    let promoted = false;
     const promote = () => {
+      if (stopped || promoted) return;
+      promoted = true;
       setState((current) => promoteAdminRouteView(current, pendingKey));
     };
     const check = () => {
-      if (stopped) return;
-      if (!isRouteViewReady(element)) {
-        readyFrames = 0;
-        return;
-      }
-      readyFrames += 1;
-      if (readyFrames >= 2) {
-        promote();
-        return;
-      }
-      animationFrame = window.requestAnimationFrame(check);
+      if (stopped || promoted) return;
+      if (isRouteViewReady(element)) promote();
     };
-    const observer = new MutationObserver(() => {
-      readyFrames = 0;
-      window.cancelAnimationFrame(animationFrame);
-      animationFrame = window.requestAnimationFrame(check);
-    });
+    const observer = new MutationObserver(check);
     observer.observe(element, {
       attributes: true,
       attributeFilter: ["data-admin-route-pending"],
       childList: true,
-      characterData: true,
       subtree: true,
     });
-    animationFrame = window.requestAnimationFrame(check);
+    check();
 
     return () => {
       stopped = true;
       observer.disconnect();
-      window.cancelAnimationFrame(animationFrame);
     };
   }, [state.pendingKey]);
+
+  React.useLayoutEffect(() => {
+    if (firstReadyRef.current) return;
+    const watchKey = state.pendingKey ?? state.activeKey;
+    const element = viewElements.current.get(watchKey);
+    if (!element) return;
+
+    let stopped = false;
+    const check = () => {
+      if (stopped || firstReadyRef.current) return;
+      if (!isRouteViewReady(element)) return;
+      firstReadyRef.current = true;
+      onFirstReadyRef.current?.();
+    };
+    const observer = new MutationObserver(check);
+    observer.observe(element, {
+      attributes: true,
+      attributeFilter: ["data-admin-route-pending"],
+      childList: true,
+      subtree: true,
+    });
+    check();
+
+    return () => {
+      stopped = true;
+      observer.disconnect();
+    };
+  }, [state.activeKey, state.pendingKey]);
 
   return (
     <div className="admin-route-viewport">

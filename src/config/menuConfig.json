@@ -11,6 +11,11 @@
       "icon": "Server"
     },
     {
+      "labelKey": "navigation.billing",
+      "path": "/admin/billing",
+      "icon": "Payments"
+    },
+    {
       "labelKey": "navigation.monitoring",
       "path": "/admin/monitoring",
       "icon": "Activity",
@@ -36,11 +41,6 @@
           "labelKey": "exec.title",
           "path": "/admin/exec",
           "icon": "Code"
-        },
-        {
-          "labelKey": "terminal.remote_title",
-          "path": "/admin/terminal",
-          "icon": "Terminal"
         },
         {
           "labelKey": "navigation.terminal_settings",
@@ -149,7 +149,7 @@
     },
     {
       "labelKey": "common.documentation",
-      "path": "https://nuomiiiii.github.io/komari-document/",
+      "path": "https://nuomiiiii.github.io/Lite-document/",
       "icon": "Book",
       "newTab": true
     }

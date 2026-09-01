@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Callout, Box } from "@radix-ui/themes";
+import { Callout, Box } from "@/components/admin/ui";
 import Loading from "@/components/loading";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import {
   getRawThemeHtml,
   type ThemeConfiguration,
 } from "@/utils/themeConfiguration";
+import { fetchThemeManifest } from "@/utils/themeManifest";
 
 interface ThemeConfigResponse {
   configuration?: ThemeConfiguration;
@@ -32,7 +33,7 @@ const ThemeRaw = () => {
       setError(null);
 
       try {
-        const resp = await fetch(`/themes/${theme}/komari-theme.json`, {
+        const resp = await fetchThemeManifest(theme, {
           cache: "no-cache",
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

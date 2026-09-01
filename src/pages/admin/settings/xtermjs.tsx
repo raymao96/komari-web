@@ -1,9 +1,11 @@
 import React from "react";
+import Alert from "@mui/material/Alert";
+import Stack from "@mui/material/Stack";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import { Button, Callout, Flex } from "@radix-ui/themes";
+import { Button } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "@/components/admin/muiIcons";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import {
   SettingCardButton,
@@ -138,20 +140,19 @@ export default function XtermjsSettingsPage() {
 
   if (error) {
     return (
-      <Flex direction="column" gap="3">
-        <Callout.Root color="red" size="1">
-          <Callout.Icon>
-            <AlertTriangle size={16} />
-          </Callout.Icon>
-          <Callout.Text>{error.message}</Callout.Text>
-        </Callout.Root>
-        <Button onClick={handleRetry}>{t("common.retry", "Retry")}</Button>
-      </Flex>
+      <Stack spacing={2}>
+        <Alert severity="error" icon={<AlertTriangle size={18} />}>
+          {error.message}
+        </Alert>
+        <Button variant="outlined" onClick={handleRetry}>
+          {t("common.retry", "Retry")}
+        </Button>
+      </Stack>
     );
   }
 
   return (
-    <Flex direction="column" gap="3">
+    <Stack spacing={2.5}>
       <AdminPageTitle
         description={t(
           "settings.xtermjs.page_description",
@@ -284,14 +285,9 @@ export default function XtermjsSettingsPage() {
       />
 
       {themeBackgroundIsOpaque && (
-        <Callout.Root color="amber" size="1">
-          <Callout.Icon>
-            <AlertTriangle size={16} />
-          </Callout.Icon>
-          <Callout.Text>
-            {t("settings.xtermjs.transparent_theme_hint")}
-          </Callout.Text>
-        </Callout.Root>
+        <Alert severity="warning" icon={<AlertTriangle size={18} />}>
+          {t("settings.xtermjs.transparent_theme_hint")}
+        </Alert>
       )}
 
       <SettingCardShortTextInput
@@ -331,6 +327,6 @@ export default function XtermjsSettingsPage() {
         isSaving={saving}
         OnSave={handleCustomCssSave}
       />
-    </Flex>
+    </Stack>
   );
 }

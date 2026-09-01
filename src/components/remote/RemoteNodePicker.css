@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .remote-node-picker-search {
@@ -55,7 +55,7 @@
   flex: 0 0 26px;
   place-items: center;
   border: 0;
-  border-radius: var(--radius-2);
+  border-radius: 8px;
   background: transparent;
   color: var(--gray-10);
   cursor: pointer;
@@ -157,6 +157,7 @@
 
 .remote-node-picker-status {
   display: flex;
+  min-height: 20px;
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
@@ -172,11 +173,11 @@
 }
 
 .remote-node-picker-status.is-online {
-  color: var(--green-10);
+  color: #22c55e;
 }
 
 .remote-node-picker-status.is-offline {
-  color: var(--red-10);
+  color: #ff5630;
 }
 
 .remote-node-picker-address-panel {
@@ -234,7 +235,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--gray-12);
-  font-family: var(--code-font-family);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -243,7 +244,7 @@
 .remote-node-picker-enter {
   display: grid;
   place-items: center;
-  border-radius: var(--radius-2);
+  border-radius: 8px;
 }
 
 .remote-node-picker-card-footer {
@@ -322,7 +323,7 @@
   height: 30px;
   place-items: center;
   border: 1px solid var(--gray-a6);
-  border-radius: var(--radius-2);
+  border-radius: 8px;
   background: var(--color-panel-solid);
   color: var(--gray-11);
   cursor: pointer;
@@ -335,7 +336,7 @@
 }
 
 .remote-node-picker-pagination button:disabled {
-  color: var(--gray-7);
+  color: #c4cdd5;
   cursor: default;
 }
 

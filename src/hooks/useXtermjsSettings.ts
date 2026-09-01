@@ -405,6 +405,23 @@ export async function fetchXtermjsSettings(options?: {
   return deserializeXtermjsSettings(json.data);
 }
 
+let xtermjsSettingsSnapshot: XtermjsSettings | null = null;
+
+function rememberXtermjsSettings(settings: XtermjsSettings): XtermjsSettings {
+  const sanitized = sanitizeXtermjsSettings(settings);
+  xtermjsSettingsSnapshot = sanitized;
+  return sanitized;
+}
+
+export function getXtermjsSettingsSnapshot(): XtermjsSettings | null {
+  return xtermjsSettingsSnapshot;
+}
+
+export async function prefetchXtermjsSettings(): Promise<XtermjsSettings> {
+  if (xtermjsSettingsSnapshot) return xtermjsSettingsSnapshot;
+  return rememberXtermjsSettings(await fetchXtermjsSettings());
+}
+
 export async function saveXtermjsSettings(
   settings: XtermjsSettings,
   options?: { signal?: AbortSignal }
@@ -503,17 +520,22 @@ function toError(error: unknown): Error {
 }
 
 export function useXtermjsSettings() {
+  const snapshot = getXtermjsSettingsSnapshot();
   const mountedRef = useRef(true);
-  const confirmedSettingsRef = useRef<XtermjsSettings>(defaultXtermjsSettings);
-  const pendingSettingsRef = useRef<XtermjsSettings>(defaultXtermjsSettings);
+  const confirmedSettingsRef = useRef<XtermjsSettings>(
+    snapshot ?? defaultXtermjsSettings
+  );
+  const pendingSettingsRef = useRef<XtermjsSettings>(
+    snapshot ?? defaultXtermjsSettings
+  );
   const latestRevisionRef = useRef(0);
   const mutationEpochRef = useRef(0);
   const queueTailRef = useRef(Promise.resolve());
   const pendingTaskCountRef = useRef(0);
   const [settings, setSettingsState] = useState<XtermjsSettings>(
-    defaultXtermjsSettings
+    snapshot ?? defaultXtermjsSettings
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => snapshot === null);
   const [error, setError] = useState<Error | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -545,7 +567,7 @@ export function useXtermjsSettings() {
   );
 
   const applyFetchedSettings = useCallback((nextSettings: XtermjsSettings) => {
-    const sanitized = sanitizeXtermjsSettings(nextSettings);
+    const sanitized = rememberXtermjsSettings(nextSettings);
     confirmedSettingsRef.current = sanitized;
     pendingSettingsRef.current = sanitized;
 
@@ -562,7 +584,7 @@ export function useXtermjsSettings() {
       const requestEpoch = mutationEpochRef.current;
       const requestPendingCount = pendingTaskCountRef.current;
 
-      if (mountedRef.current) {
+      if (mountedRef.current && xtermjsSettingsSnapshot === null) {
         setLoading(true);
       }
 
@@ -611,7 +633,7 @@ export function useXtermjsSettings() {
       return startQueuedTask(async () => {
         try {
           await saveXtermjsSettings(sanitizedNext);
-          const confirmed = await fetchXtermjsSettings();
+          const confirmed = rememberXtermjsSettings(await fetchXtermjsSettings());
 
           if (latestRevisionRef.current === revision) {
             confirmedSettingsRef.current = confirmed;

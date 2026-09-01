@@ -2,43 +2,24 @@ import Account from "@/pages/admin/account";
 import Sessions from "@/pages/admin/sessions";
 import SignOnSettings from "@/pages/admin/settings/sign-on";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import { Flex, Tabs } from "@radix-ui/themes";
-import { KeyRound, UserCircle, Users } from "lucide-react";
+import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
+import { History, KeyRound, User } from "@/components/admin/muiIcons";
+import Stack from "@mui/material/Stack";
+import { Tabs } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useAdminTabParam } from "@/hooks/useAdminTabParam";
 
-type AccountSecurityTab = "account" | "sign-on" | "sessions";
-
-const ACCOUNT_SECURITY_TABS = new Set<AccountSecurityTab>([
-  "account",
-  "sign-on",
-  "sessions",
-]);
-
-function resolveTab(value: string | null): AccountSecurityTab {
-  return ACCOUNT_SECURITY_TABS.has(value as AccountSecurityTab)
-    ? (value as AccountSecurityTab)
-    : "account";
-}
+const ACCOUNT_SECURITY_TABS = ["account", "sign-on", "sessions"] as const;
 
 export default function AccountSecuritySettings() {
   const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = resolveTab(searchParams.get("tab"));
-
-  const setActiveTab = (value: string) => {
-    const tab = resolveTab(value);
-    const next = new URLSearchParams(searchParams);
-    if (tab === "account") {
-      next.delete("tab");
-    } else {
-      next.set("tab", tab);
-    }
-    setSearchParams(next, { replace: true });
-  };
+  const [activeTab, setActiveTab] = useAdminTabParam(
+    ACCOUNT_SECURITY_TABS,
+    "account",
+  );
 
   return (
-    <Flex direction="column" gap="3">
+    <Stack spacing={2.5}>
       <AdminPageTitle
         description={t(
           "settings.account_security_page_description",
@@ -49,37 +30,36 @@ export default function AccountSecuritySettings() {
       </AdminPageTitle>
 
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <div className="w-full overflow-x-auto pb-1">
-          <Tabs.List className="w-max min-w-full">
-            <Tabs.Trigger value="account" className="min-w-[7.5rem] flex-1">
-              <UserCircle size={15} />
-              {t("account.title")}
+        <AdminSheetTabs>
+          <Tabs.List>
+            <Tabs.Trigger value="account">
+              <AdminTabLabel icon={<User size={18} />}>{t("account.title")}</AdminTabLabel>
             </Tabs.Trigger>
-            <Tabs.Trigger value="sign-on" className="min-w-[7.5rem] flex-1">
-              <KeyRound size={15} />
-              {t("settings.sign_on.title")}
+            <Tabs.Trigger value="sign-on">
+              <AdminTabLabel icon={<KeyRound size={18} />}>
+                {t("settings.sign_on.title")}
+              </AdminTabLabel>
             </Tabs.Trigger>
-            <Tabs.Trigger value="sessions" className="min-w-[7.5rem] flex-1">
-              <Users size={15} />
-              {t("sessions.title")}
+            <Tabs.Trigger value="sessions">
+              <AdminTabLabel icon={<History size={18} />}>{t("sessions.title")}</AdminTabLabel>
             </Tabs.Trigger>
           </Tabs.List>
-        </div>
+        </AdminSheetTabs>
 
-        <Tabs.Content value="account" className="pt-3">
+        <Tabs.Content value="account" className="admin-tab-panel pt-3">
           {activeTab === "account" ? <Account /> : null}
         </Tabs.Content>
-        <Tabs.Content value="sign-on" className="pt-3">
+        <Tabs.Content value="sign-on" className="admin-tab-panel pt-3">
           {activeTab === "sign-on" ? (
-            <Flex direction="column" gap="3">
+            <Stack spacing={2.5}>
               <SignOnSettings />
-            </Flex>
+            </Stack>
           ) : null}
         </Tabs.Content>
-        <Tabs.Content value="sessions" className="pt-3">
+        <Tabs.Content value="sessions" className="admin-tab-panel pt-3">
           {activeTab === "sessions" ? <Sessions /> : null}
         </Tabs.Content>
       </Tabs.Root>
-    </Flex>
+    </Stack>
   );
 }

@@ -2,20 +2,28 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  container = true,
+  ...props
+}: React.ComponentProps<"table"> & { container?: boolean }) {
+  const table = (
+    <table
+      data-slot="table"
+      className={cn(
+        "km-table w-full caption-bottom bg-[var(--color-panel-solid)] text-sm text-[var(--gray-12)]",
+        className,
+      )}
+      {...props}
+    />
+  );
+  if (!container) return table;
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
-      <table
-        data-slot="table"
-        className={cn(
-          "w-full caption-bottom bg-[var(--color-panel-solid)] text-sm text-[var(--gray-12)]",
-          className,
-        )}
-        {...props}
-      />
+      {table}
     </div>
   );
 }
@@ -25,7 +33,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "admin-table-header [&_tr]:border-b [&_tr]:border-[var(--gray-a5)]",
+        "admin-table-header select-none [&_tr]:border-b [&_tr]:border-[var(--gray-a5)]",
         className,
       )}
       {...props}
@@ -72,7 +80,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 whitespace-nowrap px-2 text-left align-middle font-medium text-[var(--gray-11)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-11 whitespace-nowrap px-2 text-left align-middle font-medium text-[var(--gray-12)] [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -85,7 +93,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "whitespace-nowrap p-2 align-middle text-[var(--gray-12)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "whitespace-nowrap p-2 align-middle font-medium text-[var(--gray-12)] [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

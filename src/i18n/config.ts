@@ -1,86 +1,89 @@
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import en from "./locales/en.json";
-import zh_CN from "./locales/zh_CN.json";
-import zh_TW from "./locales/zh_TW.json";
-import ja_JP from "./locales/ja_JP.json";
-import id_ID from "./locales/id_ID.json";
 import {
+  ADMIN_UI_LANGUAGES,
   LANGUAGE_STORAGE_KEY,
   readStoredLanguage,
+  resolveUiLanguage,
   writeLanguageCookie,
+  type AdminUiLanguage,
 } from "@/utils/language";
 
-// 不添加 name 字段的语言将不会在语言切换菜单中显示
-// not adding the name field will hide the language from the language switcher menu
-const resources = {
-  en: {
-    translation: en,
-  },
-  "en-US": {
-    translation: en,
-    name: "English",
-  },
-  "en-GB": {
-    translation: en,
-  },
-  "en-CA": {
-    translation: en,
-  },
-  "en-AU": {
-    translation: en,
-  },
-  "zh-CN": {
-    translation: zh_CN,
-    name: "简体中文",
-  },
-  "zh-SG": {
-    translation: zh_CN,  // Singapore uses Simplified Chinese
-  },
-  "zh-TW": {
-    translation: zh_TW,
-    name: "繁體中文",
-  },
-  "zh-HK": {
-    translation: zh_TW,  // Hong Kong uses Traditional Chinese
-  },
-  "zh-MO": {
-    translation: zh_TW,  // Macau uses Traditional Chinese
-  },
-  "ja-JP": {
-    translation: ja_JP,
-    name: "日本語",
-  },
-  "id-ID": {
-    translation: id_ID,
-    name: "Bahasa Indonesia",
-  },
+const localeLoaders: Record<
+  AdminUiLanguage,
+  () => Promise<{ default: Record<string, unknown> }>
+> = {
+  "en-US": () => import("./locales/en.json"),
+  "zh-CN": () => import("./locales/zh_CN.json"),
+  "zh-TW": () => import("./locales/zh_TW.json"),
+  "ja-JP": () => import("./locales/ja_JP.json"),
 };
 
-writeLanguageCookie(readStoredLanguage());
-
-i18next.on("languageChanged", (language) => {
-  writeLanguageCookie(language);
-});
+const localeLoads = new Map<AdminUiLanguage, Promise<Record<string, unknown>>>();
 
 const i18n = i18next;
 
-void i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources,
-    fallbackLng: "en-US",
+export async function loadUiLocale(language: string) {
+  const lng = resolveUiLanguage(language);
+  let pending = localeLoads.get(lng);
+  if (!pending) {
+    pending = localeLoaders[lng]().then((mod) => mod.default);
+    localeLoads.set(lng, pending);
+  }
+  const data = await pending;
+  if (i18n.isInitialized) {
+    i18n.addResourceBundle(lng, "translation", data, true, true);
+  }
+  return lng;
+}
+
+export function preloadUiLocales() {
+  return Promise.all(
+    ADMIN_UI_LANGUAGES.map((item) => loadUiLocale(item.code)),
+  );
+}
+
+export async function changeUiLanguage(language: string) {
+  const lng = await loadUiLocale(language);
+  await i18n.changeLanguage(lng);
+  writeLanguageCookie(lng);
+  return lng;
+}
+
+const initialLng = resolveUiLanguage(
+  readStoredLanguage() ||
+    (typeof navigator !== "undefined" ? navigator.language : "en-US"),
+);
+
+i18n.on("languageChanged", (language) => {
+  writeLanguageCookie(language);
+});
+
+export const i18nReady = loadUiLocale(initialLng).then(async (lng) => {
+  const data = await localeLoads.get(lng);
+  writeLanguageCookie(lng);
+  await i18n.use(LanguageDetector).use(initReactI18next).init({
+    lng,
+    fallbackLng: lng,
+    supportedLngs: ADMIN_UI_LANGUAGES.map((item) => item.code),
+    resources: data
+      ? {
+          [lng]: { translation: data },
+        }
+      : undefined,
+    partialBundledLanguages: true,
+    load: "currentOnly",
     interpolation: {
-      escapeValue: false, // React handles XSS
+      escapeValue: false,
     },
     detection: {
       order: ["localStorage", "navigator"],
       caches: ["localStorage"],
       lookupLocalStorage: LANGUAGE_STORAGE_KEY,
+      convertDetectedLanguage: (detected) => resolveUiLanguage(detected),
     },
   });
+});
 
 export default i18n;
-export { resources };

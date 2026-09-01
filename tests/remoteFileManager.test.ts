@@ -8,11 +8,15 @@ const source = readFileSync(
   "utf8",
 );
 
-test("file-manager checkboxes use the shared system control", () => {
+test("file manager reuses the shared table header and keeps multi-select rows", () => {
+  assert.match(source, /Table container=\{false\} className="remote-file-table"/);
+  assert.match(source, /<TableHeader>/);
+  assert.match(source, /<TableHead>名称<\/TableHead>/);
+  assert.match(source, /data-file-path=\{entry\.path\}/);
   assert.match(source, /import \{ Checkbox \} from "@\/components\/ui\/checkbox"/);
   assert.doesNotMatch(source, /<input type="checkbox"/);
   assert.match(source, /<Checkbox checked=\{showHidden\}/);
-  assert.match(source, /<Checkbox checked=\{selected\.has\(entry\.path\)\}/);
+  assert.match(source, /<Checkbox\s+checked=\{selected\.has\(entry\.path\)\}/);
 });
 
 test("the existing multi-selection context menu can download selected files", () => {

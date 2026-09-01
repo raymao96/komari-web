@@ -1,26 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Flex, Callout, Button } from "@radix-ui/themes";
+import { Flex, Callout, Button } from "@/components/admin/ui";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import ThemeConfigTabs from "@/components/admin/ThemeConfigTabs";
 import { toast } from "sonner";
-import Loading from "@/components/loading";
 import { useTranslation } from "react-i18next";
-import { resolveI18nText, type I18nText } from "@/utils/i18nText";
-import {
-  getThemeConfigurationType,
-  THEME_CONFIGURATION_MANAGED,
-  type ThemeConfiguration,
-} from "@/utils/themeConfiguration";
+import { resolveI18nText } from "@/utils/i18nText";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import type { ThemeConfigTabField } from "@/utils/themeConfigTabs";
-
-type ThemeFieldBase = ThemeConfigTabField;
-
-interface ThemeConfigResponse {
-  name?: I18nText;
-  configuration?: ThemeConfiguration;
-  [k: string]: any;
-}
+import {
+  buildThemeManagedValues,
+  getThemeManagedSnapshot,
+  loadThemeManagedConfig,
+} from "@/lib/themeManaged";
 
 const ThemeManaged: React.FC = () => {
   const {
@@ -30,7 +20,7 @@ const ThemeManaged: React.FC = () => {
     refresh,
   } = usePublicInfo();
   const theme = publicInfo?.theme;
-  const themeSettings = publicInfo?.theme_settings || {}; // 当前值
+  const themeSettings = publicInfo?.theme_settings || {};
   const { t, i18n } = useTranslation();
 
   const currentLanguage =
@@ -38,19 +28,20 @@ const ThemeManaged: React.FC = () => {
     i18n.language ||
     (typeof navigator !== "undefined" ? navigator.language : "");
 
-  const [loading, setLoading] = useState(true);
+  const snapshot = getThemeManagedSnapshot(theme);
+  const [loading, setLoading] = useState(() => snapshot === null);
   const [saving, setSaving] = useState(false);
-  const [fields, setFields] = useState<ThemeFieldBase[]>([]);
-  const [values, setValues] = useState<Record<string, any>>({});
-  const [themeDisplayName, setThemeDisplayName] = useState("");
+  const [fields, setFields] = useState(snapshot?.fields ?? []);
+  const [values, setValues] = useState<Record<string, any>>(
+    snapshot?.values ?? {},
+  );
   const [error, setError] = useState<string | null>(null);
-  const [firstLoading, setFirstLoading] = useState(true);
+  const [firstLoading, setFirstLoading] = useState(() => snapshot === null);
 
-  // 拉取主题配置
   useEffect(() => {
     async function load() {
       if (publicInfoLoading || (!publicInfo && !publicInfoError)) {
-        setLoading(true);
+        if (!getThemeManagedSnapshot(theme)) setLoading(true);
         return;
       }
       if (publicInfoError) {
@@ -62,46 +53,23 @@ const ThemeManaged: React.FC = () => {
       if (!theme) {
         setFields([]);
         setValues({});
-        setThemeDisplayName("");
         setLoading(false);
         setFirstLoading(false);
         return;
       }
-      setLoading(true);
+      const cached = getThemeManagedSnapshot(theme);
+      if (!cached) setLoading(true);
       setError(null);
       try {
-        const resp = await fetch(`/themes/${theme}/komari-theme.json`, {
-          cache: "no-cache",
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data: ThemeConfigResponse = await resp.json();
-        const configuration = data.configuration;
-        setThemeDisplayName(
-          resolveI18nText(data.name, currentLanguage) ||
-            (theme === "default" ? "" : theme),
+        const next = cached
+          ? cached
+          : await loadThemeManagedConfig(theme, themeSettings);
+        setFields(next.fields);
+        setValues(
+          cached
+            ? buildThemeManagedValues(next.fields, themeSettings)
+            : next.values,
         );
-        if (
-          getThemeConfigurationType(configuration) !==
-            THEME_CONFIGURATION_MANAGED ||
-          !Array.isArray(configuration?.data)
-        ) {
-          setFields([]);
-          setValues({});
-          return;
-        }
-        const ds = configuration.data as ThemeFieldBase[];
-        setFields(ds);
-        // 初始值：优先 publicInfo.theme_settings，其次 default
-        const init: Record<string, any> = {};
-        ds.forEach((f) => {
-          if (f.type !== "title" && f.key) {
-            init[f.key] =
-              themeSettings && themeSettings[f.key] !== undefined
-                ? themeSettings[f.key]
-                : f.default;
-          }
-        });
-        setValues(init);
       } catch (e: any) {
         setError(e.message || t("theme.load_config_failed"));
       } finally {
@@ -109,7 +77,7 @@ const ThemeManaged: React.FC = () => {
         setFirstLoading(false);
       }
     }
-    load();
+    void load();
   }, [currentLanguage, publicInfo, publicInfoError, publicInfoLoading, theme, themeSettings, t]);
 
   const handleValueChange = (key: string, val: any) => {
@@ -117,12 +85,10 @@ const ThemeManaged: React.FC = () => {
   };
 
   const payload = useMemo(() => {
-    // 全量：对所有字段（非 title）输出当前值
     const obj: Record<string, any> = {};
     fields.forEach((f) => {
       if (f.type === "title" || !f.key) return;
       const current = values[f.key];
-      // 直接使用当前值，undefined 时才用默认值
       if (current !== undefined) {
         obj[f.key] = current;
       } else if (f.default !== undefined) {
@@ -136,8 +102,6 @@ const ThemeManaged: React.FC = () => {
 
   const saveAll = async () => {
     if (!theme) return;
-    console.log("保存前的 values:", values);
-    console.log("保存前的 payload:", payload);
     setSaving(true);
     try {
       const resp = await fetch(
@@ -153,7 +117,6 @@ const ThemeManaged: React.FC = () => {
         throw new Error(d.message || `HTTP ${resp.status}`);
       }
       toast.success(t("settings.settings_saved"));
-      // 刷新 publicInfo 以反映最新设置
       refresh();
     } catch (e: any) {
       toast.error(`${t("settings.settings_save_failed")}: ${e.message || e}`);
@@ -167,14 +130,11 @@ const ThemeManaged: React.FC = () => {
       direction="column"
       gap="4"
       className="km-page-admin-theme-managed p-0 md:p-4"
+      data-admin-route-pending={firstLoading ? "true" : undefined}
     >
       <Flex justify="between" align="center" gap="3" wrap="wrap">
         <AdminPageTitle description={t("theme.manage_description", "调整当前主题提供的显示和功能选项。")}> 
-          {theme
-            ? t("theme.manage_with_name", {
-                name: themeDisplayName,
-              })
-            : t("theme.manage")}
+          {t("theme.configure", "主题设置")}
         </AdminPageTitle>
         {fields.length > 0 && (
           <Button onClick={saveAll} disabled={saving}>
@@ -187,7 +147,6 @@ const ThemeManaged: React.FC = () => {
           <Callout.Text>{error}</Callout.Text>
         </Callout.Root>
       )}
-      {loading && firstLoading && <Loading />}
       {!loading && !error && fields.length === 0 && theme !== "default" && (
         <Callout.Root>
           <Callout.Text>{t("theme.no_config")}</Callout.Text>

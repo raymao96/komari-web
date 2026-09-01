@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Text } from "@radix-ui/themes";
+import { Text } from "@/components/admin/ui";
 import {
   updateSettingsWithToast,
   useSettings,

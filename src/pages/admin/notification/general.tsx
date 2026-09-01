@@ -1,6 +1,6 @@
-import { Flex } from "@radix-ui/themes";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
-import { Text } from "@radix-ui/themes";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import Loading from "@/components/loading";
 import {
@@ -12,9 +12,9 @@ import { toast } from "sonner";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 const GeneralNotification = () => {
   return (
-    <Flex direction="column" gap="3" className="p-0 md:p-4">
+    <Stack spacing={2.5} className="p-0 md:p-4">
       <Inner />
-    </Flex>
+    </Stack>
   );
 };
 
@@ -27,7 +27,7 @@ const Inner = () => {
   }
 
   if (error) {
-    return <Text color="red">{error}</Text>;
+    return <Typography color="error">{error}</Typography>;
   }
   return (
     <>

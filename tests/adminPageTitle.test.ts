@@ -39,7 +39,10 @@ test("the shared page title keeps a compact admin hierarchy", () => {
     path.resolve("src/components/admin/AdminPageTitle.tsx"),
     "utf8",
   );
-  assert.match(source, /text-xl font-semibold leading-7/);
+  assert.match(source, /variant="h4"/);
+  assert.match(source, /component="h1"/);
+  assert.match(source, /fontWeight: 700/);
+  assert.match(source, /fontSize: 24/);
 });
 
 test("server and settings pages share the standard page spacing", () => {
@@ -53,7 +56,7 @@ test("server and settings pages share the standard page spacing", () => {
   );
 
   assert.match(serverPage, /direction="column" gap="4" className="p-0 md:p-4"/);
-  assert.match(settingsLayout, /direction="column" gap="4" className="p-0 md:p-4"/);
+  assert.match(settingsLayout, /<Stack[\s\S]*spacing=\{2\.5\}[\s\S]*minWidth: 0/);
 });
 
 test("traffic report selection uses an aligned column and mobile row cards", () => {
@@ -66,5 +69,6 @@ test("traffic report selection uses an aligned column and mobile row cards", () 
   assert.match(source, /admin-responsive-table[^"\n]*admin-selection-table[^"\n]*min-w-\[640px\]/);
   assert.match(source, /data-label=\{t\("common\.server"\)\}/);
   assert.match(source, /common\.deselect_all[\s\S]*common\.select_all/);
-  assert.match(source, /admin-single-text-action/);
+  assert.match(source, /<IconButton[\s\S]*<Pencil size=\{16\} \/>/);
+  assert.doesNotMatch(source, /admin-single-action-label/);
 });

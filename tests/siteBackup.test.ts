@@ -12,23 +12,22 @@ const source = readFileSync("src/pages/admin/settings/site.tsx", "utf8");
 const generalSource = readFileSync("src/pages/admin/settings/general.tsx", "utf8");
 const locales = {
   en: JSON.parse(readFileSync("src/i18n/locales/en.json", "utf8")),
-  id: JSON.parse(readFileSync("src/i18n/locales/id_ID.json", "utf8")),
   ja: JSON.parse(readFileSync("src/i18n/locales/ja_JP.json", "utf8")),
   zhCN: JSON.parse(readFileSync("src/i18n/locales/zh_CN.json", "utf8")),
   zhTW: JSON.parse(readFileSync("src/i18n/locales/zh_TW.json", "utf8")),
 };
 
 test("normalizes the global admin page size within its supported range", () => {
-  assert.equal(ADMIN_LIST_PAGE_SIZE, 10);
+  assert.equal(ADMIN_LIST_PAGE_SIZE, 20);
   assert.equal(normalizeAdminPageSize(30), 30);
   assert.equal(normalizeAdminPageSize("40"), 40);
-  assert.equal(normalizeAdminPageSize(4), 10);
-  assert.equal(normalizeAdminPageSize(101), 10);
-  assert.equal(normalizeAdminPageSize(10.5), 10);
-  assert.equal(normalizeAdminPageSize("invalid"), 10);
+  assert.equal(normalizeAdminPageSize(4), 20);
+  assert.equal(normalizeAdminPageSize(101), 20);
+  assert.equal(normalizeAdminPageSize(10.5), 20);
+  assert.equal(normalizeAdminPageSize("invalid"), 20);
   assert.equal(isValidAdminPageSize(5), true);
   assert.equal(isValidAdminPageSize(100), true);
-  assert.deepEqual(adminPageSizeOptions(), [10, 50, 100]);
+  assert.deepEqual(adminPageSizeOptions(), [10, 20, 50, 100]);
 });
 
 test("global list pagination is configured under general settings", () => {
@@ -40,10 +39,17 @@ test("global list pagination is configured under general settings", () => {
   assert.equal(locales.zhCN.settings.general.admin_default_page_size, "列表默认分页");
 });
 
-test("general settings exposes the Komari motion preference", () => {
-  assert.match(generalSource, /settings\.general\.reduce_motion/);
-  assert.match(generalSource, /reduce_motion: checked/);
-  assert.equal(locales.zhCN.settings.general.reduce_motion, "减少动态效果");
+test("general settings does not expose a reduce-motion switch", () => {
+  assert.doesNotMatch(generalSource, /settings\.general\.reduce_motion/);
+  assert.doesNotMatch(generalSource, /reduce_motion: checked/);
+  assert.equal(locales.zhCN.settings.general.reduce_motion, undefined);
+});
+
+test("node list region filter uses country/region wording", () => {
+  assert.equal(locales.zhCN.admin.nodeTable.region, "国家\\地区");
+  assert.equal(locales.zhTW.admin.nodeTable.region, "國家\\地區");
+  assert.equal(locales.en.admin.nodeTable.region, "Country/Region");
+  assert.equal(locales.ja.admin.nodeTable.region, "国/地域");
 });
 
 test("auto discovery help opens the dedicated agent guide", () => {
@@ -90,7 +96,6 @@ test("account backup hint points to the actual site settings page", () => {
 
   assert.deepEqual(hints, [
     "Looking for backups? They are now under System Settings > Site.",
-    "Mencari cadangan? Sekarang tersedia di Pengaturan Sistem > Situs.",
     "バックアップは「システム設定 > サイト」に移動しました。",
     "正在寻找备份？现已迁移至「系统设置 > 站点」。",
     "正在尋找備份？現已移至「系統設定 > 站點」。",
@@ -108,3 +113,10 @@ test("backup restore dialog uses staged progress instead of a fake 95 percent fi
   );
   assert.doesNotMatch(source, /setRestoreProgress/);
 });
+
+test("favicon upload refreshes the current icon link", () => {
+  assert.match(source, /pathname.endsWith\("\/favicon.ico"\)/);
+  assert.doesNotMatch(source, /pathname.endsWith\("\/favicon.png"\)/);
+  assert.doesNotMatch(source, /pathname.endsWith\("\/apple-touch-icon.png"\)/);
+});
+

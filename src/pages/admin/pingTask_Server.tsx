@@ -1,4 +1,3 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import {
   Table,
   TableBody,
@@ -7,10 +6,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { AdminMobileCardStack, AdminMobileListCard } from "@/components/admin/AdminMobileListCard";
 import { useNodeDetails } from "@/contexts/NodeDetailsContext";
 import { usePingTask, type PingTask } from "@/contexts/PingTaskContext";
-import { Button, Dialog, Flex, IconButton } from "@radix-ui/themes";
-import { MoreHorizontal } from "lucide-react";
+import {
+  AppDialogContent, Button, Dialog, Flex, IconButton } from "@/components/admin/ui";
+import { MoreHorizontal } from "@/components/admin/muiIcons";
+import { Server } from "@/components/admin/muiIcons";
+import Flag from "@/components/Flag";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -48,18 +52,33 @@ export const ServerView = ({
       );
     });
   }, [nodeDetail, pingTasks, search]);
+  const isMobile = useIsMobile();
   const { page, setPage, pageItems, pageSize, setPageSize } =
     useAdminPagination(filteredNodes);
 
   React.useEffect(() => setPage(1), [search, setPage]);
 
   return (
-    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
-      <div className="overflow-x-auto">
-      <Table className="admin-responsive-table min-w-[640px]">
+    <>
+      {isMobile ? (
+        <AdminMobileCardStack>
+          {pageItems.map((n) => (
+            <ServerRow
+              key={n.uuid}
+              nodeUuid={n.uuid}
+              nodeName={n.name}
+              nodeRegion={n.region}
+              pingTasks={pingTasks}
+              asCard
+            />
+          ))}
+        </AdminMobileCardStack>
+      ) : (
+      <div className="admin-responsive-table-wrap overflow-x-auto">
+      <Table container={false} className="admin-responsive-table min-w-[640px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-48">{t("common.server")}</TableHead>
+            <TableHead className="w-[22%]">{t("common.server")}</TableHead>
             <TableHead>{t("ping.task")}</TableHead>
           </TableRow>
         </TableHeader>
@@ -69,12 +88,14 @@ export const ServerView = ({
               key={n.uuid}
               nodeUuid={n.uuid}
               nodeName={n.name}
+              nodeRegion={n.region}
               pingTasks={pingTasks}
             />
           ))}
         </TableBody>
       </Table>
       </div>
+      )}
       <AdminPagination
         page={page}
         total={filteredNodes.length}
@@ -83,15 +104,17 @@ export const ServerView = ({
         onPageSizeChange={setPageSize}
         summary={false}
       />
-    </div>
+    </>
   );
 };
 
 const ServerRow: React.FC<{
   nodeUuid: string;
   nodeName: string;
+  nodeRegion?: string;
   pingTasks: PingTask[];
-}> = ({ nodeUuid, nodeName, pingTasks }) => {
+  asCard?: boolean;
+}> = ({ nodeUuid, nodeName, nodeRegion, pingTasks, asCard = false }) => {
   const { t } = useTranslation();
   const { refresh } = usePingTask();
   const [open, setOpen] = React.useState(false);
@@ -168,69 +191,101 @@ const ServerRow: React.FC<{
       .finally(() => setSaving(false));
   };
 
-  const taskNames = ownedTasks.map((t) => t.name).join(", ");
+  const taskNames =
+    ownedTasks.length > 0
+      ? ownedTasks.map((task) => task.name).join("、")
+      : "";
+  const taskValue = (
+    <div
+      className="min-w-0 truncate whitespace-nowrap leading-5"
+      title={taskNames || undefined}
+    >
+      {taskNames || (
+        <span className="text-muted-foreground">{t("common.none")}</span>
+      )}
+    </div>
+  );
+  const taskBindDialog = (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger>
+        <IconButton variant="ghost" className="shrink-0">
+          <MoreHorizontal size={16} />
+        </IconButton>
+      </Dialog.Trigger>
+      <AppDialogContent maxWidth="450px">
+        <Dialog.Title>
+          {t("common.server")} - {nodeName}
+        </Dialog.Title>
+        <div className="mt-2">
+          <Selector
+            value={selectedIds}
+            onChange={setSelectedIds}
+            items={[...pingTasks.filter((task) => task.id !== undefined)]}
+            getId={(task) => String(task.id)}
+            getLabel={(task) => (
+              <span className="text-sm">
+                {task.name}
+                {task.default_on && (
+                  <span className="ml-2 text-xs text-accent-11">
+                    {t("ping.default_on_short")}
+                  </span>
+                )}
+                <span className="ml-2 text-xs text-gray-500">
+                  {task.type}/{task.interval}s
+                </span>
+              </span>
+            )}
+            headerLabel={t("ping.task")}
+            searchPlaceholder={t("common.search", { defaultValue: "Search" })}
+            filterItem={(item, keyword) =>
+              String(item.name).toLowerCase().includes(keyword.toLowerCase())
+            }
+          />
+        </div>
+        <Flex gap="2" justify="end" className="mt-4">
+          <Dialog.Close>
+            <Button
+              variant="soft"
+              color="gray"
+              type="button"
+              onClick={() => setOpen(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+          </Dialog.Close>
+          <Button onClick={handleSave} disabled={saving}>
+            {t("common.save")}
+          </Button>
+        </Flex>
+      </AppDialogContent>
+    </Dialog.Root>
+  );
+  const serverIdentity = (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="inline-flex size-7 shrink-0 items-center justify-center text-muted-foreground">
+        {nodeRegion ? <Flag flag={nodeRegion} compact /> : <Server size={17} />}
+      </span>
+      <span className="min-w-0 truncate font-medium">{nodeName}</span>
+    </div>
+  );
+
+  if (asCard) {
+    return (
+      <AdminMobileListCard
+        title={serverIdentity}
+        cells={[[t("ping.task"), taskValue]]}
+        actions={<div className="admin-card-actions">{taskBindDialog}</div>}
+      />
+    );
+  }
 
   return (
     <TableRow>
-      <TableCell data-label={t("common.server")}>{nodeName}</TableCell>
+      <TableCell data-label={t("common.server")}>{serverIdentity}</TableCell>
       <TableCell data-label={t("ping.task")}>
-        <div className="flex min-w-0 items-start gap-2">
-          <span className="min-w-0 flex-1 whitespace-normal break-words">
-            {ownedTasks.length > 0 ? taskNames : t("common.none")}
-          </span>
-          <Dialog.Root open={open} onOpenChange={setOpen}>
-            <Dialog.Trigger>
-              <IconButton variant="ghost" className="shrink-0">
-                <MoreHorizontal size={16} />
-              </IconButton>
-            </Dialog.Trigger>
-            <AppDialogContent maxWidth="450px">
-              <Dialog.Title>
-                {t("common.server")} - {nodeName}
-              </Dialog.Title>
-              <div className="mt-2">
-                <Selector
-                  value={selectedIds}
-                  onChange={setSelectedIds}
-                  items={[...pingTasks.filter((t) => t.id !== undefined)]}
-                  getId={(task) => String(task.id)}
-                  getLabel={(task) => (
-                    <span className="text-sm">
-                      {task.name}
-                      {task.default_on && (
-                        <span className="ml-2 text-xs text-accent-11">
-                          {t("ping.default_on_short")}
-                        </span>
-                      )}
-                      <span className="ml-2 text-xs text-gray-500">
-                        {task.type}/{task.interval}s
-                      </span>
-                    </span>
-                  )}
-                  headerLabel={t("ping.task")}
-                  searchPlaceholder={t("common.search", { defaultValue: "Search" })}
-                  filterItem={(item, keyword) =>
-                    String(item.name).toLowerCase().includes(keyword.toLowerCase())
-                  }
-                />
-              </div>
-              <Flex gap="2" justify="end" className="mt-4">
-                <Dialog.Close>
-                  <Button
-                    variant="soft"
-                    color="gray"
-                    type="button"
-                    onClick={() => setOpen(false)}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </Dialog.Close>
-                <Button onClick={handleSave} disabled={saving}>
-                  {t("common.save")}
-                </Button>
-              </Flex>
-            </AppDialogContent>
-          </Dialog.Root>
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 flex-1">{taskValue}</div>
+          {taskBindDialog}
         </div>
       </TableCell>
     </TableRow>

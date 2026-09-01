@@ -481,30 +481,41 @@
 .remote-file-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  background: transparent !important;
+  color: inherit;
+  font-size: 12px;
   table-layout: fixed;
 }
 
 .remote-file-table th,
 .remote-file-table td {
   box-sizing: border-box;
-  height: 34px;
+  height: 36px;
   border-bottom: 1px solid #1e2228;
-  padding: 0 7px;
+  padding: 0 8px !important;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.remote-workspace .remote-file-table .admin-table-header,
+.remote-workspace .remote-file-table .admin-table-header tr,
+.remote-workspace .remote-file-table .admin-table-header tr:hover {
+  background: #1c2128 !important;
+}
+
 .remote-file-table th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #171b20;
-  color: #858d97;
-  font-size: 10px;
-  font-weight: 500;
+  height: 40px !important;
+  background: #1c2128 !important;
+  color: #919eab;
+  font-size: 13px;
+  font-weight: 600;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .remote-file-table th:first-child,
@@ -524,16 +535,16 @@
 }
 
 .remote-file-table tbody tr:hover {
-  background: #171c22;
+  background: #171c22 !important;
 }
 
 .remote-file-table tbody tr.is-selected {
-  background: #173239;
+  background: #173239 !important;
   box-shadow: inset 2px 0 #4fd1c5;
 }
 
 .remote-file-table tbody tr.is-selected:hover {
-  background: #1b3b43;
+  background: #1b3b43 !important;
 }
 
 .remote-file-table td:nth-child(2) {
@@ -591,12 +602,26 @@
   overflow: hidden;
 }
 
+.remote-server-picker-dialog .rt-DialogTitle,
+.remote-server-picker-dialog .rt-DialogDescription {
+  flex: 0 0 auto;
+}
+
 .remote-server-picker-dialog .remote-node-picker {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   margin-top: 18px;
+  overflow: hidden;
+}
+
+.remote-server-picker-dialog .remote-node-picker-controls {
+  flex: 0 0 auto;
+}
+
+.remote-server-picker-dialog .remote-node-picker-controls .MuiFormControl-root {
+  flex-grow: 0;
 }
 
 .remote-server-picker-dialog .remote-node-picker-results {
@@ -607,21 +632,54 @@
 }
 
 .remote-server-picker-dialog .remote-node-picker-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .remote-server-picker-dialog .remote-node-picker-card {
   min-height: 204px;
 }
 
+.remote-server-picker-dialog .remote-dialog-actions {
+  flex: 0 0 auto;
+  margin-top: 12px;
+}
+
 @media (max-width: 760px) {
   .remote-server-picker-dialog.rt-DialogContent {
-    width: min(94vw, 560px);
-    max-height: calc(100dvh - 24px);
+    width: min(calc(100vw - 16px), 560px);
+    max-height: calc(100dvh - 12px);
+    padding-bottom: max(12px, var(--safe-area-bottom));
+  }
+
+  .remote-server-picker-dialog .remote-node-picker {
+    margin-top: 12px;
+  }
+
+  .remote-server-picker-dialog .remote-node-picker-controls {
+    gap: 8px !important;
+    margin-bottom: 10px;
+  }
+
+  .remote-server-picker-dialog .remote-node-picker-controls > * + * {
+    margin-top: 0 !important;
+  }
+
+  .remote-server-picker-dialog .remote-node-picker-controls .MuiFormControl-root {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
   }
 
   .remote-server-picker-dialog .remote-node-picker-grid {
     grid-template-columns: 1fr;
+  }
+
+  .remote-server-picker-dialog .remote-node-picker-card {
+    min-height: 0;
+  }
+
+  .remote-server-picker-dialog .remote-dialog-actions {
+    margin-top: 10px;
   }
 }
 
@@ -781,7 +839,7 @@
     position: absolute;
     z-index: 4;
     right: 8px;
-    bottom: calc(var(--mobile-keyboard-inset, 0px) + max(8px, env(safe-area-inset-bottom)));
+    bottom: calc(var(--mobile-keyboard-inset, 0px) + max(8px, var(--safe-area-bottom)));
     left: 8px;
     display: flex;
     align-items: center;
@@ -815,7 +873,7 @@
 
   .terminal-page .xterm {
     max-width: 100%;
-    padding-bottom: calc(var(--xterm-padding, 16px) + var(--mobile-keyboard-inset, 0px) + max(60px, env(safe-area-inset-bottom)));
+    padding-bottom: calc(var(--xterm-padding, 16px) + var(--mobile-keyboard-inset, 0px) + max(60px, var(--safe-area-bottom)));
   }
 
   .terminal-page .xterm-helper-textarea {

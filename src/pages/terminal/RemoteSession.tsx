@@ -23,7 +23,7 @@ import {
   PanelRightClose,
   RotateCw,
   TextSelect,
-} from "lucide-react";
+} from "@/components/admin/muiIcons";
 import { toast } from "sonner";
 import type { Record as LiveRecord } from "@/types/LiveData";
 import { formatBytes } from "@/utils/unitHelper";
@@ -47,6 +47,7 @@ export type RemoteNode = {
   ipv4?: string;
   ipv6?: string;
   group?: string;
+  tags?: string;
   region?: string;
   region_override?: string;
   mem_total?: number;

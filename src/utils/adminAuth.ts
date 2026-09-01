@@ -1,4 +1,4 @@
-import { allowedColors, type Colors } from "../contexts/ThemeContext.ts";
+import { sameOriginApiPath, sameOriginFetchInit } from "./security.ts";
 
 export type Account = {
   logged_in: boolean;
@@ -13,15 +13,13 @@ export type Account = {
 
 export type AccountPreferences = {
   language?: string;
-  color?: Colors;
 };
 
 const supportedAccountLanguages = new Set([
-  "en-US",
   "zh-CN",
   "zh-TW",
+  "en-US",
   "ja-JP",
-  "id-ID",
 ]);
 
 export function normalizeAccountPreferenceLanguage(language?: string | null) {
@@ -31,7 +29,7 @@ export function normalizeAccountPreferenceLanguage(language?: string | null) {
   const lower = normalized.toLowerCase();
   if (lower === "en" || lower.startsWith("en-")) return "en-US";
   if (lower === "ja" || lower.startsWith("ja-")) return "ja-JP";
-  if (lower === "id" || lower.startsWith("id-")) return "id-ID";
+  if (lower === "id" || lower.startsWith("id-")) return "en-US";
   if (lower === "zh" || lower.startsWith("zh-")) {
     return /(?:^|-)(?:tw|hk|mo|hant)(?:-|$)/i.test(normalized)
       ? "zh-TW"
@@ -41,9 +39,10 @@ export function normalizeAccountPreferenceLanguage(language?: string | null) {
 }
 
 export function normalizeAccountPreferenceColor(
-  color?: string | null,
-): Colors | "" {
-  return allowedColors.includes(color as Colors) ? (color as Colors) : "";
+  _color?: string | null,
+): string {
+  void _color;
+  return "";
 }
 
 export type AdminAuthView = "loading" | "error" | "login" | "admin";
@@ -69,6 +68,26 @@ export function resolveAdminAuthView({
   return account.logged_in ? "admin" : "login";
 }
 
+export type AdminSettingsFetchPlan = "fetch" | "reset";
+
+export function planAdminSettingsFetch({
+  hasAccountContext,
+  accountLoading,
+  loggedIn,
+}: {
+  hasAccountContext: boolean;
+  accountLoading: boolean;
+  loggedIn: boolean;
+}): AdminSettingsFetchPlan {
+  if (loggedIn) return "fetch";
+  if (!hasAccountContext && !accountLoading) return "fetch";
+  return "reset";
+}
+
+export function shouldOpenRpc2Socket(loggedIn: boolean): boolean {
+  return loggedIn;
+}
+
 export function isAdminNodeBootstrapLoading(
   accountLoading: boolean,
   accountKey: string | null,
@@ -88,7 +107,10 @@ export function isAdminNodeBootstrapLoading(
 export async function fetchAccount(
   fetcher: Fetcher = fetch,
 ): Promise<Account> {
-  const response = await fetcher("/api/me", { cache: "no-store" });
+  const response = await fetcher(
+    sameOriginApiPath("/api/me"),
+    sameOriginFetchInit({ cache: "no-store" }),
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch account data (${response.status})`);
   }
@@ -99,16 +121,19 @@ export async function saveAccountPreferences(
   preferences: AccountPreferences,
   fetcher: Fetcher = fetch,
 ): Promise<void> {
-  const response = await fetcher("/api/rpc2", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "admin:updateAccountPreferences",
-      params: preferences,
+  const response = await fetcher(
+    sameOriginApiPath("/api/rpc2"),
+    sameOriginFetchInit({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "admin:updateAccountPreferences",
+        params: preferences,
+      }),
     }),
-  });
+  );
   const payload = (await response.json().catch(() => ({}))) as {
     error?: { message?: string };
   };
@@ -141,19 +166,22 @@ export async function submitPasswordLogin({
   fetcher = fetch,
   refreshAccount,
 }: PasswordLoginInput): Promise<PasswordLoginResult> {
-  const response = await fetcher("/api/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      username,
-      password,
-      ...(twoFactorCode && !twoFactorEnabled
-        ? { "2fa_code": twoFactorCode }
-        : {}),
+  const response = await fetcher(
+    sameOriginApiPath("/api/login"),
+    sameOriginFetchInit({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password,
+        ...(twoFactorCode && !twoFactorEnabled
+          ? { "2fa_code": twoFactorCode }
+          : {}),
+      }),
     }),
-  });
+  );
   const data = (await response.json().catch(() => ({}))) as {
     message?: string;
   };

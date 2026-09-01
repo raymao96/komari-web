@@ -14,6 +14,16 @@ export function resolveThemePreviewStatus(
   return image.naturalWidth > 0 ? "loaded" : "error";
 }
 
+export function installedThemePreviewPath(
+  theme: { short?: string; preview?: string } | null | undefined,
+): string | undefined {
+  const preview = theme?.preview?.trim();
+  const short = theme?.short?.trim();
+  if (!preview || !short) return undefined;
+  if (/^https?:\/\//i.test(preview) || preview.startsWith("/")) return preview;
+  return `/themes/${short}/${preview.replace(/^\/+/, "")}`;
+}
+
 export function themePreviewSrc(
   src: string | null | undefined,
   options?: { card?: boolean; version?: string },

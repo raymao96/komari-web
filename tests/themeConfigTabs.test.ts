@@ -11,10 +11,17 @@ const tabsSource = readFileSync(
   new URL("../src/components/admin/ThemeConfigTabs.tsx", import.meta.url),
   "utf8",
 );
-const panelSource = readFileSync(
-  new URL("../src/components/admin/AdminPanelBar.tsx", import.meta.url),
-  "utf8",
-);
+const panelSource = [
+  "AdminPanelBar.tsx",
+  "shell/AdminShell.tsx",
+]
+  .map((file) =>
+    readFileSync(
+      new URL(`../src/components/admin/${file}`, import.meta.url),
+      "utf8",
+    ),
+  )
+  .join("\n");
 const globalStyles = readFileSync(
   new URL("../src/global.css", import.meta.url),
   "utf8",
@@ -62,20 +69,19 @@ test("theme tabs switch only the content below the stable page heading", () => {
   assert.doesNotMatch(tabsSource, /container\.scrollTo/);
   assert.doesNotMatch(tabsSource, /scrollIntoView/);
   assert.match(globalStyles, /overscroll-behavior-x:\s*contain/);
-  assert.match(globalStyles, /min-height:\s*2\.75rem/);
+  assert.match(globalStyles, /min-height:\s*48px/);
   assert.doesNotMatch(globalStyles, /width:\s*max-content/);
   assert.match(globalStyles, /\.km-page-admin-theme-managed,[\s\S]*min-width:\s*0/);
   assert.match(tabsSource, /list\.scrollWidth - list\.clientWidth/);
   assert.match(tabsSource, /new ResizeObserver\(updateScrollEdges\)/);
   assert.match(tabsSource, /km-theme-config-scroll-button/);
-  assert.match(tabsSource, /reduceMotion \? false/);
+  assert.match(tabsSource, /reduceMotion \|\| isFirstPaint\.current/);
   assert.doesNotMatch(globalStyles, /admin-tab-content-enter/);
   assert.doesNotMatch(
     globalStyles,
     /\.rt-TabsContent\[data-state="active"\][^}]*?(?:animation|backface-visibility|will-change)/,
   );
   assert.match(globalStyles, /data-reduce-motion="true"/);
-  assert.match(globalStyles, /\.rt-SegmentedControlItem/);
   assert.match(globalStyles, /a\[href\^="\/admin"\]/);
   assert.doesNotMatch(tabsSource, /overflow-y-auto/);
   assert.doesNotMatch(tabsSource, /plugin/i);
@@ -94,12 +100,11 @@ test("installed themes resolve localized manifest text consistently", () => {
 
 test("mobile admin drawer stays above sticky theme category tabs", () => {
   assert.match(globalStyles, /\.km-theme-config-tabs\s*\{[\s\S]*?z-index:\s*10/);
-  assert.match(panelSource, /z-\[49\]/);
-  assert.match(panelSource, /zIndex:\s*isMobile\s*\?\s*50\s*:\s*1/);
+  assert.match(panelSource, /zIndex: isMobile \? 50 : 1/);
 });
 
 test("mobile theme preview actions keep close and update controls aligned", () => {
   assert.match(themePageSource, /className="km-theme-preview-actions"/);
   assert.match(globalStyles, /\.km-theme-preview-actions \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(globalStyles, /\.km-theme-preview-actions \.rt-Button \{[\s\S]*width: 100%/);
+  assert.match(globalStyles, /\.km-theme-preview-actions > \* \{[\s\S]*width: 100%/);
 });

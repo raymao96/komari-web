@@ -2,14 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
-    <meta name="description" content="A simple server monitor tool." />
+    <link rel="shortcut icon" href="/favicon.png?v=lite-icon-0e86dd" type="image/png" />
+    <meta name="description" content="All your servers, one simple view." />
     <meta
       name="keywords"
-      content="server monitor, Komari Lite, server uptime monitoring, real-time server status, server performance dashboard, monitoring tool"
+      content="server monitor, Lite, server uptime monitoring, real-time server status, server performance dashboard, monitoring tool"
     />
     <meta name="author" content="Nomi" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
     <script>
       (() => {
         const parseAppearance = (value) => {
@@ -27,19 +28,26 @@
           const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
           const isDark = appearance === "dark" || (appearance !== "light" && prefersDark);
           document.documentElement.classList.toggle("dark", isDark);
+          const themeColor = isDark ? "#161C24" : "#FFFFFF";
+          document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor);
         } catch {
           document.documentElement.classList.remove("dark");
         }
+        const standalone =
+          window.matchMedia?.("(display-mode: standalone)").matches ||
+          window.matchMedia?.("(display-mode: fullscreen)").matches ||
+          window.navigator.standalone === true;
+        document.documentElement.classList.toggle("lite-standalone", Boolean(standalone));
       })();
     </script>
     <style>
       :where(html) {
-        background: #ffffff;
+      background: #F4F6F8;
         color-scheme: light;
       }
 
       :where(html.dark) {
-        background: #111111;
+        background: #161C24;
         color-scheme: dark;
       }
 
@@ -56,20 +64,19 @@
     
     <!-- PWA Configuration -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#2563eb" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Komari Lite" />
-    <link rel="apple-touch-icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.ico" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Lite" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=lite-icon-0e86dd" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=lite-icon-0e86dd" />
     
-    <meta property="og:title" content="Komari Lite" />
-    <meta property="og:description" content="A simple server monitor tool." />
+    <meta property="og:title" content="Lite" />
+    <meta property="og:description" content="All your servers, one simple view." />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Komari Lite" />
-    <meta name="twitter:description" content="A simple server monitor tool." />
-    <title>Komari Lite</title>
+    <meta name="twitter:title" content="Lite" />
+    <meta name="twitter:description" content="All your servers, one simple view." />
+    <title>Lite</title>
   </head>
   <body>
     <div id="root"></div>

@@ -19,7 +19,7 @@ const NotificationContext = React.createContext<OfflineNotificationContextType |
 
 export const OfflineNotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [offlineNotification, setOfflineNotification] = React.useState<OfflineNotification[]>([]);
-  const [loading, setLoading] = React.useState<boolean>(false);
+  const [loading, setLoading] = React.useState<boolean>(true);
   const firstLoad = React.useRef(true);
   const [error, setError] = React.useState<Error | null>(null);
 

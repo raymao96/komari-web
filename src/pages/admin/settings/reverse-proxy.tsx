@@ -1,11 +1,12 @@
-import AppDialogContent from "@/components/AppDialogContent";
-import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
 import { SettingCard } from "@/components/admin/SettingCard";
 import { useSettings } from "@/lib/api";
 import {
   CLOUDFLARED_STOP_CONFIRM_TEXT,
   getCloudflaredStatus,
+  getCloudflaredStatusSnapshot,
+  prefetchCloudflaredStatus,
   removeCloudflaredToken,
   startCloudflared,
   stopCloudflared,
@@ -15,6 +16,8 @@ import {
   buildHTTPFallbackURL,
   buildHTTPSRedirectURL,
   getHTTPSSettings,
+  getHTTPSSettingsSnapshot,
+  prefetchHTTPSSettings,
   classifyHTTPSError,
   reloadHTTPSCertificate,
   updateHTTPSSettings,
@@ -22,6 +25,7 @@ import {
   type HTTPSStatus,
 } from "@/lib/https";
 import {
+  AppDialogContent,
   Badge,
   Button,
   Callout,
@@ -32,7 +36,7 @@ import {
   Tabs,
   Text,
   TextField,
-} from "@radix-ui/themes";
+} from "@/components/admin/ui";
 import {
   Cloud,
   ExternalLink,
@@ -44,19 +48,39 @@ import {
   Save,
   Square,
   Trash2,
-} from "lucide-react";
+} from "@/components/admin/muiIcons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { useAdminTabParam } from "@/hooks/useAdminTabParam";
+import { useHeldTab } from "@/hooks/useHeldTab";
 
-type ReverseProxyTab = "https" | "cloudflare";
+const REVERSE_PROXY_TABS = ["https", "cloudflare"] as const;
 
 export default function ReverseProxySettings() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = React.useState<ReverseProxyTab>("https");
+  const [activeTab, setActiveTab] = useAdminTabParam(REVERSE_PROXY_TABS, "https");
+  const [httpsReady, setHttpsReady] = React.useState(() => getHTTPSSettingsSnapshot() !== null);
+  const [cloudflareReady, setCloudflareReady] = React.useState(
+    () => getCloudflaredStatusSnapshot() !== null,
+  );
+  const tabReady = activeTab === "https" ? httpsReady : cloudflareReady;
+  const displayTab = useHeldTab(activeTab, tabReady);
+  const routePending = activeTab === displayTab && !tabReady;
+  const markHttpsReady = React.useCallback(() => setHttpsReady(true), []);
+  const markCloudflareReady = React.useCallback(() => setCloudflareReady(true), []);
+
+  React.useEffect(() => {
+    void prefetchHTTPSSettings();
+    void prefetchCloudflaredStatus();
+  }, []);
 
   return (
-    <Flex direction="column" gap="3">
+    <Flex
+      direction="column"
+      gap="3"
+      data-admin-route-pending={routePending ? "true" : undefined}
+    >
       <AdminPageTitle
         description={t(
           "settings.reverse_proxy.page_description",
@@ -66,30 +90,40 @@ export default function ReverseProxySettings() {
         {t("settings.reverse_proxy.title", "Reverse Proxy")}
       </AdminPageTitle>
       <Tabs.Root
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as ReverseProxyTab)}
+        value={displayTab}
+        onValueChange={setActiveTab}
       >
-        <div className="w-full overflow-x-auto pb-1">
-          <Tabs.List className="w-max min-w-full">
-            <Tabs.Trigger value="https" className="min-w-[9rem] flex-1">
-              <LockKeyhole size={15} />
-              {t("settings.reverse_proxy.https_tab", "Built-in HTTPS")}
+        <AdminSheetTabs>
+          <Tabs.List>
+            <Tabs.Trigger value="https">
+              <AdminTabLabel icon={<LockKeyhole size={18} />}>
+                {t("settings.reverse_proxy.https_tab", "Built-in HTTPS")}
+              </AdminTabLabel>
             </Tabs.Trigger>
-            <Tabs.Trigger value="cloudflare" className="min-w-[9rem] flex-1">
-              <Cloud size={15} />
-              {t(
-                "settings.reverse_proxy.cloudflare_title",
-                "Cloudflare Tunnel",
-              )}
+            <Tabs.Trigger value="cloudflare">
+              <AdminTabLabel icon={<Cloud size={18} />}>
+                {t(
+                  "settings.reverse_proxy.cloudflare_title",
+                  "Cloudflare Tunnel",
+                )}
+              </AdminTabLabel>
             </Tabs.Trigger>
           </Tabs.List>
+        </AdminSheetTabs>
+        <div
+          className="admin-tab-panel pt-3"
+          data-state={displayTab === "https" ? "active" : "inactive"}
+          hidden={displayTab !== "https"}
+        >
+          <HTTPSPanel onReady={markHttpsReady} />
         </div>
-        <Tabs.Content value="https" className="pt-3">
-          {activeTab === "https" ? <HTTPSPanel /> : null}
-        </Tabs.Content>
-        <Tabs.Content value="cloudflare" className="pt-3">
-          {activeTab === "cloudflare" ? <CloudflareTunnelPanel /> : null}
-        </Tabs.Content>
+        <div
+          className="admin-tab-panel pt-3"
+          data-state={displayTab === "cloudflare" ? "active" : "inactive"}
+          hidden={displayTab !== "cloudflare"}
+        >
+          <CloudflareTunnelPanel onReady={markCloudflareReady} />
+        </div>
       </Tabs.Root>
     </Flex>
   );
@@ -97,7 +131,7 @@ export default function ReverseProxySettings() {
 
 const emptyHTTPSSettings: HTTPSSettings = {
   https_enabled: false,
-  https_listen: ":35938",
+  https_listen: ":36888",
   https_redirect_http: false,
   https_certificate_path: "./data/tls/server.crt",
   https_private_key_path: "./data/tls/server.key",
@@ -112,21 +146,22 @@ const emptyHTTPSStatus: HTTPSStatus = {
   listener_ipv4_available: true,
   listener_ipv6_available: true,
   listener_probe_done: true,
-  listen: ":35938",
+  listen: ":36888",
   domains: [],
 };
 
 function extractListenPort(listen: string): string {
   const match = listen.trim().match(/:(\d+)$/);
-  return match?.[1] ?? "35938";
+  return match?.[1] ?? "36888";
 }
 
-function HTTPSPanel() {
+function HTTPSPanel({ onReady }: { onReady: () => void }) {
   const { t, i18n } = useTranslation();
-  const [settings, setSettings] = React.useState(emptyHTTPSSettings);
-  const [status, setStatus] = React.useState(emptyHTTPSStatus);
-  const [port, setPort] = React.useState("35938");
-  const [loading, setLoading] = React.useState(true);
+  const snapshot = getHTTPSSettingsSnapshot();
+  const [settings, setSettings] = React.useState(snapshot?.settings ?? emptyHTTPSSettings);
+  const [status, setStatus] = React.useState(snapshot?.status ?? emptyHTTPSStatus);
+  const [port, setPort] = React.useState(() => extractListenPort(snapshot?.settings.https_listen ?? "36888"));
+  const [loading, setLoading] = React.useState(() => snapshot === null);
   const [saving, setSaving] = React.useState(false);
   const [reloading, setReloading] = React.useState(false);
 
@@ -171,8 +206,9 @@ function HTTPSPanel() {
       }
     } finally {
       setLoading(false);
+      onReady();
     }
-  }, [t]);
+  }, [onReady]);
 
   React.useEffect(() => {
     void refresh(false, true);
@@ -246,7 +282,7 @@ function HTTPSPanel() {
   };
 
   if (loading) {
-    return <SettingsPageSkeleton />;
+    return null;
   }
 
   const date = (value?: string) => {
@@ -353,7 +389,7 @@ function HTTPSPanel() {
         title={t("settings.reverse_proxy.enable_https", "Enable built-in HTTPS")}
         description={t(
           "settings.reverse_proxy.enable_https_description",
-          "When enabled, Komari Lite provides HTTPS access for both the web UI and Agent APIs.",
+          "When enabled, Lite provides HTTPS access for both the web UI and Agent APIs.",
         )}
       >
         <SettingCard.Action>
@@ -412,7 +448,7 @@ function HTTPSPanel() {
         title={t("settings.reverse_proxy.certificate_paths", "Certificate paths")}
         description={t(
           "settings.reverse_proxy.certificate_paths_description",
-          "Komari Lite reads the certificate and private key from the server. Docker users should mount the certificate directory first and enter its path inside the container.",
+          "Lite reads the certificate and private key from the server. Docker users should mount the certificate directory first and enter its path inside the container.",
         )}
         direction="column"
       >
@@ -509,12 +545,12 @@ const emptyStatus: CloudflaredStatus = {
   envTokenPresent: false,
 };
 
-function CloudflareTunnelPanel() {
+function CloudflareTunnelPanel({ onReady }: { onReady: () => void }) {
   const { t } = useTranslation();
-  const { settings, loading: settingsLoading, error: settingsError } =
-    useSettings();
-  const [status, setStatus] = React.useState<CloudflaredStatus>(emptyStatus);
-  const [loading, setLoading] = React.useState(true);
+  const { settings, error: settingsError } = useSettings();
+  const snapshot = getCloudflaredStatusSnapshot();
+  const [status, setStatus] = React.useState<CloudflaredStatus>(snapshot ?? emptyStatus);
+  const [loading, setLoading] = React.useState(() => snapshot === null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [token, setToken] = React.useState("");
@@ -547,8 +583,9 @@ function CloudflareTunnelPanel() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      onReady();
     }
-  }, []);
+  }, [onReady, t]);
 
   React.useEffect(() => {
     void refreshStatus();
@@ -587,8 +624,8 @@ function CloudflareTunnelPanel() {
     }
   };
 
-  if (settingsLoading || loading) {
-    return <SettingsPageSkeleton />;
+  if (loading) {
+    return null;
   }
 
   if (settingsError) {
@@ -665,7 +702,7 @@ function CloudflareTunnelPanel() {
             <Text size="2" color="gray">
               {t(
                 "settings.reverse_proxy.env_token_hint",
-                "Environment variable `KOMARI_CLOUDFLARED_TOKEN` is present. Komari Lite will try to restore cloudflared automatically on restart."
+                "Environment variable `KOMARI_CLOUDFLARED_TOKEN` is present. Lite will try to restore cloudflared automatically on restart."
               )}
             </Text>
           ) : null}
@@ -880,7 +917,7 @@ function CloudflareTunnelPanel() {
           <Dialog.Description>
             {t(
               "settings.reverse_proxy.stop_dialog_description",
-              "If you are currently accessing Komari Lite through this tunnel, stopping cloudflared may immediately disconnect your session."
+              "If you are currently accessing Lite through this tunnel, stopping cloudflared may immediately disconnect your session."
             )}
           </Dialog.Description>
 

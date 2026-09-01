@@ -20,9 +20,28 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return data.data as T;
 }
 
+let cloudflaredStatusSnapshot: CloudflaredStatus | null = null;
+
+export function getCloudflaredStatusSnapshot(): CloudflaredStatus | null {
+  return cloudflaredStatusSnapshot;
+}
+
+function rememberCloudflaredStatus(status: CloudflaredStatus): CloudflaredStatus {
+  const next = {
+    ...status,
+    logs: Array.isArray(status.logs) ? status.logs : [],
+  };
+  cloudflaredStatusSnapshot = next;
+  return next;
+}
+
 export async function getCloudflaredStatus(): Promise<CloudflaredStatus> {
   const response = await fetch("/api/admin/settings/cloudflared");
-  return parseResponse<CloudflaredStatus>(response);
+  return rememberCloudflaredStatus(await parseResponse<CloudflaredStatus>(response));
+}
+
+export function prefetchCloudflaredStatus(): Promise<CloudflaredStatus> {
+  return getCloudflaredStatus();
 }
 
 export async function startCloudflared(
@@ -35,7 +54,7 @@ export async function startCloudflared(
     },
     body: JSON.stringify({ token }),
   });
-  return parseResponse<CloudflaredStatus>(response);
+  return rememberCloudflaredStatus(await parseResponse<CloudflaredStatus>(response));
 }
 
 export async function stopCloudflared(
@@ -52,7 +71,7 @@ export async function stopCloudflared(
       confirm_text: confirmText,
     }),
   });
-  return parseResponse<CloudflaredStatus>(response);
+  return rememberCloudflaredStatus(await parseResponse<CloudflaredStatus>(response));
 }
 
 export async function removeCloudflaredToken(): Promise<CloudflaredStatus> {
@@ -62,5 +81,5 @@ export async function removeCloudflaredToken(): Promise<CloudflaredStatus> {
       "Content-Type": "application/json",
     },
   });
-  return parseResponse<CloudflaredStatus>(response);
+  return rememberCloudflaredStatus(await parseResponse<CloudflaredStatus>(response));
 }

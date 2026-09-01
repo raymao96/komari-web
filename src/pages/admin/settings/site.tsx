@@ -1,6 +1,6 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import { useTranslation } from "react-i18next";
-import { Button, Dialog, Flex, Text } from "@radix-ui/themes";
+import {
+  AppDialogContent, Button, Dialog, Flex, Text } from "@/components/admin/ui";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import {
   SettingCardButton,
@@ -93,7 +93,7 @@ export default function SiteSettings() {
 
     const disposition = response.headers.get("content-disposition") || "";
     const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
-      || `Komari-Lite-${scope}.zip`;
+      || `Lite-${scope}.zip`;
     const objectURL = URL.createObjectURL(await response.blob());
     const anchor = document.createElement("a");
     anchor.href = objectURL;
@@ -397,7 +397,7 @@ export default function SiteSettings() {
           <Flex gap="2" align="center">
             <Dialog.Root>
               <Dialog.Trigger>
-                <Button color="tomato">
+                <Button color="red">
                   {t("settings.custom.favicon_default", "恢复默认")}
                 </Button>
               </Dialog.Trigger>
@@ -415,7 +415,7 @@ export default function SiteSettings() {
                   <Dialog.Close>
                     <Button variant="soft">{t("common.cancel", "取消")}</Button>
                   </Dialog.Close>
-                  <Dialog.Trigger>
+                  <Dialog.Close>
                     <Button
                       color="red"
                       onClick={async () => {
@@ -442,7 +442,7 @@ export default function SiteSettings() {
                     >
                       {t("settings.custom.favicon_confirm")}
                     </Button>
-                  </Dialog.Trigger>
+                  </Dialog.Close>
                 </Flex>
               </AppDialogContent>
             </Dialog.Root>

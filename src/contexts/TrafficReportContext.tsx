@@ -28,7 +28,7 @@ export const TrafficReportNotificationProvider: React.FC<{
   const { t } = useTranslation();
   const [trafficReportNotification, setTrafficReportNotification] =
     React.useState<TrafficReportNotification[]>([]);
-  const [loading, setLoading] = React.useState<boolean>(false);
+  const [loading, setLoading] = React.useState<boolean>(true);
   const firstLoad = React.useRef(true);
   const [error, setError] = React.useState<Error | null>(null);
 

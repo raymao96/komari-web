@@ -1,15 +1,18 @@
 import React from "react";
-import { Button, Callout, Skeleton } from "@radix-ui/themes";
-import {
-  AlertCircle,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Database,
-  RefreshCw,
-  Server,
-  WalletCards,
-} from "lucide-react";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import { Skeleton } from "@/components/admin/ui";
+import ArrowDownward from "@mui/icons-material/ArrowDownward";
+import ArrowUpward from "@mui/icons-material/ArrowUpward";
+import CreditCardOutlined from "@mui/icons-material/CreditCardOutlined";
+import DnsOutlined from "@mui/icons-material/DnsOutlined";
+import ErrorOutlined from "@mui/icons-material/ErrorOutlined";
+import AccountBalanceWalletOutlined from "@mui/icons-material/AccountBalanceWalletOutlined";
+import Refresh from "@mui/icons-material/Refresh";
+import StorageOutlined from "@mui/icons-material/StorageOutlined";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAccount } from "@/contexts/AccountContext";
@@ -29,6 +32,7 @@ import {
   ResourceRankingPanel,
   ReturnRouteStatusPanel,
   StoragePanel,
+  SummaryCardSkeleton,
   SummaryPanel,
   TrafficTrendPanel,
 } from "@/components/admin/DashboardPanels";
@@ -43,12 +47,22 @@ import {
 } from "@/utils/dashboard";
 import {
   dashboardChartSections,
+  dashboardCostCenterEnabled,
   dashboardModuleSpans,
   dashboardSummarySections,
+  DASHBOARD_SUMMARY_CARD_IDS,
   enabledDashboardModules,
   packDashboardModules,
   type DashboardModuleId,
 } from "@/utils/dashboardSettings";
+import {
+  billingQuery,
+  formatBillingMoney,
+  getBillingSnapshot,
+  readStoredBillingCurrency,
+  requestBillingCached,
+  type BillingOverview,
+} from "@/utils/billing";
 import { formatBytes } from "@/utils/unitHelper";
 import {
   readDashboardSession,
@@ -63,6 +77,12 @@ const moduleGridClass: Record<number, string> = {
   4: "md:col-span-4",
   5: "md:col-span-5",
   6: "md:col-span-6",
+  7: "md:col-span-7",
+  8: "md:col-span-8",
+  9: "md:col-span-9",
+  10: "md:col-span-10",
+  11: "md:col-span-11",
+  12: "md:col-span-12",
 };
 
 export default function AdminDashboard() {
@@ -95,9 +115,14 @@ export default function AdminDashboard() {
   const dashboardRootRef = React.useRef<HTMLDivElement>(null);
   const navigationAnchorRef = React.useRef<Omit<DashboardViewState, "scrollTop"> | null>(null);
   const restoredViewKeyRef = React.useRef<string | null>(null);
+  const billingCurrency = readStoredBillingCurrency();
+  const billingURL = billingQuery("/api/admin/billing/overview", { currency: billingCurrency, revision: 0 });
 
   const [data, setData] = React.useState<DashboardData | null>(() => getDashboardSnapshot(summaryKey, accountKey));
   const [charts, setCharts] = React.useState<DashboardChartsData | null>(() => getDashboardChartsSnapshot(chartKey, accountKey));
+  const [billing, setBilling] = React.useState<BillingOverview | null>(
+    () => getBillingSnapshot<BillingOverview>(billingURL),
+  );
   const [loading, setLoading] = React.useState(() => getDashboardSnapshot(summaryKey, accountKey) === null);
   const [error, setError] = React.useState<string | null>(null);
   const [chartsError, setChartsError] = React.useState<string | null>(null);
@@ -120,6 +145,21 @@ export default function AdminDashboard() {
     }
   }, [accountKey, settings.ranking_limit, summaryKey, summarySections]);
 
+  const costCenterVisible = dashboardCostCenterEnabled(settings);
+
+  const loadBilling = React.useCallback(async () => {
+    if (!costCenterVisible) {
+      setBilling(null);
+      return;
+    }
+    try {
+      const next = await requestBillingCached<BillingOverview>(billingURL);
+      setBilling(next);
+    } catch {
+      // Keep the last successful snapshot so a transient FX error does not blank the card.
+    }
+  }, [billingURL, costCenterVisible]);
+
   const loadCharts = React.useCallback(async () => {
     if (chartSections.length === 0) {
       setCharts(null);
@@ -138,7 +178,8 @@ export default function AdminDashboard() {
   const refreshAll = React.useCallback(() => {
     void loadSummary(false);
     void loadCharts();
-  }, [loadCharts, loadSummary]);
+    void loadBilling();
+  }, [loadBilling, loadCharts, loadSummary]);
 
   React.useEffect(() => {
     const cachedSummary = getDashboardSnapshot(summaryKey, accountKey);
@@ -148,6 +189,13 @@ export default function AdminDashboard() {
     setLoading(!cachedSummary);
     void loadSummary(Boolean(cachedSummary));
     void loadCharts();
+    if (costCenterVisible) {
+      const snapshot = getBillingSnapshot<BillingOverview>(billingURL);
+      if (snapshot) setBilling(snapshot);
+      void loadBilling();
+    } else {
+      setBilling(null);
+    }
 
     const refreshWhenVisible = (callback: () => void) => {
       if (document.visibilityState === "visible") callback();
@@ -164,13 +212,23 @@ export default function AdminDashboard() {
         settings.chart_refresh_seconds * 1000,
       )
       : null;
+    const billingInterval = costCenterVisible
+      ? window.setInterval(
+        () => refreshWhenVisible(() => void loadBilling()),
+        settings.refresh_seconds * 1000,
+      )
+      : null;
     return () => {
       if (summaryInterval !== null) window.clearInterval(summaryInterval);
       if (chartInterval !== null) window.clearInterval(chartInterval);
+      if (billingInterval !== null) window.clearInterval(billingInterval);
     };
   }, [
+    billingURL,
     chartKey,
     chartSections.length,
+    costCenterVisible,
+    loadBilling,
     loadCharts,
     loadSummary,
     settings.chart_refresh_seconds,
@@ -278,36 +336,42 @@ export default function AdminDashboard() {
     switch (module) {
       case "server_status":
         return data ? (
-          <SummaryPanel
-            icon={<Server size={18} />}
-            label={t("admin_dashboard.servers")}
-            value={`${data.servers.online} / ${data.servers.total}`}
-            tone={data.servers.offline > 0 ? "orange" : "green"}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span>{t("admin_dashboard.online_count", { count: data.servers.online })}</span>
-              <span className={data.servers.offline > 0 ? "text-[var(--orange-11)]" : "text-[var(--green-11)]"}>
-                {t("admin_dashboard.offline_count", { count: data.servers.offline })}
-              </span>
-            </div>
-          </SummaryPanel>
-        ) : <Skeleton className="h-[112px] w-full" />;
+          <Link to="/admin/servers" className="group block h-full min-w-0 text-inherit no-underline">
+            <SummaryPanel
+              icon={<DnsOutlined />}
+              label={t("admin_dashboard.servers")}
+              value={`${data.servers.online} / ${data.servers.total}`}
+              tone={data.servers.offline > 0 ? "orange" : "green"}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span>{t("admin_dashboard.online_count", { count: data.servers.online })}</span>
+                <Box
+                  component="span"
+                  sx={{ color: data.servers.offline > 0 ? "warning.main" : "success.main" }}
+                >
+                  {t("admin_dashboard.offline_count", { count: data.servers.offline })}
+                </Box>
+              </div>
+            </SummaryPanel>
+          </Link>
+        ) : <SummaryCardSkeleton />;
       case "traffic_summary":
         return (
           <SummaryPanel
-            icon={<WalletCards size={18} />}
+            icon={<CreditCardOutlined />}
             label={t("admin_dashboard.today_billable")}
             value={charts && !charts.traffic.error ? formatBytes(charts.traffic.today_billable) : "-"}
+            tone="accent"
           >
             {charts && !charts.traffic.error ? (
-              <div className="grid grid-cols-2 gap-3">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <ArrowUpFromLine size={14} className="shrink-0 text-[var(--accent-11)]" />
-                  <span className="truncate">{t("admin_dashboard.upload")} {formatBytes(charts.traffic.today_up)}</span>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <ArrowUpward sx={{ fontSize: 14, color: "text.secondary" }} className="shrink-0" />
+                  <span className="whitespace-nowrap">{t("admin_dashboard.upload")} {formatBytes(charts.traffic.today_up)}</span>
                 </span>
-                <span className="flex min-w-0 items-center justify-end gap-1.5 text-right">
-                  <ArrowDownToLine size={14} className="shrink-0 text-[var(--orange-11)]" />
-                  <span className="truncate">{t("admin_dashboard.download")} {formatBytes(charts.traffic.today_down)}</span>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <ArrowDownward sx={{ fontSize: 14, color: "text.secondary" }} className="shrink-0" />
+                  <span className="whitespace-nowrap">{t("admin_dashboard.download")} {formatBytes(charts.traffic.today_down)}</span>
                 </span>
               </div>
             ) : <span>{chartsError ? t("admin_dashboard.data_unavailable") : t("admin_dashboard.chart_loading")}</span>}
@@ -315,19 +379,42 @@ export default function AdminDashboard() {
         );
       case "storage_summary":
         return data ? (
-          <SummaryPanel
-            icon={<Database size={18} />}
-            label={t("admin_dashboard.database_usage")}
-            value={dashboardLocalStorageTotal(data) === null
-              ? t("admin_dashboard.external_storage")
-              : formatBytes(dashboardLocalStorageTotal(data) ?? 0)}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span>{t("admin_dashboard.database_files")} {formatBytes(data.storage.database_files)}</span>
-              <span>WAL + SHM {formatBytes(dashboardRuntimeStorageTotal(data))}</span>
-            </div>
-          </SummaryPanel>
-        ) : <Skeleton className="h-[112px] w-full" />;
+          <Link to="/admin/settings/metrics" className="group block h-full min-w-0 text-inherit no-underline">
+            <SummaryPanel
+              icon={<StorageOutlined />}
+              label={t("admin_dashboard.database_usage")}
+              tone="muted"
+              value={dashboardLocalStorageTotal(data) === null
+                ? t("admin_dashboard.external_storage")
+                : formatBytes(dashboardLocalStorageTotal(data) ?? 0)}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span>{t("admin_dashboard.database_files")} {formatBytes(data.storage.database_files)}</span>
+                <span>WAL + SHM {formatBytes(dashboardRuntimeStorageTotal(data))}</span>
+              </div>
+            </SummaryPanel>
+          </Link>
+        ) : <SummaryCardSkeleton />;
+      case "cost_center":
+        return (
+          <Link to="/admin/billing" className="group block h-full min-w-0 text-inherit no-underline">
+            <SummaryPanel
+              icon={<AccountBalanceWalletOutlined />}
+              label={t("admin_dashboard.cost_center")}
+              value={billing ? formatBillingMoney(billing.summary.month.total, billingCurrency) : "-"}
+              tone="accent"
+            >
+              {billing ? (
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <span className="whitespace-nowrap">{t("admin_dashboard.cost_year")} {formatBillingMoney(billing.summary.year.total, billingCurrency)}</span>
+                  <span className="whitespace-nowrap">{t("billing.metrics.remainingValue")} {formatBillingMoney(billing.summary.remaining_value, billingCurrency)}</span>
+                </div>
+              ) : (
+                <span>{t("admin_dashboard.chart_loading")}</span>
+              )}
+            </SummaryPanel>
+          </Link>
+        );
       case "resource_ranking":
         return data
           ? <ResourceRankingPanel data={data} limit={settings.ranking_limit} />
@@ -405,8 +492,8 @@ export default function AdminDashboard() {
   const initialDataPending = summarySections.length > 0 && loading && !data;
   const formalLayout = (
     <>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {(["server_status", "traffic_summary", "storage_summary"] as const).map((module) => (
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        {DASHBOARD_SUMMARY_CARD_IDS.map((module) => (
           <div key={module} data-dashboard-module={module} className="min-w-0">{renderModule(module)}</div>
         ))}
       </div>
@@ -421,7 +508,7 @@ export default function AdminDashboard() {
           <div
             key={module}
             data-dashboard-module={module}
-            data-dashboard-span="3"
+            data-dashboard-span="6"
             className="min-w-0 [&>*]:h-full"
           >
             {renderModule(module)}
@@ -436,15 +523,19 @@ export default function AdminDashboard() {
       ref={dashboardRootRef}
       data-admin-route-pending={initialDataPending ? "true" : undefined}
       onClickCapture={rememberClickedModule}
-      className="flex flex-col gap-3 p-0 md:p-4"
+      className="flex flex-col gap-4 p-0 md:p-4"
     >
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <AdminPageTitle description={t("admin_dashboard.subtitle")}>
           {t("admin_dashboard.title")}
         </AdminPageTitle>
         {generatedAt ? (
-          <Button style={{ marginRight: 0 }} variant="ghost" color="gray" size="1" onClick={refreshAll}>
-            <RefreshCw size={14} />
+          <Button
+            color="inherit"
+            onClick={refreshAll}
+            startIcon={<Refresh sx={{ fontSize: 16 }} />}
+            sx={{ mr: 0, color: "text.secondary" }}
+          >
             {t("admin_dashboard.updated_at", {
               time: new Intl.DateTimeFormat(locale, {
                 hour: "2-digit",
@@ -457,25 +548,31 @@ export default function AdminDashboard() {
       </div>
 
       {settingsError || error ? (
-        <Callout.Root color="red" role="alert">
-          <Callout.Icon><AlertCircle size={16} /></Callout.Icon>
-          <Callout.Text className="flex flex-wrap items-center gap-2">
-            <span>{t("admin_dashboard.load_failed")}: {settingsError?.message || error}</span>
-            <Button size="1" variant="soft" onClick={() => {
-              if (settingsError) void refetchSettings(true);
-              refreshAll();
-            }}>
-              <RefreshCw size={14} />
+        <Alert
+          severity="error"
+          icon={<ErrorOutlined sx={{ fontSize: 18 }} />}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => {
+                if (settingsError) void refetchSettings(true);
+                refreshAll();
+              }}
+              startIcon={<Refresh sx={{ fontSize: 16 }} />}
+            >
               {t("common.retry")}
             </Button>
-          </Callout.Text>
-        </Callout.Root>
+          }
+        >
+          {t("admin_dashboard.load_failed")}: {settingsError?.message || error}
+        </Alert>
       ) : null}
 
       {loading && !data && chartSections.length === 0 ? (
         <OverviewSkeleton />
       ) : settings.preset === "overview" ? formalLayout : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
           {packedModules.map(({ id, span }) => (
             <div
               key={id}

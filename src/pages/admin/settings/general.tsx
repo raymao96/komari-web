@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Button, Code, Flex, Text, TextField } from "@radix-ui/themes";
+import { Button, Code, Flex, Text, TextField } from "@/components/admin/ui";
 import {
   updateSettingsWithToast,
   useSettings,
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
+  ADMIN_LIST_PAGE_SIZE,
   ADMIN_LIST_PAGE_SIZE_MAX,
   ADMIN_LIST_PAGE_SIZE_MIN,
   isValidAdminPageSize,
@@ -52,7 +53,7 @@ export default function GeneralSettings() {
       </SettingCardLabel>
       <SettingCardShortTextInput
         description={t("settings.general.admin_default_page_size_description")}
-        defaultValue={settings.admin_default_page_size || 10}
+        defaultValue={settings.admin_default_page_size || ADMIN_LIST_PAGE_SIZE}
         type="number"
         min={ADMIN_LIST_PAGE_SIZE_MIN}
         max={ADMIN_LIST_PAGE_SIZE_MAX}
@@ -72,18 +73,6 @@ export default function GeneralSettings() {
             { admin_default_page_size: pageSize },
             t,
           );
-          await refetch();
-        }}
-      />
-      <SettingCardLabel>
-        {t("settings.general.interface_motion")}
-      </SettingCardLabel>
-      <SettingCardSwitch
-        title={t("settings.general.reduce_motion")}
-        description={t("settings.general.reduce_motion_description")}
-        defaultChecked={Boolean(settings.reduce_motion)}
-        onChange={async (checked) => {
-          await updateSettingsWithToast({ reduce_motion: checked }, t);
           await refetch();
         }}
       />

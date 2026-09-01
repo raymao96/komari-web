@@ -1,5 +1,17 @@
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import Alert from "@mui/material/Alert";
+import AlertTitle from "@mui/material/AlertTitle";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import React from "react";
 import type { ErrorInfo, ReactNode } from "react";
+
+import i18n from "@/i18n/config";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -28,64 +40,105 @@ class ErrorBoundary extends React.Component<
   }
 
   render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[300px] p-8 bg-gradient-to-br from-rose-50 to-red-50 border border-red-200 rounded-md shadow-md max-w-3xl mx-auto">
-          {/* Icon for visual emphasis */}
-          <svg
-            className="w-12 h-12 text-red-500 mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+    if (!this.state.hasError) return this.props.children;
 
-          {/* Title */}
-          <h2 className="text-3xl font-semibold text-red-700 mb-3 tracking-tight">
-            Something Went Wrong
-          </h2>
+    const message =
+      this.state.error?.message ||
+      i18n.t("common.unexpected_error", "An unexpected error occurred.");
+    const stack = this.state.error?.stack || "";
 
-          {/* Error Message */}
-          <p className="text-red-600 text-lg mb-6 font-medium text-center">
-            {this.state.error?.message || "An unexpected error occurred."}
-          </p>
-
-          {/* Error Details */}
-          <details className="w-full max-w-xl">
-            <summary className="cursor-pointer text-sm font-medium text-red-500 hover:text-red-700 transition-colors duration-200">
-              View Error Details
-            </summary>
-            <pre className="mt-3 p-4 bg-red-100 text-sm text-red-900 border border-red-200 rounded-lg shadow-sm overflow-x-auto">
-              {this.state.error?.stack || "No stack trace available."}
-            </pre>
-          </details>
-
-          {/* Action Buttons */}
-          <div className="mt-6 flex gap-4">
-            <button
+    return (
+      <Box
+        sx={{
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "background.default",
+          px: 2,
+          py: 4,
+        }}
+      >
+        <Stack spacing={2} sx={{ width: "100%", maxWidth: 640 }}>
+          <Alert severity="error">
+            <AlertTitle>
+              {i18n.t("common.something_went_wrong", "Something went wrong")}
+            </AlertTitle>
+            {message}
+          </Alert>
+          {stack ? (
+            <Accordion
+              disableGutters
+              elevation={0}
+              sx={{
+                border: 1,
+                borderColor: "divider",
+                borderRadius: "8px",
+                overflow: "hidden",
+                "&:before": { display: "none" },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMore fontSize="small" />}
+                sx={{
+                  flexDirection: "row-reverse",
+                  justifyContent: "flex-start",
+                  gap: 1,
+                  minHeight: 44,
+                  px: 1.5,
+                  "& .MuiAccordionSummary-content": {
+                    my: 0,
+                    ml: 0,
+                    flexGrow: 0,
+                    alignItems: "center",
+                  },
+                  "& .MuiAccordionSummary-expandIconWrapper": {
+                    display: "inline-flex",
+                    alignItems: "center",
+                    mr: 0,
+                  },
+                }}
+              >
+                <Typography variant="body2">
+                  {i18n.t("common.view_error_details", "View error details")}
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
+                <Box
+                  component="pre"
+                  sx={{
+                    m: 0,
+                    p: 1.5,
+                    borderRadius: "8px",
+                    bgcolor: "action.hover",
+                    color: "text.primary",
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    overflowX: "auto",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {stack}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          ) : null}
+          <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              color="error"
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
             >
-              Reload Page
-            </button>
-            <button
-              onClick={() => (window.location.href = "/")}
-              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg shadow hover:bg-gray-300 transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
-            >
-              Go to Home
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
+              {i18n.t("common.reload_page", "Reload page")}
+            </Button>
+            <Button variant="outlined" onClick={() => { window.location.href = "/"; }}>
+              {i18n.t("common.go_home", "Go to home")}
+            </Button>
+          </Stack>
+        </Stack>
+      </Box>
+    );
   }
 }
 

@@ -13,10 +13,22 @@ import type { MenuItem } from "../src/types/menu.ts";
 const menuConfig = JSON.parse(
   readFileSync(new URL("../src/config/menuConfig.json", import.meta.url), "utf8"),
 ) as { menu: MenuItem[]; footer: MenuItem[] };
-const adminPanelSource = readFileSync(
-  new URL("../src/components/admin/AdminPanelBar.tsx", import.meta.url),
-  "utf8",
-);
+const adminPanelSource = [
+  "AdminPanelBar.tsx",
+  "shell/AdminShell.tsx",
+  "shell/useAdminShell.ts",
+  "shell/AdminSidebar.tsx",
+  "shell/AdminTopbar.tsx",
+  "shell/UpdateReleaseDialog.tsx",
+  "shell/adminShellModel.ts",
+]
+  .map((file) =>
+    readFileSync(
+      new URL(`../src/components/admin/${file}`, import.meta.url),
+      "utf8",
+    ),
+  )
+  .join("\n");
 const routesSource = readFileSync(new URL("../src/routes.ts", import.meta.url), "utf8");
 const mainSource = readFileSync(new URL("../src/main.tsx", import.meta.url), "utf8");
 const adminLayoutSource = readFileSync(new URL("../src/pages/admin/_layout.tsx", import.meta.url), "utf8");
@@ -30,8 +42,8 @@ const dashboardPanelsSource = readFileSync(new URL("../src/components/admin/Dash
 const selectorSource = readFileSync(new URL("../src/components/Selector.tsx", import.meta.url), "utf8");
 const nodeSelectorSource = readFileSync(new URL("../src/components/NodeSelector.tsx", import.meta.url), "utf8");
 const checkboxSource = readFileSync(new URL("../src/components/ui/checkbox.tsx", import.meta.url), "utf8");
+const appThemeSource = readFileSync(new URL("../src/theme/createAppTheme.ts", import.meta.url), "utf8");
 const selectOrInputSource = readFileSync(new URL("../src/components/ui/select-or-input.tsx", import.meta.url), "utf8");
-const accountSource = readFileSync(new URL("../src/pages/admin/account.tsx", import.meta.url), "utf8");
 const zhCN = JSON.parse(
   readFileSync(new URL("../src/i18n/locales/zh_CN.json", import.meta.url), "utf8"),
 );
@@ -46,6 +58,7 @@ test("keeps the admin navigation in the intended groups", () => {
     [
       "/admin",
       "/admin/servers",
+      "/admin/billing",
       "/admin/monitoring",
       "/admin/remote-management",
       "/admin/notifications",
@@ -93,16 +106,19 @@ test("keeps the admin navigation in the intended groups", () => {
     remoteManagement?.children?.map((item) => item.path),
     [
       "/admin/exec",
-      "/admin/terminal",
       "/admin/settings/xtermjs",
     ],
+  );
+  assert.equal(
+    remoteManagement?.children?.some((item) => item.path === "/admin/terminal"),
+    false,
   );
 
   assert.deepEqual(
     menuConfig.footer.map((item) => item.path),
     [
       "/admin/logs",
-      "https://nuomiiiii.github.io/komari-document/",
+      "https://nuomiiiii.github.io/Lite-document/",
     ],
   );
   assert.equal(allPaths(menuConfig.footer).includes("/admin/about"), false);
@@ -127,11 +143,13 @@ test("places dynamic theme configuration inside the appearance group", () => {
 
 test("loads the active theme configuration into the sidebar", () => {
   assert.match(adminPanelSource, /buildAdminMenuItems\(baseMenuItems, extraMenuItems\)/);
-  assert.match(adminPanelSource, /\/themes\/\$\{encodeURIComponent\(currentTheme\)\}\/komari-theme\.json/);
+  assert.match(adminPanelSource, /fetchThemeManifest\(currentTheme/);
   assert.match(adminPanelSource, /itemPath = "\/admin\/theme_managed"/);
   assert.match(adminPanelSource, /itemPath = "\/admin\/theme_raw"/);
   assert.match(adminPanelSource, /normalizeThemeRedirectTarget\(configuration\.data\)/);
-  assert.equal(zhCN.theme.manage_with_name, "{{name}} 设置");
+  assert.match(adminPanelSource, /theme\.configure/);
+  assert.doesNotMatch(adminPanelSource, /theme\.manage_with_name/);
+  assert.equal(zhCN.theme.configure, "主题设置");
 });
 
 test("keeps only one sidebar group expanded", () => {
@@ -145,35 +163,71 @@ test("keeps only one sidebar group expanded", () => {
   );
 });
 
-test("keeps the monitoring group open across rapid standalone navigation", () => {
+test("keeps the monitoring group open across nested monitoring routes", () => {
   let openSubMenus = { "/admin/monitoring": true };
 
-  for (const pathname of [
-    "/admin/servers",
-    "/admin/ping",
-    "/admin/return-route",
-  ]) {
+  for (const pathname of ["/admin/ping", "/admin/return-route"]) {
     const next = syncSubMenuForLocation(
       openSubMenus,
       menuConfig.menu,
       pathname,
     );
-    assert.equal(next, openSubMenus);
+    assert.deepEqual(next, { "/admin/monitoring": true });
     openSubMenus = next;
   }
 });
 
-test("does not match a sibling route that only shares a child prefix", () => {
+test("collapses groups on top-level pages and unmatched sibling prefixes", () => {
   const monitoringOpen = { "/admin/monitoring": true };
 
-  assert.equal(
+  assert.deepEqual(
+    syncSubMenuForLocation(monitoringOpen, menuConfig.menu, "/admin"),
+    {},
+  );
+  assert.deepEqual(
+    syncSubMenuForLocation(monitoringOpen, menuConfig.menu, "/admin/servers"),
+    {},
+  );
+  assert.deepEqual(
     syncSubMenuForLocation(
       monitoringOpen,
       menuConfig.menu,
       "/admin/ping-history",
     ),
-    monitoringOpen,
+    {},
   );
+});
+
+test("sidebar groups stay collapsed until opened", () => {
+  assert.match(adminPanelSource, /Boolean\(openGroups\[item\.path\]\)/);
+  assert.doesNotMatch(adminPanelSource, /openGroups\[item\.path\] \?\? true/);
+});
+
+test("desktop navigation expands by default and can collapse to a mini rail", () => {
+  assert.match(adminPanelSource, /DESKTOP_SIDEBAR_WIDTH = 220/);
+  assert.match(adminPanelSource, /lite-admin-nav-rail/);
+  assert.match(adminPanelSource, /=== "mini"/);
+  assert.match(adminPanelSource, /data-testid="admin-nav-toggle"/);
+  assert.match(adminPanelSource, /data-admin-nav-mini/);
+  assert.match(adminPanelSource, /readDesktopNavMini\(\)/);
+  assert.match(adminPanelSource, /<MiniGroup/);
+  assert.match(adminPanelSource, /function MiniFlyoutMenu/);
+  assert.match(adminPanelSource, /admin-mini-nav-slide/);
+  assert.match(adminPanelSource, /const MiniGroupButton = memo/);
+  assert.doesNotMatch(
+    adminPanelSource,
+    /function MiniGroup\([\s\S]*?<Tooltip[\s\S]*?function MiniFlyoutMenu/,
+  );
+  assert.doesNotMatch(adminPanelSource, /lite-admin-nav-collapsed/);
+  assert.match(adminPanelSource, /const navRowSx = \{/);
+  assert.match(adminPanelSource, /sx=\{navRowSx\}/);
+  assert.match(adminPanelSource, /nestedNavRowSx/);
+  assert.match(adminPanelSource, /px: 1\.25/);
+  assert.match(
+    adminPanelSource,
+    /title=\{versionLabel\}[\s\S]*<ListItemIcon[\s\S]*<Github size=\{18\} strokeWidth=\{1\.5\} \/>[\s\S]*<ListItemText/,
+  );
+  assert.match(routesSource, /path: "servers\/:uuid"/);
 });
 
 test("switches to the submenu containing the current nested route", () => {
@@ -187,25 +241,20 @@ test("switches to the submenu containing the current nested route", () => {
   );
 });
 
-test("does not create an implicit second grid column on mobile", () => {
-  assert.match(adminPanelSource, /className="md:col-span-2"/);
+test("uses a flex shell with a grouped MUI drawer instead of a second grid column", () => {
+  assert.match(adminPanelSource, /display: "flex"/);
+  assert.match(
+    adminPanelSource,
+    /variant=\{isMobile \? "temporary" : "permanent"\}/,
+  );
+  assert.doesNotMatch(adminPanelSource, /className="md:col-span-2"/);
   assert.doesNotMatch(adminPanelSource, /className="col-span-2"/);
-  assert.match(adminPanelSource, /open: \{\s+x: 0,\s+opacity: 1,/);
-  assert.match(adminPanelSource, /closed: \{\s+x: 0,\s+opacity: 1,/);
-  assert.match(adminPanelSource, /sidebarOpen\s+\? `\$\{DESKTOP_SIDEBAR_WIDTH\}px`\s+: "0px"/);
 });
 
-test("mobile and desktop submenus share the original motion collapse", () => {
+test("mobile and desktop submenus share the collapse animation", () => {
   assert.doesNotMatch(adminPanelSource, /km-admin-mobile-submenu/);
   assert.doesNotMatch(globalCssSource, /\.km-admin-mobile-submenu/);
-  assert.match(
-    adminPanelSource,
-    /<motion\.div\s+initial=\{\{ height: 0, opacity: 0 \}\}[\s\S]*height: "auto", opacity: 1/,
-  );
-  assert.match(
-    adminPanelSource,
-    /transition=\{reduceMotion \? \{ duration: 0 \} : \{ duration: 0\.14 \}\}/,
-  );
+  assert.match(adminPanelSource, /<Collapse in=\{open\} timeout=\{140\}/);
 });
 
 test("system UI routes do not embed the legacy public dashboard", () => {
@@ -214,23 +263,24 @@ test("system UI routes do not embed the legacy public dashboard", () => {
   assert.match(routesSource, /path:\s*["']\/admin["']/);
   assert.match(routesSource, /path:\s*["']\/install["']/);
   assert.match(routesSource, /path:\s*["']\/terminal["']/);
+  assert.doesNotMatch(routesSource, /pages\/admin\/terminal/);
   assert.match(routesSource, /path:\s*["']\/manage\/\*["']/);
 });
 
 test("admin route changes keep the main content out of a composited animation layer", () => {
   assert.doesNotMatch(adminPanelSource, /<AnimatePresence mode="wait"/);
-  assert.match(
-    adminPanelSource,
-    /<div data-admin-page-content style=\{\{ minHeight: "100%" \}\}>/,
-  );
+  assert.match(adminPanelSource, /data-admin-page-content/);
   assert.doesNotMatch(adminPanelSource, /<motion\.div[^>]*data-admin-page-content/);
   assert.doesNotMatch(adminPanelSource, /ADMIN_PAGE_TRANSITION/);
   assert.doesNotMatch(adminPanelSource, /key=\{location\.pathname\}/);
   assert.doesNotMatch(adminPanelSource, /willChange:[^\n]*"opacity, transform"/);
   assert.doesNotMatch(adminPanelSource, /useReducedMotion/);
-  assert.match(adminPanelSource, /Boolean\(settings\.reduce_motion\)/);
-  assert.match(adminPanelSource, /preloadAdminRoute\(to\)/);
-  assert.match(adminPanelSource, /onPointerOverCapture=\{\(event\) => preloadAdminLink/);
+  assert.match(adminPanelSource, /useReduceMotionPreference\(\)/);
+  assert.match(adminPanelSource, /preloadAdminRoute\(item\.path\)/);
+  assert.match(
+    adminPanelSource,
+    /onPointerOverCapture=\{\(event\) => shell.preloadAdminLink/,
+  );
   assert.doesNotMatch(adminPanelSource, /onClickCapture=/);
   assert.match(adminPanelSource, /url\.pathname !== "\/admin"/);
   assert.match(adminPanelSource, /anchor\.dataset\.adminReloadDocument/);
@@ -253,42 +303,84 @@ test("EULA acceptance closes only after settings persist successfully", () => {
 test("admin tabs and dialogs share the saved motion preference", () => {
   assert.match(adminPanelSource, /dataset\.adminShellActive = "true"/);
   assert.match(adminPanelSource, /data-admin-tab-motion-ready/);
+  assert.match(adminPanelSource, /data-admin-tab-indicator-instant/);
+  assert.doesNotMatch(adminPanelSource, /setTimeout\(\(\) => registerTabListsWithin\(root\), 400\)/);
   assert.doesNotMatch(globalCssSource, /admin-tab-content-enter/);
-  assert.doesNotMatch(
+  assert.match(
     globalCssSource,
-    /\.rt-TabsContent\[data-state="active"\][\s\S]*?(?:animation|backface-visibility|will-change)/,
+    /\[data-admin-tab-motion-ready="true"\]::after[\s\S]*width 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\)/,
   );
-  assert.match(globalCssSource, /admin-dialog-content-enter 240ms[^;]*backwards/);
-  assert.match(globalCssSource, /height: 2px;[\s\S]*background: var\(--accent-9\)/);
-  assert.match(globalCssSource, /\.rt-TabsTriggerInner[\s\S]*background-color: transparent !important/);
-  assert.match(globalCssSource, /\.rt-TabsTrigger:hover \.rt-TabsTriggerInner[\s\S]*background-color: var\(--gray-a3\) !important/);
-  assert.doesNotMatch(globalCssSource, /\.rt-TabsTrigger\[data-state="active"\] \.rt-TabsTriggerInner[\s\S]*background-color: var\(--accent-a3\) !important/);
-  assert.match(globalCssSource, /\.rt-TabsTrigger:focus-visible[\s\S]*outline-offset: 1px/);
-  assert.match(globalCssSource, /admin-dialog-content-exit 220ms[^;]*forwards/);
-  assert.doesNotMatch(
+  assert.match(
     globalCssSource,
-    /\.rt-BaseDialogContent\[data-state="(?:open|closed)"\][^}]*will-change/,
+    /\.km-admin-sheet-tabs \[role="tab"\]\[aria-selected="true"\]::after/,
   );
-  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.rt-BaseDialogContent/);
+  assert.match(globalCssSource, /\.km-admin-sheet-tabs \.MuiTabs-indicator[\s\S]*display: none/);
+  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.admin-tab-panel/);
+  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.km-admin-sheet-panel/);
+});
+
+test("admin multi-sheet pages share the node-detail tab bar", () => {
+  const sheetPages = [
+    pingTaskPageSource,
+    returnRoutePageSource,
+    readFileSync(new URL("../src/pages/admin/settings/metrics.tsx", import.meta.url), "utf8"),
+    readFileSync(new URL("../src/pages/admin/settings/account-security.tsx", import.meta.url), "utf8"),
+    readFileSync(new URL("../src/pages/admin/settings/reverse-proxy.tsx", import.meta.url), "utf8"),
+    readFileSync(new URL("../src/pages/admin/notification/load.tsx", import.meta.url), "utf8"),
+    readFileSync(new URL("../src/pages/admin/notification/ping_loss.tsx", import.meta.url), "utf8"),
+  ];
+  for (const source of sheetPages) {
+    assert.match(source, /<AdminSheetTabs/);
+    assert.match(source, /<AdminTabLabel icon=/);
+    assert.doesNotMatch(source, /w-max min-w-full/);
+    assert.doesNotMatch(source, /Tabs\.Trigger[^>]*flex-1/);
+    assert.doesNotMatch(source, /<Tabs\.Trigger[^>]*>\s*<\/Tabs\.Trigger>/);
+  }
+  const themeTabsSource = readFileSync(
+    new URL("../src/components/admin/ThemeConfigTabs.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(themeTabsSource, /km-theme-config-tabs km-admin-sheet-tabs/);
+  assert.match(themeTabsSource, /<AdminTabLabel icon=/);
+  const nodeDetailSource = readFileSync(
+    new URL("../src/pages/admin/NodeDetailPage.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(nodeDetailSource, /<AdminSheetTabs(?:\s|>)/);
+  assert.match(nodeDetailSource, /<AdminTabLabel icon=/);
+  assert.match(
+    nodeDetailSource,
+    /km-admin-sheet-panel/,
+  );
+  assert.doesNotMatch(
+    nodeDetailSource,
+    /iconPosition="start"/,
+  );
+  assert.match(globalCssSource, /\.km-admin-sheet-tabs \.MuiTabs-indicator[\s\S]*display: none/);
+  assert.match(
+    globalCssSource,
+    /\[data-admin-tab-motion-ready="true"\]::after[\s\S]*width 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\)/,
+  );
+  for (const source of sheetPages) {
+    assert.match(source, /admin-tab-panel/);
+  }
 });
 
 test("admin checkboxes share the active accent palette", () => {
-  assert.match(globalCssSource, /\.rt-CheckboxRoot::before[\s\S]*background-color 150ms ease/);
-  assert.doesNotMatch(globalCssSource, /\.rt-CheckboxRoot\[data-state="checked"\]::before[\s\S]*background-color: var\(--accent-8\)/);
-  assert.match(checkboxSource, /data-\[state=checked\]:border-\[var\(--accent-9\)\]/);
-  assert.match(checkboxSource, /data-\[state=checked\]:bg-\[var\(--accent-9\)\]/);
-  assert.match(checkboxSource, /data-\[state=checked\]:text-\[var\(--accent-contrast\)\]/);
-  assert.match(checkboxSource, /data-\[state=indeterminate\]:bg-\[var\(--accent-9\)\]/);
-  assert.match(checkboxSource, /data-\[state=indeterminate\]:text-\[var\(--accent-contrast\)\]/);
-  assert.match(checkboxSource, /border shadow-xs transition-shadow/);
-  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.rt-CheckboxRoot::before/);
+  assert.match(checkboxSource, /import MuiCheckbox from "@mui\/material\/Checkbox"/);
+  assert.match(checkboxSource, /data-slot="checkbox"/);
+  assert.match(checkboxSource, /indeterminate=\{indeterminate\}/);
+  assert.match(checkboxSource, /onChange=\{\(_, next\) => onCheckedChange\?\.\(next\)\}/);
+  assert.match(appThemeSource, /MuiCheckbox:[\s\S]*&\.Mui-checked, &\.MuiCheckbox-indeterminate[\s\S]*color: ACCENT/);
+  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\[data-slot="checkbox"\]/);
   assert.match(selectorSource, /import \{ Checkbox \} from "\.\/ui\/checkbox"/);
   assert.doesNotMatch(selectorSource, /import \{ Checkbox, TextField \} from "@radix-ui\/themes"/);
   assert.match(selectorSource, /checked=\{checkAllState\}/);
-  assert.match(checkboxSource, /MinusIcon[\s\S]*group-data-\[state=indeterminate\]:block/);
+  assert.doesNotMatch(checkboxSource, /@radix-ui\/react-checkbox/);
 });
 
 test("node selector dialogs keep a single select-all control", () => {
+  assert.match(selectorSource, /km-search-before-content/);
   assert.match(selectorSource, /showHeaderSelectAll = true/);
   assert.match(selectorSource, /showHeaderSelectAll \? \([\s\S]*aria-label=\{t\("common\.select_all"\)\}/);
   assert.match(nodeSelectorSource, /showHeaderSelectAll=\{false\}/);
@@ -296,49 +388,62 @@ test("node selector dialogs keep a single select-all control", () => {
 
 test("admin floating controls and switches animate consistently", () => {
   assert.match(globalCssSource, /@keyframes admin-floating-content-enter/);
-  assert.match(globalCssSource, /:is\(\.rt-SelectContent, \.rt-DropdownMenuContent, \.rt-PopoverContent, \.admin-select-or-input-content\)\[data-state="open"\]/);
   assert.match(globalCssSource, /admin-floating-content-enter 180ms[^;]*backwards/);
-  assert.match(globalCssSource, /admin-floating-content-exit 140ms[^;]*forwards/);
-  assert.doesNotMatch(
-    globalCssSource,
-    /:is\(\.rt-SelectContent,[^}]*\[data-state="(?:open|closed)"\][^}]*will-change/,
-  );
-  assert.doesNotMatch(globalCssSource, /\.rt-SelectItem\[data-highlighted\][\s\S]*background-color: var\(--accent-a3\)/);
-  assert.doesNotMatch(globalCssSource, /\.rt-SelectItem\[data-state="checked"\][\s\S]*background-color: var\(--accent-a4\)/);
   assert.match(selectOrInputSource, /admin-select-or-input-content/);
-  assert.match(selectOrInputSource, /data-state=\{open \? "open" : "closed"\}/);
-  assert.match(selectOrInputSource, /FLOATING_CONTENT_EXIT_MS = 140/);
-  assert.match(selectOrInputSource, /bg-accent-9 text-\[var\(--accent-contrast\)\]/);
-  assert.match(selectOrInputSource, /hover:bg-accent hover:text-accent-foreground/);
-  assert.match(selectOrInputSource, /text-sm font-normal outline-hidden/);
-  assert.doesNotMatch(selectOrInputSource, /text-sm font-semibold outline-hidden/);
-  assert.match(selectOrInputSource, /rounded-md border bg-accent-1[\s\S]*shadow-md/);
-  assert.match(globalCssSource, /\.rt-SwitchThumb[\s\S]*transform 180ms/);
-  assert.match(globalCssSource, /\.rt-SwitchThumb\[data-state="checked"\][\s\S]*scale\(0\.92\)/);
-  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.rt-SelectContent/);
-  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.rt-SwitchThumb/);
+  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.admin-select-or-input-content/);
 });
 
 test("admin command buttons use motion instead of abrupt active flashes", () => {
-  assert.match(globalCssSource, /\.rt-Button,[\s\S]*\.rt-IconButton[\s\S]*background-color 160ms/);
-  assert.match(globalCssSource, /\.rt-Button:active:not\(\[data-disabled\],[\s\S]*filter: none;[\s\S]*scale\(0\.985\)/);
-  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.rt-Button/);
-  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*\.rt-IconButton/);
   assert.match(
     globalCssSource,
-    /@media \(pointer: coarse\)[\s\S]*\.rt-Button:active[\s\S]*outline: none/,
+    /\[data-admin-shell\] button\[aria-pressed\],[\s\S]*\[data-admin-mini-group\] \.MuiListItemButton-root[\s\S]*background-color 160ms/,
   );
+  assert.match(
+    globalCssSource,
+    /\[data-admin-shell\] button\[aria-pressed\]:active[\s\S]*\[data-admin-mini-group\] \.MuiListItemButton-root:active[\s\S]*scale\(0\.99\)/,
+  );
+  assert.match(globalCssSource, /data-reduce-motion="true"[\s\S]*button\[aria-pressed\]/);
 });
 
 test("prewarms admin routes and reuses shared monitoring data", () => {
   assert.match(routesSource, /export const preloadAdminRoutes/);
   assert.match(mainSource, /scheduleIdleAdminWarmup/);
   assert.match(mainSource, /getIdleAdminWarmupTargets/);
+  assert.doesNotMatch(mainSource, /NodeListProvider/);
+  assert.doesNotMatch(mainSource, /common:getNodes/);
+  assert.match(mainSource, /<RPC2Provider>/);
+  assert.match(adminLayoutSource, /<SettingsProvider>\s*<NodeDetailsProvider>/);
   assert.match(
     adminLayoutSource,
-    /<NodeDetailsProvider>\s*<PingTaskProvider>\s*<AdminAuthenticatedContent \/>/,
+    /view === "loading" \? \(\s*<FullPageLoading \/>/,
   );
-  assert.match(pingTaskContextSource, /React\.useState<boolean>\(true\)/);
+  assert.match(
+    adminLayoutSource,
+    /view === "login" \? \(\s*<AdminLoginPage \/>/,
+  );
+  assert.match(
+    adminLayoutSource,
+    /<PingTaskProvider>\s*<AdminNodeLiveDataProvider>\s*<AdminAuthenticatedContent \/>/,
+  );
+  assert.doesNotMatch(
+    adminLayoutSource,
+    /<SettingsProvider>\s*<NodeDetailsProvider>\s*<PingTaskProvider>/,
+  );
+  assert.match(settingsAPISource, /planAdminSettingsFetch/);
+  assert.match(settingsAPISource, /plan === "reset"/);
+  assert.match(settingsAPISource, /setSettings\(createDefaultSettings\(\)\)/);
+  const nodeDetailsSource = readFileSync(
+    new URL("../src/contexts/NodeDetailsContext.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(nodeDetailsSource, /load\(PREAUTHENTICATED_NODE_DATA\)/);
+  assert.match(
+    nodeDetailsSource,
+    /if \(accountLoading \|\| !account\?\.logged_in \|\| !accountKey\)/,
+  );
+  assert.match(mainSource, /preloadAdminRoute\("\/admin\/settings\/dashboard"\)/);
+  assert.match(pingTaskContextSource, /ensureLoaded/);
+  assert.match(pingTaskContextSource, /if \(!requested\) return;/);
   assert.match(pingTaskContextSource, /const inherited = React\.useContext\(PingTaskContext\)/);
   assert.doesNotMatch(pingTaskContextSource, /refresh\(\);\s*setIsLoading\(false\)/);
   assert.doesNotMatch(pingTaskPageSource, /<PingTaskProvider>/);
@@ -346,12 +451,12 @@ test("prewarms admin routes and reuses shared monitoring data", () => {
   assert.doesNotMatch(returnRoutePageSource, /<NodeDetailsProvider>/);
 });
 
-test("dashboard alert navigation prepares filtered server data before switching", () => {
-  assert.match(dashboardPanelsSource, /prefetchDashboardAlertItems\(kind, accountKey\)/);
-  assert.match(dashboardPanelsSource, /event\.preventDefault\(\)/);
-  assert.match(serverPageSource, /getDashboardAlertItemsSnapshot\(routeAlert, accountKey\)/);
+test("dashboard alert navigation reuses destination pages without extra banners", () => {
+  assert.doesNotMatch(dashboardPanelsSource, /prefetchDashboardAlertItems\(kind, accountKey\)/);
+  assert.doesNotMatch(dashboardPanelsSource, /event\.preventDefault\(\)/);
+  assert.doesNotMatch(serverPageSource, /routeAlert/);
+  assert.match(serverPageSource, /routeStatus === "offline"/);
   assert.match(serverPageSource, /if \(isLoading\) return <Loading text="" \/>/);
-  assert.doesNotMatch(serverPageSource, /isLoading \|\| alertFilterLoading/);
 });
 
 test("registers the dashboard settings route", () => {

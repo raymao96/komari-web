@@ -1,16 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import type { LiveDataResponse } from "@/types/LiveData";
+import { nodeOnlineState } from "@/utils/adminNodeOnlineState";
 import { mergeLatestStatus } from "@/utils/liveData";
+
+export { nodeOnlineState };
 
 export const ADMIN_NODE_LIVE_INTERVAL_MS = 5000;
 
-export function useAdminNodeLiveData() {
+type AdminNodeLiveDataValue = {
+  liveData: LiveDataResponse | null;
+  available: boolean;
+};
+
+const AdminNodeLiveDataContext = createContext<AdminNodeLiveDataValue | null>(
+  null,
+);
+
+let cachedLiveData: LiveDataResponse | null = null;
+let cachedAvailable = false;
+
+function AdminNodeLiveDataPoller({ children }: { children: ReactNode }) {
   const { call } = useRPC2Call();
-  const [liveData, setLiveData] = useState<LiveDataResponse | null>(null);
-  const [available, setAvailable] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
-  const liveDataRef = useRef<LiveDataResponse | null>(null);
+  const [liveData, setLiveData] = useState<LiveDataResponse | null>(
+    () => cachedLiveData,
+  );
+  const [available, setAvailable] = useState(() => cachedAvailable);
+  const liveDataRef = useRef<LiveDataResponse | null>(cachedLiveData);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -43,12 +68,13 @@ export function useAdminNodeLiveData() {
         const next = mergeLatestStatus(result, liveDataRef.current);
         if (next !== liveDataRef.current) {
           liveDataRef.current = next;
+          cachedLiveData = next;
           setLiveData(next);
         }
+        cachedAvailable = true;
         setAvailable(true);
-        setLastUpdatedAt(Date.now());
       } catch {
-        if (!stopped) setAvailable(false);
+        if (!stopped && !liveDataRef.current) setAvailable(false);
       } finally {
         running = false;
         scheduleNext();
@@ -73,5 +99,34 @@ export function useAdminNodeLiveData() {
     };
   }, [call]);
 
-  return { liveData, available, lastUpdatedAt };
+  const value = useMemo(
+    () => ({ liveData, available }),
+    [liveData, available],
+  );
+
+  return createElement(
+    AdminNodeLiveDataContext.Provider,
+    { value },
+    children,
+  );
+}
+
+export function AdminNodeLiveDataProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const existing = useContext(AdminNodeLiveDataContext);
+  if (existing) return children;
+  return createElement(AdminNodeLiveDataPoller, null, children);
+}
+
+export function useAdminNodeLiveData() {
+  const context = useContext(AdminNodeLiveDataContext);
+  if (!context) {
+    throw new Error(
+      "useAdminNodeLiveData must be used within AdminNodeLiveDataProvider",
+    );
+  }
+  return context;
 }

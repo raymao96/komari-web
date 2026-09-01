@@ -1,4 +1,3 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 import { toast } from "sonner";
 import {
@@ -10,7 +9,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { useTranslation } from "react-i18next";
-import { Dialog, Flex, Button } from "@radix-ui/themes";
+import {
+  AppDialogContent, Dialog, Flex, Button } from "@/components/admin/ui";
 import { UserAgentHelper } from "@/utils/UserAgentHelper";
 import Loading from "@/components/loading";
 import { AdminSectionTitle } from "@/components/admin/AdminPageTitle";
@@ -128,19 +128,19 @@ export default function Sessions() {
               {t("sessions.delete_all_desc")}
             </Dialog.Description>
             <Flex gap="2" justify={"end"}>
-              <Dialog.Trigger>
+              <Dialog.Close>
                 <Button variant="soft">{t("sessions.cancel")}</Button>
-              </Dialog.Trigger>
-              <Dialog.Trigger>
+              </Dialog.Close>
+              <Dialog.Close>
                 <Button color="red" onClick={deleteAllSessions}>
                   {t("delete")}
                 </Button>
-              </Dialog.Trigger>
+              </Dialog.Close>
             </Flex>
           </AppDialogContent>
         </Dialog.Root>
       </div>
-      <div className="w-full min-w-0 overflow-hidden rounded-md border border-[var(--gray-a5)]">
+      <div className="admin-responsive-table-wrap w-full min-w-0 overflow-hidden rounded-md border border-[var(--gray-a5)]">
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -155,10 +155,10 @@ export default function Sessions() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pageItems.map((s) => {
+            {pageItems.map((s, index) => {
               const isCurrent = s.session === sessions.current;
               return (
-                <TableRow key={s.uuid}>
+                <TableRow key={`${s.uuid}-${s.session}-${index}`}>
                   <TableCell>
                     <Dialog.Root>
                       <Dialog.Trigger>
@@ -227,9 +227,9 @@ export default function Sessions() {
                             {new Date(s.expires).toLocaleString()}
                           </label>
                           <Flex justify={"end"}>
-                            <Dialog.Trigger>
+                            <Dialog.Close>
                               <Button variant="soft">{t("close")}</Button>
-                            </Dialog.Trigger>
+                            </Dialog.Close>
                           </Flex>
                         </Flex>
                       </AppDialogContent>
@@ -259,19 +259,19 @@ export default function Sessions() {
                           {t("sessions.delete_one_desc")}
                         </Dialog.Description>
                         <Flex gap="2" justify={"end"}>
-                          <Dialog.Trigger>
+                          <Dialog.Close>
                             <Button variant="soft">
                               {t("sessions.cancel")}
                             </Button>
-                          </Dialog.Trigger>
-                          <Dialog.Trigger>
+                          </Dialog.Close>
+                          <Dialog.Close>
                             <Button
                               color="red"
                               onClick={() => deleteSession(s.session)}
                             >
                               {t("delete")}
                             </Button>
-                          </Dialog.Trigger>
+                          </Dialog.Close>
                         </Flex>
                       </AppDialogContent>
                     </Dialog.Root>

@@ -24,31 +24,25 @@ const node: RemoteExecNodeSearchItem = {
   ipv6: "2602:f732:1:59::a",
   group: "线路机",
   remark: "香港中转",
-  price: 383.04,
-  billing_cycle: 365,
-  currency: "USD",
-  expired_at: "2027-09-27T00:00:00Z",
   tags: "premium",
 };
 
-test("searches remote execution nodes across every displayed field", () => {
+test("searches remote execution nodes across name, address, group, remark, and tags", () => {
   assert.equal(matchesRemoteExecNode(node, "neburst"), true);
   assert.equal(matchesRemoteExecNode(node, "74.52"), true);
   assert.equal(matchesRemoteExecNode(node, "f732:1"), true);
   assert.equal(matchesRemoteExecNode(node, "线路"), true);
   assert.equal(matchesRemoteExecNode(node, "中转"), true);
-  assert.equal(matchesRemoteExecNode(node, "383.04"), true);
-  assert.equal(matchesRemoteExecNode(node, "usd"), true);
-  assert.equal(matchesRemoteExecNode(node, "365"), true);
-  assert.equal(matchesRemoteExecNode(node, "2027-09"), true);
   assert.equal(matchesRemoteExecNode(node, "premium"), true);
+  assert.equal(matchesRemoteExecNode(node, "383.04"), false);
+  assert.equal(matchesRemoteExecNode(node, "usd"), false);
+  assert.equal(matchesRemoteExecNode(node, "365"), false);
+  assert.equal(matchesRemoteExecNode(node, "2027-09"), false);
 });
 
-test("includes localized billing text in fuzzy search", () => {
-  const billingTerms = ["$383.04/年", "余419天"];
-  assert.equal(matchesRemoteExecNode(node, "年", billingTerms), true);
-  assert.equal(matchesRemoteExecNode(node, "余419", billingTerms), true);
-  assert.equal(remoteExecNodeSearchText(node, billingTerms).includes("$383.04/年"), true);
+test("does not include billing text in fuzzy search", () => {
+  assert.equal(remoteExecNodeSearchText(node).includes("premium"), true);
+  assert.equal(remoteExecNodeSearchText(node).includes("383"), false);
 });
 
 test("normalizes case and surrounding whitespace", () => {
@@ -81,19 +75,25 @@ test("hides an unreported IPv6 row and vertically centers IPv4", () => {
     "utf8",
   );
   assert.match(selectorCss, /\.remote-exec-node-addresses \{[\s\S]*height: 100%[\s\S]*justify-content: center/);
+  assert.match(selectorCss, /\.remote-exec-node-status\.is-online \{\s*color: #22c55e;/);
+  assert.match(selectorCss, /\.remote-exec-node-status\.is-offline \{\s*color: #ff5630;/);
+  assert.doesNotMatch(selectorCss, /--green-10|--red-10/);
 });
 
-test("keeps one palette-aware select-all action without a redundant command shell", () => {
-  const selectAllAction = selectorSource.match(
-    /<Button\s+type="button"[\s\S]*?<\/Button>/,
-  )?.[0] ?? "";
-
-  assert.notEqual(selectAllAction, "");
-  assert.match(selectAllAction, /<ListChecks size=\{16\} \/>/);
-  assert.doesNotMatch(selectAllAction, /color="gray"/);
-  assert.match(selectorSource, /<ListChecks size=\{16\} \/>/);
+test("keeps node-list filters and a palette-aware select-all action", () => {
+  assert.match(selectorSource, /<AdminListShell/);
+  assert.match(selectorSource, /nodeOnlineState\(available, onlineSet, node\.uuid\)/);
+  assert.match(selectorSource, /visibility: "hidden"/);
+  assert.match(selectorSource, /<AdminNodeListFilters/);
+  assert.match(selectorSource, /exec\.nodeSearchPlaceholder/);
+  assert.match(selectorSource, /startIcon=\{<ListChecks size=\{16\} \/>\}/);
+  assert.match(selectorSource, /toggleFiltered\(!allFilteredSelected\)/);
   assert.doesNotMatch(selectorSource, /selectAllState/);
-  assert.match(execPageSource, /<SettingCardCollapse title=\{t\("exec\.selectNodes"\)\} defaultOpen>/);
+  assert.doesNotMatch(selectorSource, /<PriceTags/);
+  assert.match(selectorSource, /<CustomTags/);
+  assert.match(selectorSource, /admin\.nodeTable\.tags/);
+  assert.match(execPageSource, /\{t\("exec\.selectNodes"\)\}/);
+  assert.doesNotMatch(execPageSource, /SettingCardCollapse/);
   assert.doesNotMatch(execPageSource, /<Card className="p-4 sm:p-5">/);
 });
 

@@ -1,31 +1,51 @@
-import * as React from "react"
-import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { CheckIcon, MinusIcon } from "lucide-react"
+import MuiCheckbox from "@mui/material/Checkbox";
+import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils"
+type CheckedState = boolean | "indeterminate";
+
+type CheckboxProps = Omit<
+  ComponentProps<typeof MuiCheckbox>,
+  "checked" | "defaultChecked" | "onChange" | "size"
+> & {
+  checked?: CheckedState;
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: CheckedState) => void;
+};
 
 function Checkbox({
+  checked,
+  defaultChecked,
+  onCheckedChange,
   className,
+  sx,
   ...props
-}: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+}: CheckboxProps) {
+  const controlled = checked !== undefined;
+  const indeterminate = checked === "indeterminate";
+
   return (
-    <CheckboxPrimitive.Root
-      data-slot="checkbox"
-      className={cn(
-        "peer border-[var(--accent-6)] bg-[var(--accent-1)] data-[state=checked]:border-[var(--accent-9)] data-[state=checked]:bg-[var(--accent-9)] data-[state=checked]:text-[var(--accent-contrast)] data-[state=indeterminate]:border-[var(--accent-9)] data-[state=indeterminate]:bg-[var(--accent-9)] data-[state=indeterminate]:text-[var(--accent-contrast)] focus-visible:border-[var(--accent-10)] focus-visible:ring-[var(--accent-7)]/50 aria-invalid:ring-red-500/20 dark:aria-invalid:ring-red-400/40 aria-invalid:border-red-500 size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
-        className
-      )}
+    <MuiCheckbox
       {...props}
-    >
-      <CheckboxPrimitive.Indicator
-        data-slot="checkbox-indicator"
-        className="group flex items-center justify-center text-current transition-none"
-      >
-        <CheckIcon className="size-3.5 group-data-[state=indeterminate]:hidden" />
-        <MinusIcon className="hidden size-3.5 group-data-[state=indeterminate]:block" />
-      </CheckboxPrimitive.Indicator>
-    </CheckboxPrimitive.Root>
-  )
+      data-slot="checkbox"
+      className={className}
+      size="small"
+      disableRipple
+      indeterminate={indeterminate}
+      {...(controlled
+        ? { checked: indeterminate ? false : checked }
+        : { defaultChecked })}
+      onChange={(_, next) => onCheckedChange?.(next)}
+      sx={{
+        width: 32,
+        height: 32,
+        p: 0.75,
+        flexShrink: 0,
+        color: "text.secondary",
+        "& .MuiSvgIcon-root": { fontSize: 20 },
+        ...(Array.isArray(sx) ? Object.assign({}, ...sx) : sx),
+      }}
+    />
+  );
 }
 
-export { Checkbox }
+export { Checkbox };

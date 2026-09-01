@@ -1,17 +1,14 @@
 import React from "react";
 import { useAccount } from "@/contexts/AccountContext";
-import { ThemeContext } from "@/contexts/ThemeContext";
-import i18n from "@/i18n/config";
+import i18n, { changeUiLanguage } from "@/i18n/config";
 import {
-  normalizeAccountPreferenceColor,
   normalizeAccountPreferenceLanguage,
   type AccountPreferences,
 } from "@/utils/adminAuth";
-import { readStoredLanguage, writeLanguageCookie } from "@/utils/language";
+import { readStoredLanguage } from "@/utils/language";
 
 const AccountPreferenceSync = () => {
   const { account, updatePreferences } = useAccount();
-  const { color, setColor } = React.useContext(ThemeContext);
   const syncedAccount = React.useRef<string | null>(null);
 
   React.useLayoutEffect(() => {
@@ -28,23 +25,16 @@ const AccountPreferenceSync = () => {
       normalizeAccountPreferenceLanguage(i18n.resolvedLanguage) ||
       normalizeAccountPreferenceLanguage(i18n.language) ||
       "en-US";
-    const savedColor = normalizeAccountPreferenceColor(account.color);
 
     if (savedLanguage) {
-      void i18n.changeLanguage(savedLanguage);
-      writeLanguageCookie(savedLanguage);
-    }
-    if (savedColor) setColor(savedColor);
-
-    const initialPreferences: AccountPreferences = {};
-    if (!savedLanguage) initialPreferences.language = localLanguage;
-    if (!savedColor) initialPreferences.color = color;
-    if (initialPreferences.language || initialPreferences.color) {
+      void changeUiLanguage(savedLanguage);
+    } else {
+      const initialPreferences: AccountPreferences = { language: localLanguage };
       void updatePreferences(initialPreferences).catch((error) => {
         console.warn("Failed to initialize account preferences:", error);
       });
     }
-  }, [account, color, setColor, updatePreferences]);
+  }, [account, updatePreferences]);
 
   return null;
 };

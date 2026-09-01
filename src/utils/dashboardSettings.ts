@@ -2,6 +2,7 @@ export const DASHBOARD_MODULE_IDS = [
   "server_status",
   "traffic_summary",
   "storage_summary",
+  "cost_center",
   "resource_ranking",
   "daily_traffic_ranking",
   "latency_ranking",
@@ -16,7 +17,7 @@ export const DASHBOARD_MODULE_IDS = [
 ] as const;
 
 export type DashboardModuleId = (typeof DASHBOARD_MODULE_IDS)[number];
-export type DashboardModuleSpan = 2 | 3 | 6;
+export type DashboardModuleSpan = 3 | 4 | 6 | 12;
 export type DashboardPresetId =
   | "overview"
   | "network"
@@ -25,6 +26,14 @@ export type DashboardPresetId =
   | "operations"
   | "lite"
   | "custom";
+
+export const DASHBOARD_GRID_COLUMNS = 12;
+export const DASHBOARD_SUMMARY_CARD_IDS = [
+  "server_status",
+  "traffic_summary",
+  "storage_summary",
+  "cost_center",
+] as const;
 
 export interface DashboardModuleSetting {
   id: DashboardModuleId;
@@ -38,6 +47,7 @@ export interface DashboardSettings {
   refresh_seconds: 15 | 30 | 60 | 120;
   chart_refresh_seconds: 15 | 30 | 60 | 120;
   ranking_limit: 5 | 10 | 15 | 20;
+  layout_columns: typeof DASHBOARD_GRID_COLUMNS;
 }
 
 interface DashboardPresetDefinition {
@@ -52,6 +62,7 @@ export const FORMAL_DASHBOARD_MODULES: readonly DashboardModuleId[] = [
   "server_status",
   "traffic_summary",
   "storage_summary",
+  "cost_center",
   "latency_trend",
   "traffic_trend",
   "billing_trend",
@@ -73,6 +84,7 @@ export const DASHBOARD_PRESETS: readonly DashboardPresetDefinition[] = [
       "server_status",
       "traffic_summary",
       "storage_summary",
+      "cost_center",
       "latency_trend",
       "daily_traffic_ranking",
       "latency_ranking",
@@ -92,6 +104,7 @@ export const DASHBOARD_PRESETS: readonly DashboardPresetDefinition[] = [
     enabled: [
       "server_status",
       "storage_summary",
+      "cost_center",
       "resource_ranking",
       "alerts",
       "storage_detail",
@@ -106,6 +119,7 @@ export const DASHBOARD_PRESETS: readonly DashboardPresetDefinition[] = [
       "server_status",
       "traffic_summary",
       "storage_summary",
+      "cost_center",
       "daily_traffic_ranking",
       "alerts",
       "traffic_trend",
@@ -121,6 +135,7 @@ export const DASHBOARD_PRESETS: readonly DashboardPresetDefinition[] = [
       "server_status",
       "traffic_summary",
       "storage_summary",
+      "cost_center",
       "alerts",
       "return_route",
       "resource_ranking",
@@ -138,6 +153,7 @@ export const DASHBOARD_PRESETS: readonly DashboardPresetDefinition[] = [
     enabled: [
       "server_status",
       "storage_summary",
+      "cost_center",
       "resource_ranking",
       "alerts",
       "storage_detail",
@@ -153,6 +169,16 @@ const presetIdSet = new Set<string>([
   ...DASHBOARD_PRESETS.map((preset) => preset.id),
   "custom",
 ]);
+
+function isDashboardModuleSpan(value: number): value is DashboardModuleSpan {
+  return value === 3 || value === 4 || value === 6 || value === 12;
+}
+
+function migrateLegacyModuleSpan(span: number, layoutColumns: unknown): number {
+  if (layoutColumns === DASHBOARD_GRID_COLUMNS) return span;
+  if (span === 2 || span === 3 || span === 6) return span * 2;
+  return span;
+}
 
 function buildPresetModules(preset: DashboardPresetDefinition): DashboardModuleSetting[] {
   const enabled = new Set<DashboardModuleId>(preset.enabled);
@@ -174,24 +200,26 @@ export function dashboardSettingsForPreset(
     refresh_seconds: preset.refresh_seconds,
     chart_refresh_seconds: preset.chart_refresh_seconds,
     ranking_limit: preset.ranking_limit,
+    layout_columns: DASHBOARD_GRID_COLUMNS,
   };
 }
 
 const DASHBOARD_BASE_SPANS: Record<DashboardModuleId, DashboardModuleSpan> = {
-  server_status: 2,
-  traffic_summary: 2,
-  storage_summary: 2,
-  resource_ranking: 6,
-  daily_traffic_ranking: 3,
-  latency_ranking: 3,
-  latency_jitter_ranking: 3,
-  packet_loss_ranking: 3,
-  latency_trend: 6,
-  traffic_trend: 3,
-  billing_trend: 3,
-  return_route: 3,
-  alerts: 3,
-  storage_detail: 3,
+  server_status: 3,
+  traffic_summary: 3,
+  storage_summary: 3,
+  cost_center: 3,
+  resource_ranking: 12,
+  daily_traffic_ranking: 6,
+  latency_ranking: 6,
+  latency_jitter_ranking: 6,
+  packet_loss_ranking: 6,
+  latency_trend: 12,
+  traffic_trend: 6,
+  billing_trend: 6,
+  return_route: 6,
+  alerts: 6,
+  storage_detail: 6,
 };
 
 export const DEFAULT_DASHBOARD_SETTINGS = dashboardSettingsForPreset("overview");
@@ -211,23 +239,30 @@ export function packDashboardModules(
 
   for (const id of modules) {
     const span = spans[id] ?? DASHBOARD_BASE_SPANS[id];
-    if (used > 0 && used + span > 6) {
-      if (fillRows) packed[packed.length - 1].span += 6 - used;
+    if (used > 0 && used + span > DASHBOARD_GRID_COLUMNS) {
+      if (fillRows) packed[packed.length - 1].span += DASHBOARD_GRID_COLUMNS - used;
       used = 0;
     }
     packed.push({ id, span });
     used += span;
-    if (used === 6) used = 0;
+    if (used === DASHBOARD_GRID_COLUMNS) used = 0;
   }
 
   if (fillRows && used > 0 && packed.length > 0) {
-    packed[packed.length - 1].span += 6 - used;
+    packed[packed.length - 1].span += DASHBOARD_GRID_COLUMNS - used;
   }
   return packed;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function shrinkSummaryCardsToQuarter(modules: DashboardModuleSetting[]) {
+  for (const id of DASHBOARD_SUMMARY_CARD_IDS) {
+    const module = modules.find((item) => item.id === id);
+    if (module && (module.span === 3 || module.span === 4)) module.span = 3;
+  }
 }
 
 export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
@@ -244,13 +279,36 @@ export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
     if (!moduleIdSet.has(rawModule.id) || seen.has(rawModule.id as DashboardModuleId)) continue;
     const id = rawModule.id as DashboardModuleId;
     seen.add(id);
-    const span = rawModule.span === 2 || rawModule.span === 3 || rawModule.span === 6
-      ? rawModule.span
-      : DASHBOARD_BASE_SPANS[id];
+    const migrated = migrateLegacyModuleSpan(
+      typeof rawModule.span === "number" ? rawModule.span : DASHBOARD_BASE_SPANS[id],
+      value.layout_columns,
+    );
+    const span = isDashboardModuleSpan(migrated) ? migrated : DASHBOARD_BASE_SPANS[id];
     modules.push({ id, enabled: rawModule.enabled === true, span });
   }
   for (const id of DASHBOARD_MODULE_IDS) {
-    if (!seen.has(id)) modules.push({ id, enabled: false, span: DASHBOARD_BASE_SPANS[id] });
+    if (!seen.has(id)) {
+      if (id === "cost_center") {
+        const storageIndex = modules.findIndex((module) => module.id === "storage_summary");
+        modules.splice(storageIndex >= 0 ? storageIndex + 1 : modules.length, 0, {
+          id,
+          enabled: false,
+          span: DASHBOARD_BASE_SPANS[id],
+        });
+        continue;
+      }
+      modules.push({ id, enabled: false, span: DASHBOARD_BASE_SPANS[id] });
+    }
+  }
+  const costCenter = modules.find((module) => module.id === "cost_center");
+  const summaryCards = (["server_status", "traffic_summary", "storage_summary"] as const)
+    .map((id) => modules.find((module) => module.id === id));
+  const summaryEnabled = summaryCards.every((module) => module?.enabled);
+  const legacyThirds = summaryCards.every((module) => module?.span === 4);
+  const newlyInsertedCost = !seen.has("cost_center");
+  if (costCenter && summaryEnabled && !costCenter.enabled && (legacyThirds || newlyInsertedCost)) {
+    costCenter.enabled = true;
+    shrinkSummaryCardsToQuarter(modules);
   }
   if (!modules.some((module) => module.enabled)) {
     modules[0] = { ...modules[0], enabled: true };
@@ -285,6 +343,7 @@ export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
     refresh_seconds: refresh,
     chart_refresh_seconds: chartRefresh,
     ranking_limit: rankingLimit,
+    layout_columns: DASHBOARD_GRID_COLUMNS,
   };
 }
 
@@ -296,6 +355,10 @@ export function dashboardModuleSpans(settings: DashboardSettings): Partial<Recor
   return Object.fromEntries(settings.modules.map((module) => [module.id, module.span]));
 }
 
+export function dashboardCostCenterEnabled(settings: DashboardSettings): boolean {
+  return settings.preset === "overview" || enabledDashboardModules(settings).includes("cost_center");
+}
+
 export function dashboardSummarySections(settings: DashboardSettings): string[] {
   const enabled = new Set(enabledDashboardModules(settings));
   const sections = new Set<string>();
@@ -305,6 +368,13 @@ export function dashboardSummarySections(settings: DashboardSettings): string[] 
   if (enabled.has("return_route")) sections.add("return_route");
   if (enabled.has("alerts") || enabled.has("latency_trend")) sections.add("alerts");
   return [...sections];
+}
+
+export function dashboardSettingsEqual(
+  left: DashboardSettings,
+  right: DashboardSettings,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function dashboardChartSections(settings: DashboardSettings): string[] {

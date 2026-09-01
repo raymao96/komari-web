@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ADMIN_IDLE_WARMUP_FALLBACK_MS,
   ADMIN_IDLE_WARMUP_SLICE_TIMEOUT_MS,
+  ADMIN_IDLE_WARMUP_START_DELAY_MS,
   expandAdminPreloadTargets,
   getIdleAdminWarmupTargets,
   scheduleIdleAdminWarmup,
@@ -11,14 +12,20 @@ import {
   type AdminIdleWarmupTimers,
 } from "../src/utils/adminPreload.ts";
 
+test("idle warmup waits until after the first admin paint", () => {
+  assert.equal(ADMIN_IDLE_WARMUP_START_DELAY_MS, 4000);
+});
+
 test("idle warmup skips the current page and throttles 3g", () => {
   assert.deepEqual(getIdleAdminWarmupTargets("/admin"), [
     "/admin/servers",
+    "/admin/billing",
     "/admin/ping",
     "/admin/return-route",
   ]);
   assert.deepEqual(getIdleAdminWarmupTargets("/admin/ping"), [
     "/admin/servers",
+    "/admin/billing",
     "/admin/return-route",
   ]);
   assert.deepEqual(

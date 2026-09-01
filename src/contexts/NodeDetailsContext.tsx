@@ -118,15 +118,16 @@ const NodeDetailsProviderValue: React.FC<{ children: React.ReactNode }> = ({
         const nodes = await hydrateLegacyDeploymentStatuses(data);
         if (sequence !== requestSequence.current) return;
         setNodeDetail(nodes);
+        setLoadedAccount(targetAccount);
       })
       .catch((error: unknown) => {
         if (sequence !== requestSequence.current) return;
+        setNodeDetail([]);
         setError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => {
         if (sequence === requestSequence.current) {
           activeRequestAccount.current = null;
-          setLoadedAccount(targetAccount);
         }
       });
   }, []);
@@ -136,34 +137,22 @@ const NodeDetailsProviderValue: React.FC<{ children: React.ReactNode }> = ({
   }, [accountKey, load]);
 
   React.useEffect(() => {
-    if (accountLoading) {
-      if (
-        !activeRequestAccount.current &&
-        loadedAccount !== PREAUTHENTICATED_NODE_DATA
-      ) {
-        load(PREAUTHENTICATED_NODE_DATA);
+    if (accountLoading || !account?.logged_in || !accountKey) {
+      if (!accountLoading && !account?.logged_in) {
+        requestSequence.current += 1;
+        activeRequestAccount.current = null;
+        setNodeDetail([]);
+        setError(null);
+        setLoadedAccount(null);
       }
       return;
     }
-
-    if (!account?.logged_in) {
-      requestSequence.current += 1;
-      activeRequestAccount.current = null;
-      setNodeDetail([]);
-      setError(null);
-      setLoadedAccount(null);
-      return;
-    }
-    if (!accountKey) return;
 
     if (loadedAccount === PREAUTHENTICATED_NODE_DATA) {
       setLoadedAccount(accountKey);
       return;
     }
-    if (
-      loadedAccount !== accountKey &&
-      activeRequestAccount.current !== PREAUTHENTICATED_NODE_DATA
-    ) {
+    if (loadedAccount !== accountKey) {
       load(accountKey);
     }
   }, [account?.logged_in, accountKey, accountLoading, load, loadedAccount]);

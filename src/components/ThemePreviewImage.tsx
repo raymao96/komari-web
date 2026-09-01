@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { Box, Flex, Text } from "@/components/admin/ui";
 import { Image as ImageIcon } from "lucide-react";
 import { resolveThemePreviewStatus } from "@/utils/themePreviewImage";
 

@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   fetchAccount,
   isAdminNodeBootstrapLoading,
+  planAdminSettingsFetch,
   resolveAdminAuthView,
+  shouldOpenRpc2Socket,
   submitPasswordLogin,
 } from "../src/utils/adminAuth.ts";
 
@@ -30,6 +32,46 @@ test("未登录时只进入登录视图", () => {
     }),
     "login",
   );
+});
+
+test("只有已登录才拉管理设置，未登录和核对中都丢弃", () => {
+  assert.equal(
+    planAdminSettingsFetch({
+      hasAccountContext: false,
+      accountLoading: false,
+      loggedIn: false,
+    }),
+    "fetch",
+  );
+  assert.equal(
+    planAdminSettingsFetch({
+      hasAccountContext: true,
+      accountLoading: true,
+      loggedIn: false,
+    }),
+    "reset",
+  );
+  assert.equal(
+    planAdminSettingsFetch({
+      hasAccountContext: true,
+      accountLoading: false,
+      loggedIn: false,
+    }),
+    "reset",
+  );
+  assert.equal(
+    planAdminSettingsFetch({
+      hasAccountContext: true,
+      accountLoading: false,
+      loggedIn: true,
+    }),
+    "fetch",
+  );
+});
+
+test("只有已登录才打开管理 RPC 套接字", () => {
+  assert.equal(shouldOpenRpc2Socket(false), false);
+  assert.equal(shouldOpenRpc2Socket(true), true);
 });
 
 test("已登录后才进入后台视图", () => {
@@ -67,6 +109,7 @@ test("登录成功后刷新外层账户信息", async () => {
     fetcher: async (input, init) => {
       assert.equal(input, "/api/login");
       assert.equal(init?.method, "POST");
+      assert.equal(init?.credentials, "same-origin");
       assert.deepEqual(JSON.parse(String(init?.body)), {
         username: "admin",
         password: "secret",

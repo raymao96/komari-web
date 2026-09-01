@@ -69,3 +69,6 @@ coverage/
 vite.config.dev.ts
 todo.md
 .codex
+
+# Cursor editor rules stay on this machine.
+.cursor/

@@ -1,7 +1,9 @@
-import { Dialog, Text } from "@radix-ui/themes";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
+import { getAppAssetUrl } from "@/utils/assetUrl";
 
 type LoginIdentityHeaderProps = {
   dialog?: boolean;
@@ -12,31 +14,28 @@ export default function LoginIdentityHeader({
 }: LoginIdentityHeaderProps) {
   const { t } = useTranslation();
   const { publicInfo } = usePublicInfo();
-  const title = publicInfo?.sitename || "Komari Lite";
+  const title = publicInfo?.sitename || "Lite";
 
   return (
-    <header className="mb-6 flex items-center gap-3">
-      <img src="/favicon.ico" alt="" className="size-12 shrink-0 object-contain" />
-      <div className="min-w-0">
-        {dialog ? (
-          <Dialog.Title size="5" mb="0" className="truncate">
-            {title}
-          </Dialog.Title>
-        ) : (
-          <Text as="div" size="5" weight="bold" className="truncate">
-            {title}
-          </Text>
-        )}
-        {dialog ? (
-          <Dialog.Description size="2" color="gray">
-            {t("login.desc")}
-          </Dialog.Description>
-        ) : (
-          <Text as="div" size="2" color="gray">
-            {t("login.desc")}
-          </Text>
-        )}
-      </div>
-    </header>
+    <Box
+      component="header"
+      data-login-identity={dialog ? "dialog" : "page"}
+      sx={{ mb: 3, display: "flex", alignItems: "center", gap: 1.5 }}
+    >
+      <Box
+        component="img"
+        src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
+        alt=""
+        sx={{ width: 48, height: 48, flexShrink: 0, objectFit: "contain" }}
+      />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="h6" noWrap sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {t("login.desc")}
+        </Typography>
+      </Box>
+    </Box>
   );
 }

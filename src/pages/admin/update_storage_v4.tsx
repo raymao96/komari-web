@@ -1,25 +1,16 @@
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Button,
-  Callout,
-  Flex,
-  Heading,
-  Progress,
-  Text,
-} from "@radix-ui/themes";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Database,
-  LoaderCircle,
-  RefreshCw,
-} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { CheckCircle2, RefreshCw } from "lucide-react";
 
-import GuideHeader from "@/components/GuideHeader";
-import RestrictedLoginDialog, {
-  type RestrictedAuthStatus,
-} from "@/components/RestrictedLoginDialog";
+import MigrationGuideShell from "@/components/install/MigrationGuideShell";
+import { isGuidePreview } from "@/utils/guidePreview";
+import { useSearchParams } from "react-router-dom";
 
 const API_BASE = "/api/admin/update/storage-v4";
 const I18N_PREFIX = "settings.update_storage_v4";
@@ -46,12 +37,6 @@ type MigrationStatus = {
   error?: string;
 };
 
-type Me = { logged_in: boolean; username: string };
-type AuthStatus = RestrictedAuthStatus & Me;
-type LoginMethods = Pick<
-  RestrictedAuthStatus,
-  "oauth_enabled" | "oauth_provider" | "password_login_enabled"
->;
 type APIResponse<T> = { status: "success" | "error"; message: string; data?: T };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -69,12 +54,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-async function getMe(): Promise<Me> {
-  const response = await fetch("/api/me", { cache: "no-store" });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return (await response.json()) as Me;
-}
-
 export default function StorageV4Upgrade() {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language || "en-US";
@@ -82,59 +61,53 @@ export default function StorageV4Upgrade() {
     (value: number) => new Intl.NumberFormat(locale).format(value),
     [locale],
   );
-  const [auth, setAuth] = useState<AuthStatus | null>(null);
-  const [status, setStatus] = useState<MigrationStatus | null>(null);
+  const [searchParams] = useSearchParams();
+  const preview = searchParams.get("preview") === "1" || isGuidePreview();
+  const [status, setStatus] = useState<MigrationStatus | null>(() =>
+    isGuidePreview() ? previewStatus() : null,
+  );
   const [pageError, setPageError] = useState("");
   const [retrying, setRetrying] = useState(false);
 
-  const refreshAuth = useCallback(async () => {
-    try {
-      const [methods, me] = await Promise.all([
-        request<LoginMethods>("/auth"),
-        getMe(),
-      ]);
-      const next = { ...methods, ...me };
-      setAuth(next);
-      return next;
-    } catch (error) {
-      setPageError(error instanceof Error ? error.message : t(`${I18N_PREFIX}.network_error`));
-      return null;
-    }
-  }, [t]);
-
   const refreshStatus = useCallback(async () => {
+    if (preview) {
+      const next = previewStatus();
+      setStatus(next);
+      setPageError("");
+      return next;
+    }
     try {
       const next = await request<MigrationStatus>("/status");
       setStatus(next);
       setPageError("");
       return next;
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Unauthorized")) {
-        setAuth((current) => current && { ...current, logged_in: false });
-      } else {
-        setPageError(error instanceof Error ? error.message : t(`${I18N_PREFIX}.network_error`));
-      }
+      setPageError(error instanceof Error ? error.message : t(`${I18N_PREFIX}.network_error`));
       return null;
     }
-  }, [t]);
+  }, [preview, t]);
 
   useEffect(() => {
-    void refreshAuth().then((next) => {
-      if (next?.logged_in) void refreshStatus();
-    });
-  }, [refreshAuth, refreshStatus]);
+    if (preview) {
+      setPageError("");
+      setStatus(previewStatus());
+      return;
+    }
+    void refreshStatus();
+  }, [preview, refreshStatus]);
 
   useEffect(() => {
-    if (!auth?.logged_in || status?.state === "completed" || status?.state === "failed") return;
+    if (preview) return;
+    if (status?.state === "completed" || status?.state === "failed") return;
     const timer = window.setInterval(() => void refreshStatus(), 500);
     return () => window.clearInterval(timer);
-  }, [auth?.logged_in, refreshStatus, status?.state]);
+  }, [preview, refreshStatus, status?.state]);
 
   useEffect(() => {
-    if (status?.state !== "completed") return;
+    if (preview || status?.state !== "completed") return;
     const timer = window.setTimeout(() => window.location.replace("/"), 2400);
     return () => window.clearTimeout(timer);
-  }, [status?.state]);
+  }, [preview, status?.state]);
 
   const phaseText = useMemo(() => {
     const key = status?.phase || "preparing";
@@ -156,119 +129,136 @@ export default function StorageV4Upgrade() {
     }
   };
 
+  const operating = status?.state === "migrating" || status?.state === "pending";
+  const progress =
+    operating && status
+      ? {
+          value: status.progress ?? 0,
+          label: phaseText,
+          detail: t(`${I18N_PREFIX}.progress_detail`, {
+            done: formatNumber(status.current ?? 0),
+            total: formatNumber(status.total ?? status.summary.source_rows ?? 0),
+          }),
+          determinate: (status.total ?? 0) > 0,
+        }
+      : null;
+
   return (
-    <main className="min-h-screen bg-[var(--color-background)] text-[var(--gray-12)]">
-      <header className="border-b bg-[var(--color-panel-solid)]" style={{ borderColor: "var(--gray-a5)" }}>
-        <div className="mx-auto box-border w-full max-w-5xl px-4 py-3 sm:px-6">
-          <GuideHeader />
-        </div>
-      </header>
-
-      <div className="mx-auto box-border w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-        <Flex direction="column" gap="5">
-          <div>
-            <Flex align="center" gap="3">
-              <Database size={28} />
-              <Heading size="7" weight="bold">{t(`${I18N_PREFIX}.title`)}</Heading>
-            </Flex>
-            <Text as="p" size="2" color="gray" mt="2">{t(`${I18N_PREFIX}.subtitle`)}</Text>
-          </div>
-
-          {pageError && (
-            <Callout.Root color="red" variant="surface">
-              <Callout.Icon><AlertTriangle size={18} /></Callout.Icon>
-              <Callout.Text>{pageError}</Callout.Text>
-            </Callout.Root>
-          )}
+    <MigrationGuideShell
+      title={t(`${I18N_PREFIX}.title`)}
+      subtitle={t(`${I18N_PREFIX}.subtitle`)}
+      progress={progress}
+    >
+      <Stack spacing={2}>
+          {pageError && !preview ? <Alert severity="error">{pageError}</Alert> : null}
 
           {status?.state === "completed" ? (
-            <Callout.Root color="green" variant="surface" size="3">
-              <Callout.Icon><CheckCircle2 size={22} /></Callout.Icon>
-              <Callout.Text>
-                <Text as="div" weight="bold">{t(`${I18N_PREFIX}.completed_title`)}</Text>
-                <Text as="div" mt="1">{t(`${I18N_PREFIX}.completed_description`)}</Text>
-              </Callout.Text>
-            </Callout.Root>
-          ) : (
-            <section
-              className="w-full min-w-0 rounded-lg border p-5"
-              style={{ borderColor: "var(--gray-a5)" }}
+            <Alert
+              severity="success"
+              icon={<CheckCircle2 size={22} />}
+              sx={{ alignItems: "flex-start" }}
             >
-              <Heading as="h2" size="4">{t(`${I18N_PREFIX}.progress_title`)}</Heading>
-              <Text as="p" size="2" color="gray" mt="1">{phaseText}</Text>
-              <Flex direction="column" gap="4" className="mt-4 w-full min-w-0">
-                <Flex justify="between" align="center" gap="3">
-                  <Text size="2" color="gray">
-                    {t(`${I18N_PREFIX}.progress_detail`, {
-                      done: formatNumber(status?.current ?? 0),
-                      total: formatNumber(status?.total ?? status?.summary.source_rows ?? 0),
-                    })}
-                  </Text>
-                  <Text weight="bold" className="tabular-nums">
-                    {Math.round(status?.progress ?? 0)}%
-                  </Text>
-                </Flex>
-                <Progress value={status?.progress ?? 0} size="3" />
-                <div className="grid min-w-0 gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--gray-a5)" }}>
-                  <Metric label={t(`${I18N_PREFIX}.preserved`)} value={formatNumber(status?.preserved ?? 0)} />
-                  <Metric label={t(`${I18N_PREFIX}.deferred`)} value={formatNumber(status?.deferred ?? 0)} />
-                  <Metric label={t(`${I18N_PREFIX}.source_rows`)} value={formatNumber(status?.summary.source_rows ?? 0)} />
-                  <Metric label={t(`${I18N_PREFIX}.elapsed`)} value={formatElapsed(status?.elapsed_ms ?? 0)} />
-                </div>
-              </Flex>
-            </section>
-          )}
+              <Typography variant="subtitle2">{t(`${I18N_PREFIX}.completed_title`)}</Typography>
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                {t(`${I18N_PREFIX}.completed_description`)}
+              </Typography>
+            </Alert>
+          ) : null}
 
-          {(status?.deferred ?? 0) > 0 && status?.state !== "failed" && (
-            <Callout.Root color="amber" variant="surface">
-              <Callout.Icon><AlertTriangle size={18} /></Callout.Icon>
-              <Callout.Text>{t(`${I18N_PREFIX}.deferred_hint`, { count: status?.deferred ?? 0 })}</Callout.Text>
-            </Callout.Root>
-          )}
+          {status && status.state !== "completed" ? (
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, minmax(0, 1fr))" },
+              }}
+            >
+              <Metric label={t(`${I18N_PREFIX}.preserved`)} value={formatNumber(status.preserved ?? 0)} />
+              <Metric label={t(`${I18N_PREFIX}.deferred`)} value={formatNumber(status.deferred ?? 0)} />
+              <Metric
+                label={t(`${I18N_PREFIX}.source_rows`)}
+                value={formatNumber(status.summary.source_rows ?? 0)}
+              />
+              <Metric label={t(`${I18N_PREFIX}.elapsed`)} value={formatElapsed(status.elapsed_ms ?? 0)} />
+            </Box>
+          ) : null}
 
-          {status?.state === "failed" && (
-            <Callout.Root color="red" variant="surface">
-              <Callout.Icon><AlertTriangle size={18} /></Callout.Icon>
-              <Callout.Text>
-                <Text as="div" weight="bold">{t(`${I18N_PREFIX}.failed_title`)}</Text>
-                <Text as="div" mt="1" className="break-all">{status.error}</Text>
-                <Text as="div" mt="1">{t(`${I18N_PREFIX}.failed_hint`)}</Text>
-                <Button mt="3" color="red" variant="soft" disabled={retrying} onClick={() => void retry()}>
-                  {retrying ? <LoaderCircle size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                  {t(`${I18N_PREFIX}.retry`)}
-                </Button>
-              </Callout.Text>
-            </Callout.Root>
-          )}
+          {(status?.deferred ?? 0) > 0 && status?.state !== "failed" ? (
+            <Alert severity="warning">
+              {t(`${I18N_PREFIX}.deferred_hint`, { count: status?.deferred ?? 0 })}
+            </Alert>
+          ) : null}
 
-          {!status && !pageError && (
-            <Flex align="center" gap="2" py="6" justify="center">
-              <LoaderCircle size={18} className="animate-spin" />
-              <Text color="gray">{t(`${I18N_PREFIX}.loading`)}</Text>
-            </Flex>
-          )}
-        </Flex>
-      </div>
+          {status?.state === "failed" ? (
+            <Alert severity="error" sx={{ alignItems: "flex-start" }}>
+              <Typography variant="subtitle2">{t(`${I18N_PREFIX}.failed_title`)}</Typography>
+              <Typography variant="body2" sx={{ mt: 0.5, overflowWrap: "anywhere" }}>
+                {status.error}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                {t(`${I18N_PREFIX}.failed_hint`)}
+              </Typography>
+              <Button
+                sx={{ mt: 1.5 }}
+                color="error"
+                variant="outlined"
+                disabled={retrying}
+                startIcon={
+                  retrying ? <CircularProgress size={16} /> : <RefreshCw size={16} />
+                }
+                onClick={() => void retry()}
+              >
+                {t(`${I18N_PREFIX}.retry`)}
+              </Button>
+            </Alert>
+          ) : null}
 
-      <RestrictedLoginDialog
-        auth={auth}
-        requestFailedKey={`${I18N_PREFIX}.login_failed`}
-        onAuthenticated={async () => {
-          const next = await refreshAuth();
-          if (next?.logged_in) await refreshStatus();
-        }}
-      />
-    </main>
+          {!status && !pageError ? (
+            <Stack direction="row" spacing={1.25} sx={{ py: 4, justifyContent: "center", alignItems: "center" }}>
+              <CircularProgress size={18} />
+              <Typography color="text.secondary">{t(`${I18N_PREFIX}.loading`)}</Typography>
+            </Stack>
+          ) : null}
+      </Stack>
+    </MigrationGuideShell>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
-      <Text as="div" size="1" color="gray">{label}</Text>
-      <Text as="div" size="4" weight="bold" mt="1" className="break-words tabular-nums">{value}</Text>
-    </div>
+    <Box sx={{ minWidth: 0 }}>
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography
+        variant="h6"
+        sx={{ mt: 0.5, fontWeight: 700, overflowWrap: "anywhere", fontVariantNumeric: "tabular-nums" }}
+      >
+        {value}
+      </Typography>
+    </Box>
   );
+}
+
+function previewStatus(): MigrationStatus {
+  return {
+    state: "migrating",
+    phase: "encoding_points",
+    current: 12840,
+    total: 20000,
+    preserved: 12600,
+    deferred: 12,
+    progress: 64,
+    elapsed_ms: 185000,
+    summary: {
+      required: true,
+      layout: "normalized",
+      source_rows: 20000,
+      legacy_blocks: 0,
+      legacy_digest_blocks: 0,
+      legacy_axis_blocks: 0,
+    },
+  };
 }
 
 function formatElapsed(milliseconds: number) {

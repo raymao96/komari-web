@@ -6,16 +6,17 @@ import {
     Button,
     Card,
     Flex,
+    IconButton,
     Text,
     Badge,
-    Popover,
-    TextField
-} from "@radix-ui/themes";
-import { Play, AlertCircle, CheckCircle2, ChevronDown, Copy, Clock } from "lucide-react";
+    Popover
+} from "@/components/admin/ui";
+import MuiButton from "@mui/material/Button";
+import MuiTextField from "@mui/material/TextField";
+import { AlertCircle, CheckCircle2, Copy, Clock } from "@/components/admin/muiIcons";
 import { toast } from "sonner";
 import RemoteExecNodeSelector from "@/components/remote/RemoteExecNodeSelector";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import { SettingCardCollapse } from "@/components/admin/SettingCard";
 import { useAccount } from "@/contexts/AccountContext";
 import {
     AdminPagination,
@@ -437,13 +438,14 @@ const ExecContent = () => {
 
 
                     <div>
-                        <SettingCardCollapse title={t("exec.selectNodes")} defaultOpen>
-                            <RemoteExecNodeSelector
-                                nodes={nodeDetail}
-                                value={selectedNodes}
-                                onChange={setSelectedNodes}
-                            />
-                        </SettingCardCollapse>
+                        <div className="mb-3 text-sm font-semibold text-[var(--gray-12)]">
+                            {t("exec.selectNodes")}
+                        </div>
+                        <RemoteExecNodeSelector
+                            nodes={nodeDetail}
+                            value={selectedNodes}
+                            onChange={setSelectedNodes}
+                        />
                         {selectedNodes.length > 0 && (
                             <Flex align="center" gap="2" wrap="wrap" className="mt-2">
                                 <Text size="2" color="gray">
@@ -459,7 +461,6 @@ const ExecContent = () => {
                                         <Popover.Trigger>
                                             <Button size="1" variant="soft" className="tabular-nums">
                                                 +{hiddenSelectedNodeCount}
-                                                <ChevronDown size={13} />
                                             </Button>
                                         </Popover.Trigger>
                                         <Popover.Content
@@ -484,22 +485,33 @@ const ExecContent = () => {
                         )}
                     </div>
 
-                    <Flex justify="end" gap="2" className="flex-col sm:flex-row">
-                        <TextField.Root
+                    <div className="remote-exec-actions flex flex-col justify-end gap-2 rounded-md border border-[var(--gray-a5)] bg-[var(--gray-a2)] p-3 sm:flex-row sm:items-center">
+                        <MuiTextField
+                            size="small"
                             className="w-full sm:w-64"
                             type="text"
                             inputMode="numeric"
                             autoComplete="one-time-code"
-                            maxLength={6}
                             aria-label={t("admin.nodeTable.twoFactorCode")}
                             placeholder={t("admin.nodeTable.twoFactorCode")}
                             value={twoFaCode}
                             onChange={(e) => setTwoFaCode((e.target as HTMLInputElement).value.replace(/\D/g, "").slice(0, 6))}
+                            slotProps={{ htmlInput: { maxLength: 6 } }}
+                            sx={{
+                                "& .MuiOutlinedInput-root": {
+                                    height: 40,
+                                    borderRadius: "8px",
+                                    bgcolor: "background.paper",
+                                },
+                            }}
                         />
-                        <Button
+                        <MuiButton
+                            variant="contained"
+                            disableElevation
                             className="w-full sm:w-auto"
                             onClick={executeCommand}
                             disabled={executing || !command.trim() || selectedNodes.length === 0 || (twoFaEnabled && !twoFaCode.trim())}
+                            sx={{ minWidth: 120, height: 40, borderRadius: "8px", textTransform: "none", fontWeight: 600 }}
                         >
                             {executing ? (
                                 <>
@@ -507,13 +519,10 @@ const ExecContent = () => {
                                     {t("exec.executing")}
                                 </>
                             ) : (
-                                <>
-                                    <Play size={16} />
-                                    {t("exec.execute")}
-                                </>
+                                t("exec.execute")
                             )}
-                        </Button>
-                    </Flex>
+                        </MuiButton>
+                    </div>
                 </Flex>
             </section>
 
@@ -579,13 +588,14 @@ const ExecContent = () => {
                                                 </Flex>
 
                                                 {result.result && (
-                                                    <Button
+                                                    <IconButton
                                                         variant="ghost"
                                                         size="1"
+                                                        title={t("common.copy")}
                                                         onClick={() => copyOutput(result.result)}
                                                     >
                                                         <Copy size={14} />
-                                                    </Button>
+                                                    </IconButton>
                                                 )}
                                             </Flex>
 

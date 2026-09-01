@@ -1,29 +1,24 @@
-import React, { StrictMode, useMemo } from "react";
+import React, { lazy, StrictMode, Suspense, useCallback, useLayoutEffect, useMemo } from "react";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import "./global.css";
-import { Theme } from "@radix-ui/themes";
-import "@radix-ui/themes/styles.css";
 import {
   ThemeContext,
   THEME_DEFAULTS,
   type Appearance,
-  type Colors,
 } from "./contexts/ThemeContext";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useSystemTheme } from "./hooks/useSystemTheme";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, useRoutes } from "react-router-dom";
 // Ensure i18n is initialized before any component renders
-import "./i18n/config";
+import { i18nReady } from "./i18n/config";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { Suspense } from "react";
-import { useRoutes } from "react-router-dom";
 import { preloadAdminEntry, preloadAdminRoute, routes } from "./routes";
 import Loading from "./components/loading";
 import { PublicInfoProvider } from "./contexts/PublicInfoContext";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { Toaster } from "./components/ui/sonner";
 import { RPC2Provider } from "./contexts/RPC2Context";
-import { NodeListProvider } from "./contexts/NodeListContext";
 import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import FullPageLoading from "./components/FullPageLoading";
@@ -34,6 +29,16 @@ import {
   scheduleIdleAdminWarmup,
 } from "./utils/adminPreload";
 import { prefetchAdminDashboard } from "./utils/dashboardPrefetch";
+import MuiAppProvider from "./theme/MuiAppProvider";
+import { applyAppearanceChrome } from "./theme/appearanceChrome";
+import { clientCookieSuffix, isSafeTempKey } from "./utils/security";
+
+const RadixThemeRoot = lazy(() => import("./theme/RadixThemeRoot"));
+
+const appShellStyle = {
+  backgroundColor: "transparent",
+  minHeight: "var(--app-viewport-height, 100vh)",
+} as const;
 
 const AdminRoutePreloader = () => {
   const { account } = useAccount();
@@ -44,6 +49,7 @@ const AdminRoutePreloader = () => {
     const pathname = window.location.pathname.replace(/\/$/, "") || "/";
     if (pathname === "/admin") {
       void prefetchAdminDashboard(accountKey).catch(() => undefined);
+      void preloadAdminRoute("/admin/settings/dashboard").catch(() => undefined);
     }
     const connection = (
       navigator as Navigator & {
@@ -103,8 +109,8 @@ const App = () => {
     const params = new URLSearchParams(window.location.search);
     const tempKey = params.get("temp_key");
 
-    if (tempKey) {
-      document.cookie = `temp_key=${tempKey}; path=/; max-age=${60 * 60 * 24 * 365 * 100}`;
+    if (tempKey && isSafeTempKey(tempKey)) {
+      document.cookie = `temp_key=${encodeURIComponent(tempKey)}; max-age=${60 * 60 * 24 * 365 * 100}${clientCookieSuffix()}`;
       params.delete("temp_key");
       window.history.replaceState(
         {},
@@ -113,82 +119,107 @@ const App = () => {
       );
     }
   }, []);
+  React.useEffect(() => {
+    try {
+      window.localStorage.removeItem("color");
+    } catch {
+      /* leftover Radix accent from older builds */
+    }
+  }, []);
   const [appearance, setAppearance] = useLocalStorage<Appearance>(
     "appearance",
     THEME_DEFAULTS.appearance,
   );
-  const [color, setColor] = useLocalStorage<Colors>(
-    "color",
-    THEME_DEFAULTS.color,
-  );
 
-  // Use the system theme hook to resolve "system" to actual theme
   const resolvedAppearance = useSystemTheme(appearance);
 
-  React.useEffect(() => {
-    const isDark = resolvedAppearance === "dark";
-    document.documentElement.classList.toggle("dark", isDark);
+  useLayoutEffect(() => {
+    applyAppearanceChrome(resolvedAppearance === "dark");
   }, [resolvedAppearance]);
+
+  const setAppearanceSynced = useCallback(
+    (value: Appearance) => {
+      const resolved =
+        value === "system"
+          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+          : value;
+      applyAppearanceChrome(resolved === "dark");
+      flushSync(() => {
+        setAppearance(value);
+      });
+    },
+    [setAppearance],
+  );
 
   const themeContextValue = useMemo(
     () => ({
       appearance,
-      setAppearance,
-      color,
-      setColor,
+      setAppearance: setAppearanceSynced,
     }),
-    [appearance, setAppearance, color, setColor],
+    [appearance, setAppearanceSynced],
   );
   const routing = useRoutes(routes);
+  const appTree = isRestrictedGuideRoute ? (
+    <PublicInfoProvider>
+      <DocumentTitle />
+      <Toaster />
+      <Suspense fallback={<Loading fullscreen />}>
+        {routing}
+      </Suspense>
+    </PublicInfoProvider>
+  ) : (
+    <AccountProvider>
+      <AccountPreferenceSync />
+      <AdminRoutePreloader />
+      <RPC2Provider>
+        <PublicInfoProvider>
+          <DocumentTitle />
+          <Toaster />
+          <OfflineIndicator />
+          <Suspense
+            fallback={isAdminRoute ? <FullPageLoading /> : <Loading fullscreen />}
+          >
+            {routing}
+          </Suspense>
+        </PublicInfoProvider>
+      </RPC2Provider>
+    </AccountProvider>
+  );
   return (
     <ThemeContext.Provider value={themeContextValue}>
-      <Theme
-          appearance={resolvedAppearance}
-          accentColor={color}
-          scaling="110%"
-          className="theme-root"
-          style={{
-            backgroundColor: "transparent",
-            minHeight: "var(--app-viewport-height, 100vh)",
-          }}
+      <MuiAppProvider appearance={resolvedAppearance}>
+      <ErrorBoundary>
+      {isAdminRoute ? (
+        <div className="theme-root" style={appShellStyle}>
+          {appTree}
+        </div>
+      ) : (
+        <Suspense
+          fallback={
+            <div className="theme-root" style={appShellStyle}>
+              <Loading fullscreen />
+            </div>
+          }
         >
-		{isRestrictedGuideRoute ? (
-		  <PublicInfoProvider>
-			<DocumentTitle />
-			<Toaster />
-			<Suspense fallback={<Loading />}>{routing}</Suspense>
-		  </PublicInfoProvider>
-		) : (
-		  <AccountProvider>
-			<AccountPreferenceSync />
-			<AdminRoutePreloader />
-			<RPC2Provider>
-			  <PublicInfoProvider>
-				<DocumentTitle />
-				<NodeListProvider>
-				  <Toaster />
-				  <OfflineIndicator />
-				  <Suspense
-					fallback={isAdminRoute ? <FullPageLoading /> : <Loading />}
-				  >
-					{routing}
-				  </Suspense>
-				</NodeListProvider>
-			  </PublicInfoProvider>
-			</RPC2Provider>
-		  </AccountProvider>
-		)}
-      </Theme>
+          <RadixThemeRoot appearance={resolvedAppearance} scaling="110%">
+            {appTree}
+          </RadixThemeRoot>
+        </Suspense>
+      )}
+      </ErrorBoundary>
+      </MuiAppProvider>
     </ThemeContext.Provider>
   );
 };
 
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
+void i18nReady.then(() => {
+  createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <BrowserRouter>
         <App />
       </BrowserRouter>
-    </StrictMode>
-  </ErrorBoundary>,
-);
+    </StrictMode>,
+  );
+});

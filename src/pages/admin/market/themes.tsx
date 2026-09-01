@@ -1,7 +1,18 @@
-import Loading from "@/components/loading";
 import { useSettings } from "@/lib/api";
 import { resolveI18nText, type I18nText } from "@/utils/i18nText";
 import {
+  getThemeMarketSnapshot,
+  loadThemeMarketSources,
+  prefetchThemeMarket,
+  refreshThemeMarketCatalog,
+  themeMarketRequest as request,
+  type MarketSource,
+  type MarketSourceStatus,
+  type MarketTheme,
+  type ThemeMarketSnapshot,
+} from "@/lib/themeMarket";
+import {
+  AppDialogContent,
   Badge,
   Box,
   Button,
@@ -15,7 +26,7 @@ import {
   Switch,
   Text,
   TextField,
-} from "@radix-ui/themes";
+} from "@/components/admin/ui";
 import {
   AlertTriangle,
   Download,
@@ -27,65 +38,17 @@ import {
   Search,
   Settings2,
   Trash2,
-} from "lucide-react";
+} from "@/components/admin/muiIcons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import AppDialogContent from "@/components/AppDialogContent";
 import ThemePreviewImage from "@/components/ThemePreviewImage";
 import { themePreviewSrc } from "@/utils/themePreviewImage";
 import {
   AdminPagination,
   useAdminPagination,
 } from "@/components/admin/AdminPagination";
-
-interface MarketSource {
-  id: string;
-  name: string;
-  url: string;
-  enabled: boolean;
-}
-
-interface MarketSourceStatus {
-  id: string;
-  name: string;
-  url: string;
-  count: number;
-  error?: string;
-}
-
-interface MarketTheme {
-  name: I18nText;
-  short: string;
-  description: I18nText;
-  version: string;
-  author: I18nText;
-  url: string;
-  preview: string;
-  download: string;
-  sha256: string;
-  installable: boolean;
-  source_id: string;
-  source_name: string;
-}
-
-interface InstalledTheme {
-  short: string;
-  version: string;
-}
-
-interface APIResponse<T> {
-  status: string;
-  message?: string;
-  data: T;
-}
-
-const emptySource = (): Omit<MarketSource, "id"> => ({
-  name: "",
-  url: "",
-  enabled: true,
-});
 
 function isVersionNewer(candidate: string, installed: string) {
   const parse = (value: string) => {
@@ -101,23 +64,25 @@ function isVersionNewer(candidate: string, installed: string) {
   return false;
 }
 
-async function request<T>(input: RequestInfo | URL, init?: RequestInit) {
-  const response = await fetch(input, init);
-  const payload = (await response.json().catch(() => null)) as APIResponse<T> | null;
-  if (!response.ok || !payload || payload.status === "error") {
-    throw new Error(payload?.message || `HTTP ${response.status}`);
-  }
-  return payload;
-}
+const emptySource = (): Omit<MarketSource, "id"> => ({
+  name: "",
+  url: "",
+  enabled: true,
+});
 
 export default function ThemeMarketPage() {
   const { t, i18n } = useTranslation();
-  const [themes, setThemes] = useState<MarketTheme[]>([]);
-  const [sourceStatuses, setSourceStatuses] = useState<MarketSourceStatus[]>([]);
-  const [sources, setSources] = useState<MarketSource[]>([]);
-  const [installed, setInstalled] = useState<Map<string, string>>(new Map());
+  const snapshot = getThemeMarketSnapshot();
+  const [themes, setThemes] = useState(snapshot?.themes ?? []);
+  const [sourceStatuses, setSourceStatuses] = useState<MarketSourceStatus[]>(
+    snapshot?.sourceStatuses ?? [],
+  );
+  const [sources, setSources] = useState<MarketSource[]>(snapshot?.sources ?? []);
+  const [installed, setInstalled] = useState<Map<string, string>>(
+    () => new Map(snapshot?.installed ?? []),
+  );
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => snapshot === null);
   const [refreshing, setRefreshing] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -137,31 +102,27 @@ export default function ThemeMarketPage() {
     [language],
   );
 
+  const applySnapshot = useCallback((next: ThemeMarketSnapshot) => {
+    setThemes(next.themes);
+    setSourceStatuses(next.sourceStatuses);
+    setSources(next.sources);
+    setInstalled(new Map(next.installed));
+  }, []);
+
   const loadSources = useCallback(async () => {
-    const payload = await request<MarketSource[]>("/api/admin/theme/market/sources");
-    setSources(payload.data || []);
+    setSources(await loadThemeMarketSources());
   }, []);
 
   const loadCatalog = useCallback(async (force = false) => {
-    const suffix = force ? "?refresh=true" : "";
-    const [catalogPayload, installedPayload] = await Promise.all([
-      request<{ themes: MarketTheme[]; sources: MarketSourceStatus[] }>(
-        `/api/admin/theme/market/catalog${suffix}`,
-      ),
-      request<InstalledTheme[]>("/api/admin/theme/list"),
-    ]);
-    setThemes(catalogPayload.data?.themes || []);
-    setSourceStatuses(catalogPayload.data?.sources || []);
-    setInstalled(
-      new Map((installedPayload.data || []).map((theme) => [theme.short, theme.version])),
-    );
-  }, []);
+    applySnapshot(await refreshThemeMarketCatalog(force));
+  }, [applySnapshot]);
 
   useEffect(() => {
-    Promise.all([loadCatalog(), loadSources()])
+    prefetchThemeMarket()
+      .then(applySnapshot)
       .catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
       .finally(() => setLoading(false));
-  }, [loadCatalog, loadSources]);
+  }, [applySnapshot]);
 
   const filteredThemes = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
@@ -302,10 +263,12 @@ export default function ThemeMarketPage() {
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) {
+    return <div data-admin-route-pending="true" />;
+  }
 
   return (
-    <Box className="space-y-5 p-0 md:p-4">
+    <Flex direction="column" gap="5" className="p-0 md:p-4">
       <Flex justify="between" align="center" gap="3" wrap="wrap">
         <AdminPageTitle
           description={t(
@@ -609,6 +572,6 @@ export default function ThemeMarketPage() {
           </Flex>
         </AppDialogContent>
       </Dialog.Root>
-    </Box>
+    </Flex>
   );
 }

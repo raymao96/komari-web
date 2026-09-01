@@ -1,4 +1,4 @@
-import { Flex, Spinner, Text } from "@radix-ui/themes";
+import { Flex, Spinner, Text } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 
 const FullPageLoading = () => {

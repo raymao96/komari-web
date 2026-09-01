@@ -11,6 +11,7 @@ import {
 const importAdminLayout = () => import("./pages/admin/_layout");
 const importAdminDashboard = () => import("./pages/admin/dashboard");
 const importAdminServers = () => import("./pages/admin");
+const importAdminBilling = () => import("./pages/admin/billing");
 const importAdminPing = () => import("./pages/admin/pingTask");
 const importAdminReturnRoute = () => import("./pages/admin/returnRoute");
 const importAdminSettingsLayout = () =>
@@ -18,6 +19,7 @@ const importAdminSettingsLayout = () =>
 let adminLayoutModule: ReturnType<typeof importAdminLayout> | undefined;
 let adminDashboardModule: ReturnType<typeof importAdminDashboard> | undefined;
 let adminServersModule: ReturnType<typeof importAdminServers> | undefined;
+let adminBillingModule: ReturnType<typeof importAdminBilling> | undefined;
 let adminPingModule: ReturnType<typeof importAdminPing> | undefined;
 let adminReturnRouteModule: ReturnType<typeof importAdminReturnRoute> | undefined;
 let adminSettingsLayoutModule: ReturnType<
@@ -27,6 +29,7 @@ const loadAdminLayout = () => (adminLayoutModule ??= importAdminLayout());
 const loadAdminDashboard = () =>
   (adminDashboardModule ??= importAdminDashboard());
 const loadAdminServers = () => (adminServersModule ??= importAdminServers());
+const loadAdminBilling = () => (adminBillingModule ??= importAdminBilling());
 const loadAdminPing = () => (adminPingModule ??= importAdminPing());
 const loadAdminReturnRoute = () =>
   (adminReturnRouteModule ??= importAdminReturnRoute());
@@ -41,11 +44,11 @@ export const preloadAdminEntry = (pathname: string) => {
 const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin": loadAdminDashboard,
   "/admin/servers": loadAdminServers,
+  "/admin/billing": loadAdminBilling,
   "/admin/ping": loadAdminPing,
   "/admin/return-route": loadAdminReturnRoute,
   "/admin/logs": () => import("./pages/admin/log"),
   "/admin/exec": () => import("./pages/admin/exec"),
-  "/admin/terminal": () => import("./pages/admin/terminal"),
   "/admin/theme_managed": () => import("./pages/admin/theme_managed.tsx"),
   "/admin/theme_raw": () => import("./pages/admin/theme_raw.tsx"),
   "/admin/market/themes": () => import("./pages/admin/market/themes"),
@@ -69,6 +72,52 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
 
 export const preloadAdminRoute = async (target: string): Promise<void> => {
   const pathname = normalizeAdminPathname(target);
+  if (pathname === "/admin/billing") {
+    void import("./utils/billing")
+      .then((mod) => mod.prefetchBillingCenter())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/settings/reverse-proxy") {
+    void import("./lib/https")
+      .then((mod) => mod.prefetchHTTPSSettings())
+      .catch(() => undefined);
+    void import("./lib/cloudflared")
+      .then((mod) => mod.prefetchCloudflaredStatus())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/settings/xtermjs") {
+    void import("./hooks/useXtermjsSettings")
+      .then((mod) => mod.prefetchXtermjsSettings())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/market/themes") {
+    void import("./lib/themeMarket")
+      .then((mod) => mod.prefetchThemeMarket())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/settings/theme") {
+    void import("./lib/themeList")
+      .then((mod) => mod.prefetchInstalledThemes())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/theme_managed") {
+    void import("./lib/themeManaged")
+      .then((mod) => mod.prefetchThemeManagedConfig())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/settings/dashboard") {
+    void import("./hooks/useDashboardSettings")
+      .then((mod) => mod.prefetchDashboardSettings())
+      .catch(() => undefined);
+  }
+  if (pathname === "/admin/settings/metrics") {
+    void import("./lib/metricDefinitions")
+      .then((mod) => mod.prefetchMetricDefinitions())
+      .catch(() => undefined);
+    void import("./components/admin/DatabaseMaintenanceCard")
+      .then((mod) => mod.prefetchDatabaseOverview())
+      .catch(() => undefined);
+  }
   await Promise.all(
     expandAdminPreloadTargets(pathname).map((path) => {
       const preload = adminRoutePreloaders[path];
@@ -88,6 +137,7 @@ export const preloadAdminRoutes = async (
 const AdminLayout = lazy(loadAdminLayout);
 const AdminDashboard = lazy(loadAdminDashboard);
 const AdminServers = lazy(loadAdminServers);
+const AdminBilling = lazy(loadAdminBilling);
 const AdminPing = lazy(loadAdminPing);
 const AdminReturnRoute = lazy(loadAdminReturnRoute);
 const AdminSettingsLayout = lazy(loadAdminSettingsLayout);
@@ -118,6 +168,16 @@ export const routes: RouteObject[] = [
       {
         path: "servers",
         element: React.createElement(AdminServers),
+      },
+      {
+        path: "billing",
+        element: React.createElement(AdminBilling),
+      },
+      {
+        path: "servers/:uuid",
+        element: React.createElement(
+          lazy(() => import("./pages/admin/NodeDetailPage")),
+        ),
       },
       {
         path: "theme_managed",
@@ -274,12 +334,6 @@ export const routes: RouteObject[] = [
       {
         path: "exec",
         element: React.createElement(lazy(() => import("./pages/admin/exec"))),
-      },
-      {
-        path: "terminal",
-        element: React.createElement(
-          lazy(() => import("./pages/admin/terminal")),
-        ),
       }
     ],
   },

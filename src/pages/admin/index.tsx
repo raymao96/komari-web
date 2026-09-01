@@ -1,10 +1,13 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import {
   quotePowerShellArg,
   quoteShellArg,
   quoteShellArgs,
 } from "@/utils/shellQuote";
 import { publicVersion } from "@/utils/version";
+import {
+  LITE_AGENT_DOCKER_IMAGE,
+  liteAgentInstallScriptUrl,
+} from "@/utils/agentInstall";
 import { normalizeOptionalServiceUrl } from "@/utils/serviceUrl";
 import { writeClipboardText } from "@/utils/clipboard";
 import React, { useEffect, useState } from "react";
@@ -13,7 +16,15 @@ import {
   useNodeDetails,
   type NodeDetail,
 } from "@/contexts/NodeDetailsContext";
+import { AdminMobileCardStack, AdminMobileListCard } from "@/components/admin/AdminMobileListCard";
+import Alert from "@mui/material/Alert";
+import MuiButton from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Typography from "@mui/material/Typography";
 import {
+  AppDialogContent,
   Flex,
   TextField,
   Button,
@@ -21,9 +32,10 @@ import {
   Dialog,
   IconButton,
   TextArea,
-  SegmentedControl,
   Callout,
-} from "@radix-ui/themes";
+  Badge,
+  Select,
+} from "@/components/admin/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   CircleDollarSign,
@@ -37,16 +49,16 @@ import {
   Pencil,
   Plus,
   Radar,
-  RotateCw,
   Save,
   Send,
   Settings,
   Terminal,
   Trash2Icon,
   XCircle,
-} from "lucide-react";
+} from "@/components/admin/muiIcons";
 import { Link, useSearchParams } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   DndContext,
   closestCenter,
@@ -64,6 +76,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import Flag from "@/components/Flag";
+import { NODE_OFFLINE, NODE_ONLINE } from "@/theme/brand";
 import {
   Table,
   TableBody,
@@ -74,11 +87,11 @@ import {
 } from "@/components/ui/table";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatBytes, stringToBytes } from "@/utils/unitHelper";
-import PriceTags from "@/components/PriceTags";
+import { normalizeBandwidth } from "@/utils/bandwidth";
+import PriceTags, { CustomTags } from "@/components/PriceTags";
 import Loading from "@/components/loading";
 import Tips from "@/components/ui/tips";
 import {
-  SettingCardCollapse,
   SettingCardSelect,
   SettingCardShortTextInput,
   SettingCardSwitch,
@@ -90,39 +103,40 @@ import {
 } from "@/lib/dateInput";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
 import { openRemoteTerminal } from "@/utils/remoteLaunch";
-import { localizeTokenRotationError } from "@/utils/tokenRotation";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import AdminActiveFilter from "@/components/admin/AdminActiveFilter";
-import AdminNodeStatusSummary, {
-  type AdminNodeStatusFilter,
-} from "@/components/admin/AdminNodeStatusSummary";
+import AdminNodeListFilters, {
+  type AdminNodeStatusValue,
+} from "@/components/admin/AdminNodeListFilters";
+import { ADMIN_LIST_ACTION_SX } from "@/components/admin/adminListLayout";
 import {
   AdminPagination,
 } from "@/components/admin/AdminPagination";
 import { useAdminDefaultPageSize } from "@/hooks/useAdminDefaultPageSize";
-import { useAdminNodeLiveData } from "@/hooks/use-admin-node-live-data";
 import {
-  getDashboardAlertItemsSnapshot,
-  requestDashboardAlertItems,
-  serverAlertKinds,
-} from "@/utils/adminAlertFilters";
-import { useAccount } from "@/contexts/AccountContext";
-import type {
-  DashboardAlertAffectedItem,
-  DashboardAlertKind,
-} from "@/utils/dashboard";
+  AdminNodeLiveDataProvider,
+  nodeOnlineState,
+  useAdminNodeLiveData,
+} from "@/hooks/use-admin-node-live-data";
 import {
   getRegionCode,
   getRegionDisplayName,
   getSupportedRegions,
 } from "@/utils/regionHelper";
+import {
+  dashboardAlertNodeUuidSet,
+  getDashboardAlertItemsSnapshot,
+  parseServerListAlertKind,
+  requestDashboardAlertItems,
+} from "@/utils/adminAlertFilters";
 
 
 const NodeDetailsPage = () => {
   return (
     <NodeDetailsProvider>
-      <Layout />
+      <AdminNodeLiveDataProvider>
+        <Layout />
+      </AdminNodeLiveDataProvider>
     </NodeDetailsProvider>
   );
 };
@@ -130,110 +144,117 @@ const NodeDetailsPage = () => {
 const PREVIOUS_PAGE_DROP_ID = "admin-node-previous-page";
 const NEXT_PAGE_DROP_ID = "admin-node-next-page";
 
+function nodeSearchHaystack(node: NodeDetail) {
+  return [
+    node.name,
+    node.ipv4,
+    node.ipv6,
+    node.group,
+    node.remark,
+    node.public_remark,
+    node.tags,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 const Layout = () => {
   const { t } = useTranslation();
-  const { account } = useAccount();
-  const accountKey = account?.uuid || account?.username || "authenticated";
   const { nodeDetail, isLoading, error, refresh } = useNodeDetails();
   const { settings, loading: settingsLoading } = useSettings();
   const { liveData, available } = useAdminNodeLiveData();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AdminNodeStatusFilter>("all");
+  const routeStatus = searchParams.get("status")?.trim();
+  const [statusFilters, setStatusFilters] = useState<AdminNodeStatusValue[]>(() =>
+    routeStatus === "offline" || routeStatus === "online" ? [routeStatus] : [],
+  );
+  const [regionFilters, setRegionFilters] = useState<string[]>([]);
+  const [groupFilters, setGroupFilters] = useState<string[]>([]);
   const routeNode = searchParams.get("node")?.trim() || "";
-  const alertParam = searchParams.get("alert")?.trim() as DashboardAlertKind | null;
-  const routeAlert = alertParam && serverAlertKinds.has(alertParam) ? alertParam : null;
-  const initialAlertSnapshot = routeAlert
-    ? getDashboardAlertItemsSnapshot(routeAlert, accountKey)
-    : null;
-  const [alertItems, setAlertItems] = useState<DashboardAlertAffectedItem[]>(
-    initialAlertSnapshot?.items ?? [],
-  );
-  const [alertFilterLoading, setAlertFilterLoading] = useState(
-    Boolean(routeAlert && !initialAlertSnapshot),
-  );
-  const [alertFilterError, setAlertFilterError] = useState("");
+  const listAlertKind = parseServerListAlertKind(searchParams.get("alert"));
+  const [alertNodeUuids, setAlertNodeUuids] = useState<ReadonlySet<string> | null>(() => {
+    if (!listAlertKind) return null;
+    const snapshot = getDashboardAlertItemsSnapshot(listAlertKind);
+    return snapshot ? dashboardAlertNodeUuidSet(snapshot.items) : null;
+  });
   const onlineSet = React.useMemo(
     () => new Set(liveData?.data.online ?? []),
     [liveData?.data.online],
   );
+  const alertFilterPending = Boolean(listAlertKind) && alertNodeUuids === null;
+
+  const clearListAlert = React.useCallback(() => {
+    setSearchParams((current) => {
+      if (!current.has("alert")) return current;
+      const next = new URLSearchParams(current);
+      next.delete("alert");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
-    if (!routeAlert) {
-      setAlertItems([]);
-      setAlertFilterLoading(false);
-      setAlertFilterError("");
-      return;
-    }
-    const snapshot = getDashboardAlertItemsSnapshot(routeAlert, accountKey);
-    if (snapshot) {
-      setAlertItems(snapshot.items);
-      setAlertFilterLoading(false);
-      setAlertFilterError("");
+    if (!listAlertKind) {
+      setAlertNodeUuids(null);
       return;
     }
     const controller = new AbortController();
-    setAlertFilterLoading(true);
-    setAlertFilterError("");
-    void requestDashboardAlertItems(routeAlert, controller.signal, accountKey)
-      .then((response) => setAlertItems(response.items))
-      .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
-        setAlertItems([]);
-        setAlertFilterError(requestError instanceof Error ? requestError.message : String(requestError));
+    const snapshot = getDashboardAlertItemsSnapshot(listAlertKind);
+    setAlertNodeUuids(snapshot ? dashboardAlertNodeUuidSet(snapshot.items) : null);
+    void requestDashboardAlertItems(listAlertKind, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setAlertNodeUuids(dashboardAlertNodeUuidSet(data.items));
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setAlertFilterLoading(false);
+      .catch((error: { name?: string } | undefined) => {
+        if (controller.signal.aborted || error?.name === "AbortError") return;
+        setAlertNodeUuids(new Set());
       });
     return () => controller.abort();
-  }, [accountKey, routeAlert]);
+  }, [listAlertKind]);
 
-  const alertItemOrder = React.useMemo(
-    () => new Map(alertItems.map((item, index) => [item.node_uuid, index])),
-    [alertItems],
-  );
   const filteredNodes = React.useMemo(
     () => {
-      if (!Array.isArray(nodeDetail)) return [];
-      const filtered = nodeDetail.filter((node) => {
-        const matchesSearch = node.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
-        const isOnline = onlineSet.has(node.uuid);
+      if (!Array.isArray(nodeDetail) || alertFilterPending) return [];
+      return nodeDetail.filter((node) => {
+        const query = searchTerm.trim().toLowerCase();
+        const matchesSearch = !query || nodeSearchHaystack(node).includes(query);
+        const isOnline = nodeOnlineState(available, onlineSet, node.uuid);
         const matchesStatus =
-          statusFilter === "all" ||
-          (statusFilter === "online" && isOnline) ||
-          (statusFilter === "offline" && !isOnline);
+          statusFilters.length === 0 ||
+          isOnline === null ||
+          statusFilters.includes(isOnline ? "online" : "offline");
+        const matchesRegion =
+          regionFilters.length === 0 || regionFilters.includes(getRegionCode(node.region));
+        const nodeGroup = node.group?.trim() ? node.group.trim() : "__none__";
+        const matchesGroup = groupFilters.length === 0 || groupFilters.includes(nodeGroup);
         const matchesNode = !routeNode || node.uuid === routeNode;
-        const matchesAlert = !routeAlert || alertItemOrder.has(node.uuid);
-        return matchesSearch && matchesStatus && matchesNode && matchesAlert;
+        const matchesAlert = !listAlertKind || Boolean(alertNodeUuids?.has(node.uuid));
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesRegion &&
+          matchesGroup &&
+          matchesNode &&
+          matchesAlert
+        );
       });
-      if (routeAlert === "billing") {
-        filtered.sort((left, right) => (
-          (alertItemOrder.get(left.uuid) ?? Number.MAX_SAFE_INTEGER)
-          - (alertItemOrder.get(right.uuid) ?? Number.MAX_SAFE_INTEGER)
-        ));
-      }
-      return filtered;
     },
-    [alertItemOrder, nodeDetail, onlineSet, routeAlert, routeNode, searchTerm, statusFilter],
+    [
+      alertFilterPending,
+      alertNodeUuids,
+      groupFilters,
+      listAlertKind,
+      nodeDetail,
+      onlineSet,
+      available,
+      regionFilters,
+      routeNode,
+      searchTerm,
+      statusFilters,
+    ],
   );
-
-  const activeFilterLabel = React.useMemo(() => {
-    if (routeNode) {
-      return nodeDetail.find((node) => node.uuid === routeNode)?.name || routeNode;
-    }
-    if (!routeAlert) return "";
-    const keys: Record<DashboardAlertKind, string> = {
-      offline: "alert_offline",
-      resource: "alert_resource",
-      latency_loss: "alert_latency_loss",
-      traffic: "alert_traffic",
-      return_route: "alert_return_route",
-      billing: "alert_billing",
-    };
-    return t(`admin_dashboard.${keys[routeAlert]}`);
-  }, [nodeDetail, routeAlert, routeNode, t]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -250,38 +271,66 @@ const Layout = () => {
   return (
     <Flex direction="column" gap="4" className="p-0 md:p-4">
       <Header
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
         settings={settings}
         settingsLoading={settingsLoading}
-        showStatusSummary={!isEmpty}
-        total={nodeDetail.length}
-        online={onlineSet.size}
-        available={available}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
       />
 
-      {activeFilterLabel ? (
-        <AdminActiveFilter label={activeFilterLabel} clearTo="/admin/servers" />
-      ) : null}
-      {alertFilterError ? (
-        <Callout.Root color="red" size="1"><Callout.Text>{alertFilterError}</Callout.Text></Callout.Root>
-      ) : null}
-
-      {alertFilterLoading ? null : isEmpty ? (
+      {isEmpty ? (
         <EmptyNodesGuide />
-      ) : filteredNodes.length === 0 ? (
-        <Callout.Root color="gray"><Callout.Text>{t("common.no_data", "没有符合当前筛选的服务器")}</Callout.Text></Callout.Root>
       ) : (
-        <>
-          <NodeTable
-            nodes={filteredNodes}
-            settings={settings}
+        <div className="km-admin-node-list">
+          <AdminNodeListFilters
+            nodes={nodeDetail}
             onlineSet={onlineSet}
-            reorderEnabled={!searchTerm.trim() && statusFilter === "all" && !routeNode && !routeAlert}
+            available={available}
+            resultCount={filteredNodes.length}
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            statusFilters={statusFilters}
+            onStatusFiltersChange={setStatusFilters}
+            regionFilters={regionFilters}
+            onRegionFiltersChange={setRegionFilters}
+            groupFilters={groupFilters}
+            onGroupFiltersChange={setGroupFilters}
+            alertChip={
+              listAlertKind
+                ? {
+                    label: t(
+                      `admin_dashboard.alert_${listAlertKind}`,
+                      listAlertKind === "resource"
+                        ? "资源超限"
+                        : listAlertKind === "traffic"
+                          ? "流量容量"
+                          : "账单提醒",
+                    ),
+                    onClear: clearListAlert,
+                  }
+                : null
+            }
           />
-        </>
+          {alertFilterPending ? (
+            <Loading inline text="" />
+          ) : filteredNodes.length === 0 ? (
+            <div className="px-5 py-6">
+              <Alert severity="info">{t("common.no_data", "没有符合当前筛选的服务器")}</Alert>
+            </div>
+          ) : (
+            <NodeTable
+              nodes={filteredNodes}
+              settings={settings}
+              onlineSet={onlineSet}
+              available={available}
+              reorderEnabled={
+                !searchTerm.trim() &&
+                statusFilters.length === 0 &&
+                regionFilters.length === 0 &&
+                groupFilters.length === 0 &&
+                !routeNode &&
+                !listAlertKind
+              }
+            />
+          )}
+        </div>
       )}
     </Flex>
   );
@@ -454,22 +503,14 @@ const AutoDiscoverySection = ({
       args.push(rotateVal);
     }
 
-    let scriptFile = "install.sh";
+    let scriptFile: "install.sh" | "install.ps1" = "install.sh";
     if (selectedPlatform === "windows") {
       scriptFile = "install.ps1";
     }
-    let scriptUrl = `https://raw.githubusercontent.com/raymao96/komari-agent/refs/heads/github-nuomiiiii/${scriptFile}`;
-    if (enableGhproxy && ghproxy) {
-      scriptUrl = scriptUrl.slice(8); // 去掉 https://
-      if (ghproxy.endsWith("/")) {
-        scriptUrl = `${ghproxy}${scriptUrl}`;
-      } else {
-        scriptUrl = `${ghproxy}/${scriptUrl}`;
-      }
-      if (!scriptUrl.startsWith("http")) {
-        scriptUrl = `http://${scriptUrl}`;
-      }
-    }
+    const scriptUrl = liteAgentInstallScriptUrl(
+      scriptFile,
+      enableGhproxy ? ghproxy : "",
+    );
 
     let finalCommand = "";
     switch (selectedPlatform) {
@@ -513,10 +554,10 @@ const AutoDiscoverySection = ({
         // 通过 bind mount 持久化该文件，容器更新重建后复用同一身份，避免重复注册。
         // 注意：文件挂载要求宿主机上文件已存在，否则 Docker 会将其创建为目录。
         finalCommand =
-          `touch .komari-auto-discovery.json && ` +
-          `docker run -d --name komari-agent --restart=always ` +
-          `-v .komari-auto-discovery.json:/app/auto-discovery.json ` +
-          `ghcr.io/raymao96/komari-agent:latest ` +
+          `touch .lite-auto-discovery.json && ` +
+          `docker run -d --name lite-agent --restart=always ` +
+          `-v .lite-auto-discovery.json:/app/auto-discovery.json ` +
+          `${LITE_AGENT_DOCKER_IMAGE} ` +
           quoteShellArgs(dockerArgs);
         break;
       }
@@ -536,7 +577,7 @@ const AutoDiscoverySection = ({
   if (loading) {
     return (
       <Flex align="center" justify="center" mt="4" py="4">
-        <Loading text="" />
+        <Loading inline text="" />
       </Flex>
     );
   }
@@ -590,16 +631,11 @@ const AutoDiscoverySection = ({
         </Text>
       </Flex>
 
-      <SegmentedControl.Root
+      <InstallPlatformToggle
         className="admin-install-platforms"
         value={selectedPlatform}
-        onValueChange={(value) => setSelectedPlatform(value as Platform)}
-      >
-        <SegmentedControl.Item value="linux">Linux</SegmentedControl.Item>
-        <SegmentedControl.Item value="windows">Windows</SegmentedControl.Item>
-        <SegmentedControl.Item value="macos">macOS</SegmentedControl.Item>
-        <SegmentedControl.Item value="docker">Docker</SegmentedControl.Item>
-      </SegmentedControl.Root>
+        onChange={setSelectedPlatform}
+      />
 
       <Flex gap="2" align="center">
         <Checkbox
@@ -816,7 +852,7 @@ const AutoDiscoverySection = ({
               <TextField.Root
                 placeholder={t(
                   "admin.nodeTable.install_dir_placeholder",
-                  "安装目录，为空则使用默认目录(/opt/komari-agent)"
+                  "安装目录，为空则使用默认目录(/opt/lite-agent)"
                 )}
                 value={installOptions.dir}
                 onChange={(e) =>
@@ -854,7 +890,7 @@ const AutoDiscoverySection = ({
               <TextField.Root
                 placeholder={t(
                   "admin.nodeTable.serviceName_placeholder",
-                  "服务名称，为空则使用默认名称(komari-agent)"
+                  "服务名称，为空则使用默认名称(lite-agent)"
                 )}
                 value={installOptions.serviceName}
                 onChange={(e) =>
@@ -1064,9 +1100,6 @@ const AutoDiscoverySection = ({
             {enableMonthRotate && (
               <TextField.Root
                 placeholder="1"
-                type="number"
-                min="1"
-                max="31"
                 value={installOptions.monthRotate}
                 onChange={(e) =>
                   setInstallOptions((prev) => ({
@@ -1103,27 +1136,11 @@ const AutoDiscoverySection = ({
 };
 
 const Header = ({
-  searchTerm,
-  setSearchTerm,
   settings,
   settingsLoading,
-  showStatusSummary,
-  total,
-  online,
-  available,
-  statusFilter,
-  setStatusFilter,
 }: {
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
   settings: any;
   settingsLoading: boolean;
-  showStatusSummary: boolean;
-  total: number;
-  online: number;
-  available: boolean;
-  statusFilter: AdminNodeStatusFilter;
-  setStatusFilter: (filter: AdminNodeStatusFilter) => void;
 }) => {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
@@ -1152,7 +1169,7 @@ const Header = ({
     }
   };
   return (
-    <Flex direction="column" gap="3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <AdminPageTitle
         description={t(
           "admin.nodeTable.description",
@@ -1161,54 +1178,39 @@ const Header = ({
       >
         {t("admin.nodeTable.nodeList")}
       </AdminPageTitle>
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        {showStatusSummary ? (
-          <AdminNodeStatusSummary
-            total={total}
-            online={online}
-            available={available}
-            value={statusFilter}
-            onValueChange={setStatusFilter}
+      <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog.Trigger asChild>
+          <MuiButton
+            variant="contained"
+            startIcon={<Plus size={16} />}
+            className="shrink-0"
+            sx={ADMIN_LIST_ACTION_SX}
+            onClick={() => setDialogOpen(true)}
+          >
+            {t("admin.nodeTable.addNode")}
+          </MuiButton>
+        </Dialog.Trigger>
+        <AppDialogContent>
+          <Dialog.Title>{t("admin.nodeTable.addNode")}</Dialog.Title>
+          <TextField.Root
+            ref={inputRef}
+            placeholder={t("admin.nodeTable.nameOptional")}
           />
-        ) : null}
-        <Flex gap="2" className="w-full md:ml-auto md:w-auto">
-        <TextField.Root
-          size="2"
-          className="min-w-0 flex-1 text-sm md:w-56"
-          placeholder={t("admin.nodeTable.searchByName")}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
-          <Dialog.Trigger>
-            <Button size="2" className="px-3 text-sm" onClick={() => setDialogOpen(true)}>
-              <Plus size={16} />
+          <Flex justify="end" gap="2" mt="4">
+            <Button
+              onClick={() => handleAddNode(inputRef.current?.value)}
+              disabled={loading}
+            >
               {t("admin.nodeTable.addNode")}
             </Button>
-          </Dialog.Trigger>
-          <AppDialogContent>
-            <Dialog.Title>{t("admin.nodeTable.addNode")}</Dialog.Title>
-            <TextField.Root
-              ref={inputRef}
-              placeholder={t("admin.nodeTable.nameOptional")}
-            />
-            <Flex justify="end" gap="2" mt="4">
-              <Button
-                onClick={() => handleAddNode(inputRef.current?.value)}
-                disabled={loading}
-              >
-                {t("admin.nodeTable.addNode")}
-              </Button>
-            </Flex>
-            <AutoDiscoverySection
-              settings={settings}
-              loading={settingsLoading}
-            />
-          </AppDialogContent>
-        </Dialog.Root>
-        </Flex>
-      </div>
-    </Flex>
+          </Flex>
+          <AutoDiscoverySection
+            settings={settings}
+            loading={settingsLoading}
+          />
+        </AppDialogContent>
+      </Dialog.Root>
+    </div>
   );
 };
 
@@ -1220,6 +1222,73 @@ const compactIPv6 = (value: string) => {
     : value;
 };
 
+function nodeNetworkAddresses(node: NodeDetail) {
+  return (
+    [
+      ["IPv4", node.ipv4?.trim()],
+      ["IPv6", node.ipv6?.trim()],
+    ] as const
+  ).filter(
+    (entry): entry is readonly ["IPv4" | "IPv6", string] => Boolean(entry[1]),
+  );
+}
+
+function nodeBillingTagsNeedStack(root: HTMLElement) {
+  const groups = root.querySelectorAll<HTMLElement>(".admin-node-billing-tags");
+  for (const group of groups) {
+    const badges = Array.from(group.children) as HTMLElement[];
+    if (badges.length < 2) continue;
+    const cell = group.closest("td");
+    const box = cell ?? group;
+    if (box.clientWidth <= 0) continue;
+    const cellStyle = getComputedStyle(box);
+    const available =
+      box.clientWidth -
+      (Number.parseFloat(cellStyle.paddingLeft) || 0) -
+      (Number.parseFloat(cellStyle.paddingRight) || 0);
+    const gap =
+      Number.parseFloat(getComputedStyle(group).columnGap || getComputedStyle(group).gap) ||
+      0;
+    let needed = 0;
+    for (let i = 0; i < badges.length; i += 1) {
+      needed += Math.max(badges[i].scrollWidth, badges[i].offsetWidth);
+      if (i > 0) needed += gap;
+    }
+    if (needed > available + 0.5) return true;
+  }
+  return false;
+}
+
+function nodeDeploymentStatusPresentation(
+  status: string | undefined | null,
+  t: TFunction,
+) {
+  switch (status) {
+    case "saved":
+      return {
+        label: t("admin.nodeTable.deliverySaved", "已保存"),
+        color: "blue" as const,
+      };
+    case "sent":
+      return {
+        label: t("admin.nodeTable.deliverySent", "已发送"),
+        color: "orange" as const,
+      };
+    case "applied":
+      return {
+        label: t("admin.nodeTable.deliveryApplied", "已生效"),
+        color: "green" as const,
+      };
+    case "failed":
+      return {
+        label: t("admin.nodeTable.deliveryFailed", "应用失败"),
+        color: "red" as const,
+      };
+    default:
+      return null;
+  }
+}
+
 const SortableRow = React.memo(({
   node,
   settings,
@@ -1228,7 +1297,7 @@ const SortableRow = React.memo(({
 }: {
   node: NodeDetail;
   settings: any;
-  online: boolean;
+  online: boolean | null;
   reorderEnabled: boolean;
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition } =
@@ -1248,32 +1317,17 @@ const SortableRow = React.memo(({
       console.error("Failed to copy text:", err);
     }
   }
-  const networkAddresses = ([
-    ["IPv4", node.ipv4?.trim()],
-    ["IPv6", node.ipv6?.trim()],
-  ] as const).filter(
-    (entry): entry is readonly ["IPv4" | "IPv6", string] => Boolean(entry[1]),
+  const networkAddresses = nodeNetworkAddresses(node);
+  const deploymentStatusPresentation = nodeDeploymentStatusPresentation(
+    node.deployment_status,
+    t,
   );
-  const deploymentStatusLabel = (() => {
-    switch (node.deployment_status) {
-      case "saved":
-        return t("admin.nodeTable.deliverySaved", "已保存");
-      case "sent":
-        return t("admin.nodeTable.deliverySent", "已发送");
-      case "applied":
-        return t("admin.nodeTable.deliveryApplied", "已生效");
-      case "failed":
-        return t("admin.nodeTable.deliveryFailed", "应用失败");
-      default:
-        return "";
-    }
-  })();
   return (
     <TableRow
       ref={setNodeRef}
       style={style}
-      className="text-sm hover:bg-[var(--accent-a2)] [&>td]:align-middle [&>td]:py-1.5"
-      data-node-status={online ? "online" : "offline"}
+      className="text-sm hover:bg-[var(--accent-a2)] [&>td]:align-middle [&>td]:py-2.5"
+      data-node-status={online === null ? "pending" : online ? "online" : "offline"}
     >
       <TableCell className="w-[44px] px-2 !align-middle" data-label={t("common.sort", "排序")}>
         <div className="flex items-center">
@@ -1304,7 +1358,7 @@ const SortableRow = React.memo(({
         data-label={t("admin.nodeTable.name")}
         title={node.name}
       >
-        <DetailView node={node} online={online} />
+        <NodeNameLink node={node} online={online} />
       </TableCell>
       <TableCell className="!align-middle" data-label={t("admin.nodeTable.network", "网络")}>
         <div className="flex min-w-0 flex-col justify-center text-sm leading-[1.125rem] text-muted-foreground">
@@ -1331,36 +1385,53 @@ const SortableRow = React.memo(({
           <span className="block max-w-full truncate text-sm leading-5 text-muted-foreground" title={publicVersion(node.version) || "--"}>
             {publicVersion(node.version) || "--"}
           </span>
-          {deploymentStatusLabel ? (
-            <span
-              className="admin-agent-config-status"
-              data-status={node.deployment_status}
-              title={deploymentStatusLabel}
+          {deploymentStatusPresentation ? (
+            <Badge
+              color={deploymentStatusPresentation.color}
+              size="1"
+              variant="soft"
+              className="text-sm"
             >
-              {deploymentStatusLabel}
-            </span>
+              <label className="text-xs" title={deploymentStatusPresentation.label}>
+                {deploymentStatusPresentation.label}
+              </label>
+            </Badge>
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="!align-middle" data-label={t("common.group", "分组")}>
-        <span className="block truncate text-sm font-normal text-muted-foreground" title={node.group || ""}>
+      <TableCell className="!align-middle min-w-0 overflow-hidden" data-label={t("common.group", "分组")}>
+        <span className="admin-cell-clip text-sm font-normal text-muted-foreground" title={node.group || ""}>
           {node.group || "--"}
         </span>
       </TableCell>
-      <TableCell className="!align-middle" data-label={t("common.remark", "备注")}>
-        <span className="block whitespace-normal break-words text-sm text-muted-foreground" title={node.remark || ""}>
+      <TableCell className="!align-middle min-w-0 overflow-hidden" data-label={t("common.remark", "备注")}>
+        <span className="admin-cell-clip text-sm text-muted-foreground" title={node.remark || ""}>
           {node.remark || "--"}
         </span>
       </TableCell>
-      <TableCell className="!align-middle" data-label={t("admin.nodeTable.billing")}>
-        <PriceTags
-          className="[&_label]:!text-xs"
-          price={node.price}
-          billing_cycle={node.billing_cycle}
-          expired_at={node.expired_at}
-          currency={node.currency}
-          tags={node.tags || ""}
-        />
+      <TableCell className="!align-middle min-w-0 whitespace-normal" data-label={t("admin.nodeTable.billing")}>
+        {Number(node.price) === 0 ? (
+          <span className="text-sm text-muted-foreground">--</span>
+        ) : (
+          <PriceTags
+            className="admin-node-billing-tags [&_label]:!text-xs"
+            direction="row"
+            wrap="nowrap"
+            price={node.price}
+            billing_cycle={node.billing_cycle}
+            expired_at={node.expired_at}
+            currency={node.currency}
+          />
+        )}
+      </TableCell>
+      <TableCell className="!align-middle min-w-0 overflow-hidden" data-label={t("admin.nodeTable.tags", "标签")}>
+        {(node.tags || "").trim() ? (
+          <div className="admin-cell-clip-row" title={node.tags || ""}>
+            <CustomTags tags={node.tags || ""} />
+          </div>
+        ) : (
+          <span className="admin-cell-clip text-sm text-muted-foreground">--</span>
+        )}
       </TableCell>
       <TableCell className="!align-middle" data-label={t("common.action", "操作")}>
         <ActionButtons node={node} settings={settings} />
@@ -1370,18 +1441,159 @@ const SortableRow = React.memo(({
 });
 SortableRow.displayName = "SortableRow";
 
+const SortableMobileCard = React.memo(function SortableMobileCard({
+  node,
+  settings,
+  online,
+  reorderEnabled,
+}: {
+  node: NodeDetail;
+  settings: any;
+  online: boolean | null;
+  reorderEnabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: node.uuid, disabled: !reorderEnabled });
+  const { t } = useTranslation();
+  const networkAddresses = nodeNetworkAddresses(node);
+  const deploymentStatusPresentation = nodeDeploymentStatusPresentation(
+    node.deployment_status,
+    t,
+  );
+  const networkValue =
+    networkAddresses.length > 0 ? (
+      <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+        {networkAddresses.map(([type, address]) => (
+          <Typography
+            key={type}
+            sx={{
+              fontSize: 13.5,
+              fontWeight: 400,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={address}
+          >
+            {type} {type === "IPv6" ? compactIPv6(address) : address}
+          </Typography>
+        ))}
+      </Stack>
+    ) : (
+      "--"
+    );
+  const billingValue =
+    Number(node.price) === 0 ? (
+      "--"
+    ) : (
+      <PriceTags
+        className="[&_label]:!text-xs"
+        direction="row"
+        wrap="nowrap"
+        price={node.price}
+        billing_cycle={node.billing_cycle}
+        expired_at={node.expired_at}
+        currency={node.currency}
+      />
+    );
+  const cells: Array<[string, React.ReactNode]> = [
+    [t("admin.nodeTable.network", "网络"), networkValue],
+    [
+      t("admin.nodeTable.agent", "Agent"),
+      <Stack key="agent" spacing={0.4} sx={{ minWidth: 0, alignItems: "flex-start" }}>
+        <Typography
+          sx={{
+            fontSize: 13.5,
+            fontWeight: 400,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            width: "100%",
+          }}
+          title={publicVersion(node.version) || "--"}
+        >
+          {publicVersion(node.version) || "--"}
+        </Typography>
+        {deploymentStatusPresentation ? (
+          <Badge
+            color={deploymentStatusPresentation.color}
+            size="1"
+            variant="soft"
+            className="text-sm"
+          >
+            <label className="text-xs" title={deploymentStatusPresentation.label}>
+              {deploymentStatusPresentation.label}
+            </label>
+          </Badge>
+        ) : null}
+      </Stack>,
+    ],
+    [t("common.group", "分组"), node.group || "--"],
+    [t("common.remark", "备注"), node.remark || "--"],
+    [t("admin.nodeTable.billing"), billingValue],
+    [
+      t("admin.nodeTable.tags", "标签"),
+      (node.tags || "").trim() ? (
+        <Flex gap="1" wrap="wrap">
+          <CustomTags tags={node.tags || ""} />
+        </Flex>
+      ) : (
+        "--"
+      ),
+    ],
+  ];
+
+  return (
+    <AdminMobileListCard
+      ref={setNodeRef}
+      sx={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      title={<NodeNameLink node={node} online={online} />}
+      headerExtra={
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          disabled={!reorderEnabled}
+          className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--gray-9)] ${
+            reorderEnabled
+              ? "cursor-grab hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)] active:cursor-grabbing"
+              : "cursor-not-allowed opacity-40"
+          } touch-manipulation select-none`}
+          style={{ touchAction: "none" }}
+          title={
+            reorderEnabled
+              ? t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")
+              : t("admin.nodeTable.clearFilterToReorder", "清除搜索和筛选后可调整顺序")
+          }
+          aria-label={t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")}
+        >
+          <GripVertical size={18} />
+        </button>
+      }
+      cells={cells}
+      actions={<ActionButtons node={node} settings={settings} />}
+    />
+  );
+});
+
 const NodeTable = ({
   nodes,
   settings,
   onlineSet,
+  available,
   reorderEnabled,
 }: {
   nodes: NodeDetail[];
   settings: any;
   onlineSet: ReadonlySet<string>;
+  available: boolean;
   reorderEnabled: boolean;
 }) => {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const sensors = useSensors(
     useSensor(MouseSensor, {
       // 需要按住 10px 距离才开始拖拽，避免与点击冲突
@@ -1415,6 +1627,30 @@ const NodeTable = ({
     pageStart,
     pageStart + pageSize,
   );
+  const tableWrapRef = React.useRef<HTMLDivElement>(null);
+  const [billingStack, setBillingStack] = useState(false);
+  const billingLayoutKey = visibleNodes
+    .map(
+      (node) =>
+        `${node.uuid}:${node.price}:${node.billing_cycle}:${node.expired_at}:${node.currency}`,
+    )
+    .join("|");
+
+  React.useLayoutEffect(() => {
+    if (isMobile) return;
+    const root = tableWrapRef.current;
+    if (!root) return;
+    const update = () => {
+      setBillingStack(nodeBillingTagsNeedStack(root));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(root);
+    const table = root.querySelector("table");
+    if (table) observer.observe(table);
+    void document.fonts?.ready.then(update);
+    return () => observer.disconnect();
+  }, [isMobile, billingLayoutKey]);
 
   React.useEffect(() => {
     setLocalNodes(nodes);
@@ -1486,7 +1722,7 @@ const NodeTable = ({
 
   return (
     <div
-      className={`admin-responsive-table-wrap overflow-x-auto overflow-y-hidden rounded-md border border-[var(--gray-a5)] ${
+      className={`admin-responsive-table-wrap overflow-x-auto overflow-y-hidden ${
         isDragging ? "select-none" : ""
       }`}
     >
@@ -1497,26 +1733,48 @@ const NodeTable = ({
         onDragEnd={handleDragEnd}
         onDragCancel={() => setIsDragging(false)}
       >
-        <Table className="admin-responsive-table admin-node-table min-w-[1280px] table-fixed text-sm">
+        {isMobile ? (
+          <SortableContext
+            items={visibleNodes.map((node) => node.uuid)}
+            strategy={verticalListSortingStrategy}
+          >
+            <AdminMobileCardStack>
+              {visibleNodes.map((node) => (
+                <SortableMobileCard
+                  key={node.uuid}
+                  node={node}
+                  settings={settings}
+                  online={nodeOnlineState(available, onlineSet, node.uuid)}
+                  reorderEnabled={reorderEnabled}
+                />
+              ))}
+            </AdminMobileCardStack>
+          </SortableContext>
+        ) : (
+        <div ref={tableWrapRef}>
+        <Table className={`admin-responsive-table admin-node-table min-w-[1136px] table-fixed text-sm${billingStack ? " admin-node-billing-stack" : ""}`}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[44px]">
                 <span className="sr-only">{t("common.sort", "排序")}</span>
               </TableHead>
-              <TableHead className="w-[190px]">{t("admin.nodeTable.name")}</TableHead>
-              <TableHead className="w-[190px]">
+              <TableHead className="w-[170px]">{t("admin.nodeTable.name")}</TableHead>
+              <TableHead className="w-[170px]">
                 {t("admin.nodeTable.network", "网络")}
               </TableHead>
-              <TableHead className="w-[72px] text-center">
+              <TableHead className="w-[64px] text-center">
                 {t("admin.nodeTable.agent", "Agent")}
               </TableHead>
-              <TableHead className="w-[72px]">
+              <TableHead className="w-[64px]">
                 {t("common.group", "分组")}
               </TableHead>
-              <TableHead className="w-[72px]">
+              <TableHead className="w-[64px]">
                 {t("common.remark", "备注")}
               </TableHead>
-              <TableHead className="w-[224px]">{t("admin.nodeTable.billing")}</TableHead>
+              <TableHead className="w-[80px]">{t("admin.nodeTable.billing")}</TableHead>
+              <TableHead className="w-[116px]">
+                {t("admin.nodeTable.tags", "标签")}
+              </TableHead>
               <TableHead className="w-[272px]">{t("common.action", "操作")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -1530,13 +1788,15 @@ const NodeTable = ({
                   key={node.uuid}
                   node={node}
                   settings={settings}
-                  online={onlineSet.has(node.uuid)}
+                  online={nodeOnlineState(available, onlineSet, node.uuid)}
                   reorderEnabled={reorderEnabled}
                 />
               ))}
             </SortableContext>
           </TableBody>
         </Table>
+        </div>
+        )}
       <AdminPagination
         page={visiblePage}
         total={localNodes.length}
@@ -1558,6 +1818,40 @@ const NodeTable = ({
 };
 
 type Platform = "linux" | "windows" | "macos" | "docker";
+
+function InstallPlatformToggle({
+  value,
+  onChange,
+  className,
+}: {
+  value: Platform;
+  onChange: (value: Platform) => void;
+  className?: string;
+}) {
+  return (
+    <ToggleButtonGroup
+      className={className}
+      exclusive
+      size="small"
+      value={value}
+      aria-label="部署平台"
+      onChange={(_event, next: Platform | null) => next && onChange(next)}
+      sx={{
+        "& .MuiToggleButton-root.Mui-selected": {
+          bgcolor: "rgba(7, 141, 238, 0.12)",
+          color: "#078dee",
+          boxShadow: "inset 0 0 0 1px rgba(7, 141, 238, 0.48)",
+          "&:hover": { bgcolor: "rgba(7, 141, 238, 0.12)" },
+        },
+      }}
+    >
+      <ToggleButton disableRipple value="linux">Linux</ToggleButton>
+      <ToggleButton disableRipple value="windows">Windows</ToggleButton>
+      <ToggleButton disableRipple value="macos">macOS</ToggleButton>
+      <ToggleButton disableRipple value="docker">Docker</ToggleButton>
+    </ToggleButtonGroup>
+  );
+}
 
 type TrafficUsage = { up: number; down: number };
 type SignedTrafficUsage = { up: number; down: number };
@@ -1607,8 +1901,7 @@ function formatTrafficCycleRange(snapshot: TrafficCalibrationSnapshot, language:
 const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) => {
   const { t } = useTranslation();
   return (
-    <div className="flex h-10 items-center justify-start gap-1.5 max-md:h-auto max-md:flex-wrap admin-node-actions max-md:w-full">
-      <RotateTokenButton node={node} />
+    <div className="flex h-10 items-center justify-start gap-1 admin-node-actions max-md:w-full">
       <GenerateCommandButton node={node} settings={settings} />
       <IconButton
         title={t("terminal.title")}
@@ -1820,27 +2113,27 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
                     {t("admin.nodeTable.trafficCalibration.history")}
                   </Text>
                   {snapshot.history?.length ? (
-                    <div className="overflow-x-auto rounded border">
-                      <table className="w-full min-w-[560px] text-left text-sm">
-                        <thead className="admin-table-header">
-                          <tr>
-                            <th className="px-3 py-2 font-medium">{t("admin.nodeTable.trafficCalibration.time")}</th>
-                            <th className="px-3 py-2 font-medium">{t("admin.nodeTable.trafficCalibration.targetUp")}</th>
-                            <th className="px-3 py-2 font-medium">{t("admin.nodeTable.trafficCalibration.targetDown")}</th>
-                            <th className="px-3 py-2 font-medium">{t("admin.nodeTable.trafficCalibration.change")}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                    <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
+                      <Table container={false} className="admin-responsive-table min-w-[560px] text-left text-sm">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("admin.nodeTable.trafficCalibration.time")}</TableHead>
+                            <TableHead>{t("admin.nodeTable.trafficCalibration.targetUp")}</TableHead>
+                            <TableHead>{t("admin.nodeTable.trafficCalibration.targetDown")}</TableHead>
+                            <TableHead>{t("admin.nodeTable.trafficCalibration.change")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {snapshot.history.map((item) => (
-                            <tr key={item.calibration_id} className="border-t">
-                              <td className="whitespace-nowrap px-3 py-2">{new Date(item.created_at).toLocaleString()}</td>
-                              <td className="whitespace-nowrap px-3 py-2">{formatBytes(item.target.up)}</td>
-                              <td className="whitespace-nowrap px-3 py-2">{formatBytes(item.target.down)}</td>
-                              <td className="whitespace-nowrap px-3 py-2">↑ {formatSignedTraffic(item.adjustment.up)} / ↓ {formatSignedTraffic(item.adjustment.down)}</td>
-                            </tr>
+                            <TableRow key={item.calibration_id}>
+                              <TableCell>{new Date(item.created_at).toLocaleString()}</TableCell>
+                              <TableCell>{formatBytes(item.target.up)}</TableCell>
+                              <TableCell>{formatBytes(item.target.down)}</TableCell>
+                              <TableCell>↑ {formatSignedTraffic(item.adjustment.up)} / ↓ {formatSignedTraffic(item.adjustment.down)}</TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   ) : (
                     <Text size="2" color="gray">{t("admin.nodeTable.trafficCalibration.noHistory")}</Text>
@@ -1859,117 +2152,6 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
             </Flex>
           </Flex>
         )}
-      </AppDialogContent>
-    </Dialog.Root>
-  );
-}
-
-function RotateTokenButton({ node }: { node: NodeDetail }) {
-  const { t } = useTranslation();
-  const { refresh } = useNodeDetails();
-  const [open, setOpen] = React.useState(false);
-  const [twoFactorCode, setTwoFactorCode] = React.useState("");
-  const [error, setError] = React.useState("");
-  const [rotating, setRotating] = React.useState(false);
-
-  const rotateToken = async () => {
-    setRotating(true);
-    setError("");
-    try {
-      const response = await fetch("/api/admin/client/token/rotate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uuid: node.uuid,
-          ...(twoFactorCode ? { "2fa_code": twoFactorCode } : {}),
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error(
-            payload?.message === "Invalid 2FA code"
-              ? "动态口令无效"
-              : "请输入动态口令",
-          );
-        }
-        throw new Error(localizeTokenRotationError(payload?.message));
-      }
-      if (!(payload?.data?.token || payload?.token)) {
-        throw new Error("Server 未返回新 Token");
-      }
-      setTwoFactorCode("");
-      setOpen(false);
-      toast.success("Token 已重置，请使用新指令更新 Agent；新 Token 连接后旧 Token 自动失效");
-      refresh();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Token 重置失败");
-    } finally {
-      setRotating(false);
-    }
-  };
-
-  return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <IconButton
-        type="button"
-        size="2"
-        variant="ghost"
-        title={t("admin.nodeTable.rotateToken", "重置 Token")}
-        aria-label={t("admin.nodeTable.rotateToken", "重置 Token")}
-        onClick={() => setOpen(true)}
-      >
-        <RotateCw size={18} />
-      </IconButton>
-      <AppDialogContent maxWidth="440px">
-        <Dialog.Title>
-          {t("admin.nodeTable.rotateToken", "重置 Token")}
-        </Dialog.Title>
-        <Dialog.Description>
-          {t(
-            "admin.nodeTable.rotateTokenDescription",
-            "生成新 Token 后，旧 Token 最多保留 24 小时；新 Token 首次成功连接后旧 Token 会立即失效。",
-          )}
-          <br />
-          {t(
-            "admin.nodeTable.rotateTokenInstructions",
-            "重置后在节点上重新执行更新后的部署指令即可，无需手动卸载；自动更新只替换程序文件，不会修改 Token。",
-          )}
-        </Dialog.Description>
-        <Flex direction="column" gap="2">
-          <label className="text-sm font-normal">
-            {t(
-              "admin.nodeTable.twoFactorCode",
-              "动态口令（未开启 2FA 可留空）",
-            )}
-          </label>
-          <TextField.Root
-            value={twoFactorCode}
-            inputMode="numeric"
-            autoFocus
-            onChange={(event) =>
-              setTwoFactorCode(event.target.value.replace(/\D/g, ""))
-            }
-            onKeyDown={(event) =>
-              event.key === "Enter" && !rotating && void rotateToken()
-            }
-          />
-          {error && <p className="text-sm text-red-500">{error}</p>}
-        </Flex>
-        <Flex gap="2" justify="end" mt="4">
-          <Button variant="soft" onClick={() => setOpen(false)}>
-            {t("common.cancel", "取消")}
-          </Button>
-          <Button
-            color="orange"
-            disabled={rotating}
-            onClick={() => void rotateToken()}
-          >
-            {rotating
-              ? t("common.loading", "处理中...")
-              : t("admin.nodeTable.confirmRotateToken", "确认重置")}
-          </Button>
-        </Flex>
       </AppDialogContent>
     </Dialog.Root>
   );
@@ -2012,9 +2194,9 @@ function DeleteButton({ node }: { node: NodeDetail }) {
           {t("admin.nodeTable.confirmDeleteQuestion")}
         </Dialog.Description>
         <Flex justify="end" gap="2" mt="4">
-          <Dialog.Trigger>
+          <Dialog.Close>
             <Button variant="soft">{t("admin.nodeTable.cancel")}</Button>
-          </Dialog.Trigger>
+          </Dialog.Close>
           <Button disabled={deleting} color="red" onClick={handleDelete}>
             {t("admin.nodeTable.confirmDelete")}
           </Button>
@@ -2342,25 +2524,14 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       args.push(`--month-rotate`);
       args.push(rotateVal);
     }
-    let scriptFile = "install.sh";
+    let scriptFile: "install.sh" | "install.ps1" = "install.sh";
     if (selectedPlatform === "windows") {
       scriptFile = "install.ps1";
     }
-    let scriptUrl =
-      `https://raw.githubusercontent.com/raymao96/komari-agent/refs/heads/github-nuomiiiii/${scriptFile}`;
-    if (enableGhproxy) {
-      if (enableGhproxy && ghproxy) {
-        scriptUrl = scriptUrl.slice(8); // 去掉 https://
-        if (ghproxy.endsWith("/")) {
-          scriptUrl = `${ghproxy}${scriptUrl}`;
-        } else {
-          scriptUrl = `${ghproxy}/${scriptUrl}`;
-        }
-        if (!scriptUrl.startsWith("http")) {
-          scriptUrl = `http://${scriptUrl}`;
-        }
-      }
-    }
+    const scriptUrl = liteAgentInstallScriptUrl(
+      scriptFile,
+      enableGhproxy ? ghproxy : "",
+    );
     let finalCommand = "";
     switch (selectedPlatform) {
       case "linux":
@@ -2399,8 +2570,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           dockerArgs.push(args[i]);
         }
         finalCommand =
-          `docker run -d --name komari-agent --restart=always ` +
-          `ghcr.io/raymao96/komari-agent:latest ` +
+          `docker run -d --name lite-agent --restart=always ` +
+          `${LITE_AGENT_DOCKER_IMAGE} ` +
           quoteShellArgs(dockerArgs);
         break;
       }
@@ -2523,30 +2694,35 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       case "sent":
         return {
           Icon: Send,
+          color: "orange",
           label: t("admin.nodeTable.deliverySent", "已发送"),
           hint: t("admin.nodeTable.deliverySentHint", "等待 Agent 返回应用结果"),
         };
       case "applied":
         return {
           Icon: CheckCircle2,
+          color: "green",
           label: t("admin.nodeTable.deliveryApplied", "已生效"),
           hint: t("admin.nodeTable.deliveryAppliedHint", "Agent 已确认配置生效"),
         };
       case "failed":
         return {
           Icon: XCircle,
+          color: "red",
           label: t("admin.nodeTable.deliveryFailed", "应用失败"),
           hint: deliveryState.error || t("admin.nodeTable.deliveryFailedHint", "Agent 未能应用此配置"),
         };
       case "saved":
         return {
           Icon: Clock3,
+          color: "blue",
           label: t("admin.nodeTable.deliverySaved", "已保存"),
           hint: t("admin.nodeTable.deliverySavedHint", "等待 Agent 上线后发送"),
         };
       default:
         return {
           Icon: Clock3,
+          color: "gray",
           label: t("admin.nodeTable.deliveryNotStarted", "尚未下发"),
           hint: t(
             "admin.nodeTable.deliveryNotStartedHint",
@@ -2562,32 +2738,29 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           <Download size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <AppDialogContent>
+      <AppDialogContent
+        maxWidth={960}
+        className="km-node-dialog km-node-deploy-dialog"
+      >
         <Dialog.Title>
           {t("admin.nodeTable.installCommand", "一键部署指令")}
         </Dialog.Title>
         <div
-          className="flex flex-col gap-4"
+          className="km-node-dialog-body flex flex-col gap-4"
           aria-busy={loadingProfile}
           style={{
             opacity: loadingProfile ? 0.55 : 1,
             pointerEvents: loadingProfile ? "none" : undefined,
           }}
         >
-          <SegmentedControl.Root
+          <InstallPlatformToggle
             className="admin-install-platforms"
             value={selectedPlatform}
-            onValueChange={(value) => setSelectedPlatform(value as Platform)}
-          >
-            <SegmentedControl.Item value="linux">Linux</SegmentedControl.Item>
-            <SegmentedControl.Item value="windows">
-              Windows
-            </SegmentedControl.Item>
-            <SegmentedControl.Item value="macos">macOS</SegmentedControl.Item>
-            <SegmentedControl.Item value="docker">Docker</SegmentedControl.Item>
-          </SegmentedControl.Root>
+            onChange={setSelectedPlatform}
+          />
 
-          <Flex direction="column" gap="2">
+          <Flex direction="column" gap="2" className="km-node-dialog-grid km-deploy-dialog-grid">
+            <section className="km-node-dialog-pane">
             <Flex justify="between" align="center">
               <Text size="3" weight="bold">
                 {t("admin.nodeTable.installationSettings", "安装配置")}
@@ -2686,7 +2859,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                 </label>
               </Flex>
             </div>
-            <Flex direction="column" gap="2" className="[&_label]:font-normal">
+            <Flex direction="column" gap="2" className="km-node-dialog-fields [&_label]:font-normal">
               <Flex gap="2" align="center">
                 <Checkbox
                   checked={enableGhproxy}
@@ -2764,7 +2937,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                 <TextField.Root
                   placeholder={t(
                     "admin.nodeTable.install_dir_placeholder",
-                    "安装目录，为空则使用默认目录(/opt/komari-agent)"
+                    "安装目录，为空则使用默认目录(/opt/lite-agent)"
                   )}
                   value={installOptions.dir}
                   onChange={(e) =>
@@ -2808,7 +2981,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                 <TextField.Root
                   placeholder={t(
                     "admin.nodeTable.serviceName_placeholder",
-                    "服务名称，为空则使用默认名称(komari-agent)"
+                    "服务名称，为空则使用默认名称(lite-agent)"
                   )}
                   value={installOptions.serviceName}
                   onChange={(e) =>
@@ -2819,7 +2992,10 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                   }
                 />
               )}
-              <Flex justify="between" align="center" mt="2">
+            </Flex>
+            </section>
+            <section className="km-node-dialog-pane">
+              <Flex justify="between" align="center">
                 <Text size="3" weight="bold">
                   {t("admin.nodeTable.onlineCollectionSettings", "在线采集配置")}
                 </Text>
@@ -2827,6 +3003,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                   {t("admin.nodeTable.onlineApplicable", "保存后可直接下发")}
                 </Text>
               </Flex>
+            <Flex direction="column" gap="2" className="km-node-dialog-fields [&_label]:font-normal">
               <div className="admin-install-options-grid grid grid-cols-2 gap-2">
                 <Flex gap="2" align="center">
                   <Checkbox
@@ -3106,9 +3283,6 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               {enableMonthRotate && (
                 <TextField.Root
                   placeholder="1"
-                  type="number"
-                  min="1"
-                  max="31"
                   value={installOptions.monthRotate}
                   onChange={(e) =>
                     setInstallOptions((prev) => ({
@@ -3131,8 +3305,14 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                     className="admin-deployment-delivery-current"
                     data-status={deliveryState?.status || "not-started"}
                   >
-                    <span className="admin-deployment-delivery-dot" />
-                    <span>{deliveryPresentation.label}</span>
+                    <Badge
+                      color={deliveryPresentation.color}
+                      size="1"
+                      variant="soft"
+                      className="text-sm"
+                    >
+                      <span className="text-xs">{deliveryPresentation.label}</span>
+                    </Badge>
                   </div>
                   <Flex gap="2" align="center" className="admin-deployment-delivery-hint">
                     <deliveryPresentation.Icon size={15} />
@@ -3159,6 +3339,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                 {t("admin.nodeTable.saveAndDispatch", "保存并下发")}
               </Button>
             </Flex>
+            </section>
           </Flex>
           <Flex direction="column" gap="2">
             <label className="text-base font-bold">
@@ -3221,8 +3402,9 @@ function EditButton({ node }: { node: NodeDetail }) {
   const nameRef = React.useRef<HTMLInputElement>(null);
   const groupRef = React.useRef<HTMLInputElement>(null);
   const tagsRef = React.useRef<HTMLInputElement>(null);
-  const publicRemarkRef = React.useRef<HTMLTextAreaElement>(null);
-  const privateRemarkRef = React.useRef<HTMLTextAreaElement>(null);
+  const bandwidthRef = React.useRef<HTMLInputElement>(null);
+  const privateRemarkRef = React.useRef<HTMLInputElement>(null);
+  const publicRemarkRef = React.useRef<HTMLInputElement>(null);
   const [hidden, setHidden] = useState(false);
   const [saving, setSaving] = useState(false);
   const [traffic_limit, setTrafficLimit] = useState(0);
@@ -3281,10 +3463,11 @@ function EditButton({ node }: { node: NodeDetail }) {
       setSaving(true);
       const payload: Record<string, unknown> = {
         name: nameRef.current?.value,
-        remark: privateRemarkRef.current?.value,
-        public_remark: publicRemarkRef.current?.value,
         group: groupRef.current?.value,
         tags: tagsRef.current?.value,
+        bandwidth: normalizeBandwidth(bandwidthRef.current?.value ?? ""),
+        remark: privateRemarkRef.current?.value ?? "",
+        public_remark: publicRemarkRef.current?.value ?? "",
         hidden,
       };
       if (traffic_limit !== (node.traffic_limit || 0)) {
@@ -3293,9 +3476,7 @@ function EditButton({ node }: { node: NodeDetail }) {
       if (traffic_limit_type !== (node.traffic_limit_type || "sum")) {
         payload.traffic_limit_type = traffic_limit_type;
       }
-      if (trafficResetDay !== (node.traffic_reset_day ?? 0)) {
-        payload.traffic_reset_day = trafficResetDay;
-      }
+      payload.traffic_reset_day = trafficResetDay;
       const currentRegionOverride = node.region_override
         ? getRegionCode(node.region_override)
         : "";
@@ -3336,9 +3517,21 @@ function EditButton({ node }: { node: NodeDetail }) {
           <Pencil size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <AppDialogContent>
-        <Dialog.Title>{t("admin.nodeEdit.editInfo", "编辑信息")}</Dialog.Title>
-        <div className="flex flex-col gap-4">
+      <AppDialogContent
+        maxWidth={920}
+        className="km-node-dialog km-node-edit-dialog"
+      >
+        <Dialog.Title>
+          {t("admin.nodeEdit.editInfo", "编辑信息")}
+        </Dialog.Title>
+        <Dialog.Description>
+          {t(
+            "admin.nodeEdit.editInfoDescription",
+            "调整服务器标识、展示信息与流量策略。",
+          )}
+        </Dialog.Description>
+        <div className="km-node-dialog-grid">
+          <section className="km-node-dialog-pane km-node-dialog-fields">
           <div>
             <label className="block mb-1 text-sm font-medium text-muted-foreground">
               {t("admin.nodeEdit.name", "名称")}
@@ -3351,17 +3544,7 @@ function EditButton({ node }: { node: NodeDetail }) {
           </div>
           <div>
             <label className="block mb-1 text-sm font-medium text-muted-foreground">
-              {t("admin.nodeEdit.token", "Token 令牌")}
-            </label>
-            <TextField.Root
-              value={node.token}
-              placeholder={t("admin.nodeEdit.tokenPlaceholder", "请输入 Token")}
-              readOnly
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-muted-foreground">
-              {t("admin.nodeEdit.regionOverride", "国家图标")}
+              {t("admin.nodeEdit.regionOverride", "国家\\地区图标")}
             </label>
             <SelectOrInput
               options={regionOptions}
@@ -3393,6 +3576,25 @@ function EditButton({ node }: { node: NodeDetail }) {
           </div>
           <div>
             <label className="block mb-1 text-sm font-medium text-muted-foreground">
+              {t("admin.nodeEdit.bandwidth", "带宽")}
+            </label>
+            <TextField.Root
+              defaultValue={node.bandwidth || ""}
+              ref={bandwidthRef}
+              placeholder={t(
+                "admin.nodeEdit.bandwidthPlaceholder",
+                "例如 100 Mbps 或 1 Gbps",
+              )}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t(
+                "admin.nodeEdit.bandwidth_description",
+                "用于概览展示，可填写 100 Mbps、1 Gbps、10 G 这类带宽。",
+              )}
+            </p>
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-muted-foreground">
               {t("common.group")}
             </label>
             <TextField.Root defaultValue={node.group} ref={groupRef} />
@@ -3401,13 +3603,12 @@ function EditButton({ node }: { node: NodeDetail }) {
             <label className="block mb-1 text-sm font-medium text-muted-foreground">
               {t("admin.nodeEdit.remark", "私有备注")}
             </label>
-            <TextArea
+            <TextField.Root
               defaultValue={node.remark}
               ref={privateRemarkRef}
-              resize={"vertical"}
               placeholder={t(
                 "admin.nodeEdit.remarkPlaceholder",
-                "请输入私有备注"
+                "请输入私有备注",
               )}
             />
           </div>
@@ -3415,34 +3616,33 @@ function EditButton({ node }: { node: NodeDetail }) {
             <label className="block mb-1 text-sm font-medium text-muted-foreground">
               {t("admin.nodeEdit.publicRemark", "公开备注")}
             </label>
-            <TextArea
+            <TextField.Root
               defaultValue={node.public_remark}
-              resize={"vertical"}
+              ref={publicRemarkRef}
               placeholder={t(
                 "admin.nodeEdit.publicRemarkPlaceholder",
-                "请输入公开备注"
+                "请输入公开备注",
               )}
-              ref={publicRemarkRef}
             />
           </div>
           <div>
             <SettingCardSwitch
+              bordless
               title={t("admin.nodeEdit.hidden")}
               description={t("admin.nodeEdit.hidden_description")}
               defaultChecked={hidden}
               onChange={setHidden}
             />
           </div>
-          <SettingCardCollapse title={t("admin.nodeEdit.trafficLimit")}>
+          </section>
+          <section className="km-node-dialog-pane km-node-dialog-fields">
+          <div className="km-node-traffic-section">
             <div className="space-y-2 pb-3 pt-2">
-              <label className="block text-base font-semibold leading-6">
+              <label className="block text-sm font-semibold leading-5">
                 {t("admin.nodeEdit.trafficResetDay", "流量重置日")}
               </label>
               <TextField.Root
                 aria-label={t("admin.nodeEdit.trafficResetDay")}
-                type="number"
-                min="0"
-                max="31"
                 value={String(trafficResetDay)}
                 onChange={(event) => {
                   const day = Number.parseInt(event.target.value || "0", 10);
@@ -3540,12 +3740,17 @@ function EditButton({ node }: { node: NodeDetail }) {
                 )}
               </div>
             </div>
-          </SettingCardCollapse>
+          </div>
+          </section>
         </div>
-        <Flex gap="2" justify={"end"} className="mt-4">
+        <Flex gap="2" justify={"end"} className="km-node-dialog-actions">
+          <Dialog.Close>
+            <Button type="button" variant="soft" color="gray">
+              {t("common.cancel", "取消")}
+            </Button>
+          </Dialog.Close>
           <Button
             type="submit"
-            className="w-full"
             disabled={saving}
             onClick={save}
           >
@@ -3559,170 +3764,38 @@ function EditButton({ node }: { node: NodeDetail }) {
   );
 }
 
-function ReadOnlyDetailField({
-  label,
-  value,
-  copyable = false,
-  mono = false,
-}: {
-  label: React.ReactNode;
-  value?: string | number | null;
-  copyable?: boolean;
-  mono?: boolean;
-}) {
+function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | null }) {
   const { t } = useTranslation();
-  const displayValue = value === undefined || value === null || value === "" ? "-" : String(value);
-  return (
-    <div className="min-w-0">
-      <label className="mb-1.5 block text-sm font-medium">{label}</label>
-      <TextField.Root
-        value={displayValue}
-        readOnly
-        title={displayValue}
-        className={`w-full bg-[var(--color-panel-solid)] ${mono ? "[&_input]:font-mono [&_input]:text-[13px]" : ""}`}
-      >
-        {copyable && displayValue !== "-" ? (
-          <TextField.Slot side="right">
-            <IconButton
-              type="button"
-              size="1"
-              variant="ghost"
-              color="gray"
-              title={t("copy", "复制")}
-              aria-label={t("copy", "复制")}
-              onClick={async () => {
-                try {
-                  await writeClipboardText(displayValue);
-                  toast.success(t("copy_success"));
-                } catch (err) {
-                  console.error("Failed to copy text:", err);
-                }
-              }}
-            >
-              <Copy size={14} />
-            </IconButton>
-          </TextField.Slot>
-        ) : null}
-      </TextField.Root>
-    </div>
-  );
-}
-
-function DetailView({ node, online }: { node: NodeDetail; online: boolean }) {
-  const { t } = useTranslation();
-  const dialogContentRef = React.useRef<HTMLDivElement>(null);
+  const pending = online === null;
   const statusLabel = online
     ? t("nodeCard.online", "在线")
     : t("nodeCard.offline", "离线");
-  const formatDateTime = (value?: string) =>
-    value ? new Date(value).toLocaleString() : "-";
 
   return (
-    <Dialog.Root>
-      <Dialog.Trigger>
-        <button
-          type="button"
-          className="flex w-full min-w-0 items-start gap-2 text-left"
+    <Link
+      to={`/admin/servers/${node.uuid}`}
+      className="flex w-full min-w-0 items-center gap-2 text-left"
+    >
+      <span className="admin-node-country-flag">
+        <Flag flag={node.region} compact />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="block max-w-full truncate text-[15px] font-semibold leading-6 hover:underline">
+          {node.name}
+        </span>
+        <span
+          className="flex h-[18px] items-center gap-1.5 text-[13.5px] text-muted-foreground"
+          aria-hidden={pending || undefined}
+          style={pending ? { visibility: "hidden" } : undefined}
         >
-          <span className="admin-node-country-flag">
-            <Flag flag={node.region} compact />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="block max-w-full truncate text-sm font-semibold leading-6 hover:underline">
-              {node.name}
-            </span>
-            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span
-                className="size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: online ? "var(--green-9)" : "var(--red-9)" }}
-              />
-              {statusLabel}
-            </span>
-          </span>
-        </button>
-      </Dialog.Trigger>
-      <AppDialogContent
-        ref={dialogContentRef}
-        tabIndex={-1}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          dialogContentRef.current?.focus({ preventScroll: true });
-        }}
-        maxWidth="720px"
-        className="max-h-[88vh] overflow-y-auto bg-[var(--color-panel-solid)] max-sm:w-[calc(100%-1rem)]"
-        style={{ maxHeight: "88vh" }}
-      >
-        <div className="flex items-start gap-3">
-          <span className="admin-node-detail-country-flag mt-0.5 inline-flex shrink-0 items-center justify-center">
-            <Flag flag={node.region} compact />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Dialog.Title className="mb-0 truncate">{node.name}</Dialog.Title>
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
-                style={{
-                  color: online ? "var(--green-11)" : "var(--red-11)",
-                  backgroundColor: online ? "var(--green-a3)" : "var(--red-a3)",
-                }}
-              >
-                <span className="size-1.5 rounded-full" style={{ backgroundColor: online ? "var(--green-9)" : "var(--red-9)" }} />
-                {statusLabel}
-              </span>
-            </div>
-            <Dialog.Description size="2" color="gray" className="mt-1">
-              {t("admin.nodeDetail.machineDetail", "机器详细信息")}
-            </Dialog.Description>
-          </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="border-b border-[var(--gray-a5)] pb-2 text-sm font-semibold sm:col-span-2">
-            {t("admin.nodeDetail.network", "网络与客户端")}
-          </div>
-          <ReadOnlyDetailField label="IPv4" value={node.ipv4} copyable mono />
-          <ReadOnlyDetailField label="IPv6" value={node.ipv6} copyable mono />
-          <ReadOnlyDetailField label={t("admin.nodeDetail.clientVersion", "客户端版本")} value={publicVersion(node.version)} />
-          <ReadOnlyDetailField label={t("admin.nodeTable.region", "国家 / 地区")} value={getRegionDisplayName(node.region)} />
-
-          <div className="border-b border-[var(--gray-a5)] pb-2 pt-1 text-sm font-semibold sm:col-span-2">
-            {t("admin.nodeDetail.system", "系统信息")}
-          </div>
-          <ReadOnlyDetailField label={t("admin.nodeDetail.os", "操作系统")} value={node.os} />
-          <ReadOnlyDetailField label={t("admin.nodeDetail.arch", "系统架构")} value={node.arch} />
-          <div className="sm:col-span-2">
-            <ReadOnlyDetailField label={t("admin.nodeDetail.cpu", "处理器")} value={node.cpu_name} />
-          </div>
-          <ReadOnlyDetailField label={t("admin.nodeDetail.cpuCores", "CPU 核心")} value={node.cpu_cores ? `${node.cpu_cores} 核` : ""} />
-          <ReadOnlyDetailField label={t("admin.nodeDetail.virtualization", "虚拟化")} value={node.virtualization} />
-          <div className="sm:col-span-2">
-            <ReadOnlyDetailField label={t("admin.nodeDetail.gpu", "显卡")} value={node.gpu_name} />
-          </div>
-
-          <div className="border-b border-[var(--gray-a5)] pb-2 pt-1 text-sm font-semibold sm:col-span-2">
-            {t("admin.nodeDetail.resources", "硬件资源")}
-          </div>
-          <ReadOnlyDetailField label={t("admin.nodeDetail.memTotal", "内存")} value={formatBytes(node.mem_total)} />
-          <ReadOnlyDetailField label={t("admin.nodeDetail.swapTotal", "Swap")} value={formatBytes(node.swap_total)} />
-          <ReadOnlyDetailField label={t("admin.nodeDetail.diskTotal", "磁盘")} value={formatBytes(node.disk_total)} />
-
-          <div className="border-b border-[var(--gray-a5)] pb-2 pt-1 text-sm font-semibold sm:col-span-2">
-            {t("admin.nodeDetail.identity", "标识与时间")}
-          </div>
-          <div className="sm:col-span-2">
-            <ReadOnlyDetailField label={t("admin.nodeDetail.uuid", "UUID")} value={node.uuid} copyable mono />
-          </div>
-          <ReadOnlyDetailField label={t("admin.nodeDetail.createdAt", "创建时间")} value={formatDateTime(node.created_at)} />
-          <ReadOnlyDetailField label={t("admin.nodeDetail.updatedAt", "更新时间")} value={formatDateTime(node.updated_at)} />
-        </div>
-
-        <Flex justify="end" className="mt-5">
-          <Dialog.Close>
-            <Button variant="soft">{t("admin.nodeDetail.done", "完成")}</Button>
-          </Dialog.Close>
-        </Flex>
-      </AppDialogContent>
-    </Dialog.Root>
+          <span
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: online ? NODE_ONLINE : NODE_OFFLINE }}
+          />
+          {statusLabel}
+        </span>
+      </span>
+    </Link>
   );
 }
 
@@ -3795,10 +3868,22 @@ function BillingButton({ node }: { node: NodeDetail }) {
           <CircleDollarSign size="18" />
         </IconButton>
       </Dialog.Trigger>
-      <AppDialogContent>
-        <Dialog.Title>{t("admin.nodeTable.billing", "账单")}</Dialog.Title>
+      <AppDialogContent
+        maxWidth={820}
+        className="km-node-dialog km-node-billing-dialog"
+      >
+        <Dialog.Title>
+          {t("admin.nodeTable.billing", "账单")}
+        </Dialog.Title>
+        <Dialog.Description>
+          {t(
+            "admin.nodeTable.billingDescription",
+            "设置价格、计费周期与到期续费策略。",
+          )}
+        </Dialog.Description>
         <form onSubmit={handleSave}>
-          <Flex direction="column" gap="2">
+          <div className="km-node-dialog-grid">
+            <section className="km-node-dialog-pane km-node-dialog-fields">
             <label className="font-bold">
               <label>{t("admin.nodeTable.price")}</label>
               <label className="text-muted-foreground text-sm ml-1 font-medium">
@@ -3820,26 +3905,32 @@ function BillingButton({ node }: { node: NodeDetail }) {
               onChange={(value) => setCurrency(value)}
               allowCustomInput
             />
-
+            </section>
+            <section className="km-node-dialog-pane km-node-dialog-fields">
             <label className="font-bold flex items-center gap-1">
               {t("admin.nodeTable.billingCycle")} <Tips><span dangerouslySetInnerHTML={{ __html: t("admin.nodeTable.billingCycleTips") }}></span></Tips>
             </label>
-            <SelectOrInput
-            options={[
-              { label: t("common.monthly"), value: "30" },
-              { label: t("common.quarterly"), value: "92" },
-              { label: t("common.semi_annual"), value: "184" },
-              { label: t("common.annual"), value: "365" },
-              { label: t("common.biennial"), value: "730" },
-              { label: t("common.triennial"), value: "1095" },
-              { label: t("common.quinquennial"), value: "1825" },
-              { label: t("common.once"), value: "-1" },
-            ]}
-            type="number"
-            name="billingCycle"
-            value={billingCycle === "0" ? "" : billingCycle}
-            onChange={setBillingCycle}
-          />
+            <Select.Root
+              name="billingCycle"
+              className="w-full"
+              value={billingCycle === "0" ? "" : billingCycle}
+              onValueChange={setBillingCycle}
+            >
+              <Select.Trigger
+                className="w-full"
+                placeholder={t("admin.nodeTable.selectBillingCycle", "选择计费周期")}
+              />
+              <Select.Content>
+                <Select.Item value="30">{t("common.monthly")}</Select.Item>
+                <Select.Item value="92">{t("common.quarterly")}</Select.Item>
+                <Select.Item value="184">{t("common.semi_annual")}</Select.Item>
+                <Select.Item value="365">{t("common.annual")}</Select.Item>
+                <Select.Item value="730">{t("common.biennial")}</Select.Item>
+                <Select.Item value="1095">{t("common.triennial")}</Select.Item>
+                <Select.Item value="1825">{t("common.quinquennial")}</Select.Item>
+                <Select.Item value="-1">{t("common.once")}</Select.Item>
+              </Select.Content>
+            </Select.Root>
 
             <Flex gap="2" align="center">
               <label className="font-bold">
@@ -3876,11 +3967,20 @@ function BillingButton({ node }: { node: NodeDetail }) {
             </TextField.Root>
             <Flex gap="2" align="center"></Flex>
             <SettingCardSwitch
+              bordless
               title={t("admin.nodeTable.autoRenewal")}
               description={t("admin.nodeTable.autoRenewalDescription")}
               defaultChecked={node.auto_renewal || false}
               onChange={setAutoRenewal}
             />
+            </section>
+          </div>
+          <Flex gap="2" justify="end" className="km-node-dialog-actions">
+            <Dialog.Close>
+              <Button type="button" variant="soft" color="gray">
+                {t("common.cancel", "取消")}
+              </Button>
+            </Dialog.Close>
             <Button type="submit" disabled={saving}>
               {t("save")}
             </Button>

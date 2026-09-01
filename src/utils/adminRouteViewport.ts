@@ -26,13 +26,11 @@ export function getAdminRouteProgressHideDelay({
 
 export const getAdminRouteViewKey = ({
   pathname,
-  search,
-  hash,
 }: {
   pathname: string;
   search: string;
   hash: string;
-}): string => `${pathname}${search}${hash}`;
+}): string => pathname;
 
 export const isAdminRouteViewReady = ({
   hasPendingMarker,

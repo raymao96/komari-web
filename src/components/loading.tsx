@@ -1,49 +1,55 @@
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
-import "./Loading.css"
 
 type LoadingProps = {
   text?: string;
   children?: React.ReactNode;
-  size?: number
+  size?: number;
+  fullscreen?: boolean;
+  inline?: boolean;
 };
 
-const Loading = ({ text, children, size }: LoadingProps) => {
+const Loading = ({
+  text,
+  children,
+  size = 28,
+  fullscreen = false,
+  inline = false,
+}: LoadingProps) => {
   const { t } = useTranslation();
 
   return (
-    <div
-      className="flex items-center justify-center flex-col"
-      data-admin-route-pending="true"
+    <Stack
+      role="status"
+      aria-live="polite"
+      data-admin-route-pending={inline ? undefined : "true"}
+      spacing={1.5}
+      sx={{
+        width: "100%",
+        minHeight: fullscreen ? "100dvh" : 160,
+        px: 2,
+        py: fullscreen ? 4 : 2.5,
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        bgcolor: fullscreen ? "background.default" : "transparent",
+        color: "text.secondary",
+      }}
     >
-      <div
-        className="showbox"
-        style={{
-          transform: `scale(${size ? size * 0.1 : 0.5})`,
-          transition: "transform 0.2s",
-        }}
-      >
-        <div className="loader">
-          <svg className="circular" viewBox="25 25 50 50">
-            <circle
-              className="path"
-              cx="50"
-              cy="50"
-              r="20"
-              fill="none"
-              strokeWidth="2"
-              strokeMiterlimit="10"
-            />
-          </svg>
-        </div>
-      </div>
-      <p className="text-lg font-bold">{t("loading")}</p>
-      <p className="text-sm text-muted-foreground mb-4">
-        {text}
-      </p>
-      <div>
-        {children}
-      </div>
-    </div>
+      <CircularProgress size={size} thickness={4} />
+      <Box>
+        <Typography variant="body2">{t("loading")}</Typography>
+        {text ? (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
+            {text}
+          </Typography>
+        ) : null}
+      </Box>
+      {children ? <Box>{children}</Box> : null}
+    </Stack>
   );
 };
 

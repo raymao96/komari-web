@@ -1,32 +1,26 @@
-import AppDialogContent from "@/components/AppDialogContent";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Typography from "@mui/material/Typography";
+import { alpha, useTheme } from "@mui/material/styles";
+import { ArrowRight, HardDrive, Server, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Button,
-  Callout,
-  Container,
-  Dialog,
-  Flex,
-  Heading,
-  Progress,
-  SegmentedControl,
-  Text,
-  TextField,
-} from "@radix-ui/themes";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  HardDrive,
-  LoaderCircle,
-  Server,
-  Trash2,
-} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import GuideHeader from "@/components/GuideHeader";
-import RestrictedLoginDialog from "@/components/RestrictedLoginDialog";
-import { SettingCard, SettingCardLabel } from "@/components/admin/SettingCard";
+import MigrationGuideShell from "@/components/install/MigrationGuideShell";
+import { isGuidePreview } from "@/utils/guidePreview";
+import { useSearchParams } from "react-router-dom";
 
 const API_BASE = "/api/admin/update/1.2.7";
 const I18N_PREFIX = "settings.update_1_2_7";
@@ -62,19 +56,6 @@ type UpgradeStatus = {
   error?: string;
 };
 
-type LoginMethods = {
-  oauth_enabled: boolean;
-  oauth_provider: string;
-  password_login_enabled: boolean;
-};
-
-type Me = {
-  logged_in: boolean;
-  username: string;
-};
-
-type AuthStatus = LoginMethods & Me;
-
 type APIResponse<T> = {
   status: "success" | "error";
   message: string;
@@ -83,10 +64,31 @@ type APIResponse<T> = {
 
 const examples: Record<Driver, string> = {
   sqlite: "./data/metrics.db",
-  mysql: "user:password@tcp(127.0.0.1:3306)/komari?parseTime=true",
+  mysql: "user:password@tcp(127.0.0.1:3306)/lite?parseTime=true",
   postgresql:
-    "host=127.0.0.1 port=5432 user=komari password=secret dbname=komari sslmode=disable",
+    "host=127.0.0.1 port=5432 user=lite password=secret dbname=lite sslmode=disable",
 };
+
+function previewUpgradeStatus(): UpgradeStatus {
+  return {
+    state: "migrating",
+    phase: "migrating",
+    table: "load",
+    summary: {
+      load_rows: 186420,
+      gpu_rows: 12400,
+      latency_rows: 54210,
+      monitoring_rows: 240630,
+      estimated_points: 18200,
+      server_count: 18,
+      retention_days: 30,
+    },
+    source_rows_done: 96400,
+    source_rows_total: 186420,
+    written_points: 9100,
+    progress: 52,
+  };
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -106,21 +108,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-async function getMe(): Promise<Me> {
-  const response = await fetch("/api/me", { cache: "no-store" });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return (await response.json()) as Me;
-}
-
 const Upgrade127 = () => {
   const { t, i18n } = useTranslation();
+  const theme = useTheme();
   const locale = i18n.resolvedLanguage || i18n.language || "en-US";
   const formatNumber = useCallback(
     (value: number) => new Intl.NumberFormat(locale).format(value),
     [locale],
   );
-  const [auth, setAuth] = useState<AuthStatus | null>(null);
-  const [status, setStatus] = useState<UpgradeStatus | null>(null);
+  const [searchParams] = useSearchParams();
+  const preview = searchParams.get("preview") === "1" || isGuidePreview();
+  const [status, setStatus] = useState<UpgradeStatus | null>(() =>
+    isGuidePreview() ? previewUpgradeStatus() : null,
+  );
   const [pageError, setPageError] = useState("");
   const [driver, setDriver] = useState<Driver>("sqlite");
   const [dsn, setDSN] = useState(examples.sqlite);
@@ -131,14 +131,17 @@ const Upgrade127 = () => {
   const [confirmSQLite, setConfirmSQLite] = useState(false);
   const [confirmLarge, setConfirmLarge] = useState(false);
 
-  const refreshAuth = useCallback(async () => {
+  const refreshStatus = useCallback(async () => {
+    if (preview) {
+      const next = previewUpgradeStatus();
+      setStatus(next);
+      setPageError("");
+      return next;
+    }
     try {
-      const [methods, me] = await Promise.all([
-        request<LoginMethods>("/auth"),
-        getMe(),
-      ]);
-      const next = { ...methods, ...me };
-      setAuth(next);
+      const next = await request<UpgradeStatus>("/status");
+      setStatus(next);
+      setPageError("");
       return next;
     } catch (error) {
       setPageError(
@@ -148,39 +151,20 @@ const Upgrade127 = () => {
       );
       return null;
     }
-  }, [t]);
+  }, [preview, t]);
 
-  const refreshStatus = useCallback(async () => {
-    try {
-      const next = await request<UpgradeStatus>("/status");
-      setStatus(next);
+  useEffect(() => {
+    if (preview) {
       setPageError("");
-      return next;
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Unauthorized")) {
-        setAuth((current) =>
-          current ? { ...current, logged_in: false } : current,
-        );
-      } else {
-        setPageError(
-          error instanceof Error
-            ? error.message
-            : t(`${I18N_PREFIX}.network_error`),
-        );
-      }
-      return null;
+      setStatus(previewUpgradeStatus());
+      return;
     }
-  }, [t]);
+    void refreshStatus();
+  }, [preview, refreshStatus]);
 
   useEffect(() => {
-    void refreshAuth().then((next) => {
-      if (next?.logged_in) void refreshStatus();
-    });
-  }, [refreshAuth, refreshStatus]);
-
-  useEffect(() => {
+    if (preview) return;
     if (
-      !auth?.logged_in ||
       !status ||
       (status.state !== "migrating" && status.state !== "cleaning")
     ) {
@@ -188,13 +172,13 @@ const Upgrade127 = () => {
     }
     const timer = window.setInterval(() => void refreshStatus(), 700);
     return () => window.clearInterval(timer);
-  }, [auth?.logged_in, refreshStatus, status]);
+  }, [preview, refreshStatus, status]);
 
   useEffect(() => {
-    if (status?.state !== "completed") return;
+    if (preview || status?.state !== "completed") return;
     const timer = window.setTimeout(() => window.location.replace("/"), 3200);
     return () => window.clearTimeout(timer);
-  }, [status?.state]);
+  }, [preview, status?.state]);
 
   const summary = status?.summary;
   const sqliteRisk =
@@ -248,10 +232,10 @@ const Upgrade127 = () => {
     ? status?.storage_progress ?? 0
     : status?.progress ?? 0;
 
-  const handleDriver = (value: string) => {
-    const next = value as Driver;
-    setDriver(next);
-    setDSN(examples[next]);
+  const handleDriver = (_: unknown, value: Driver | null) => {
+    if (!value) return;
+    setDriver(value);
+    setDSN(examples[value]);
     setConfirmSQLite(false);
   };
 
@@ -307,391 +291,313 @@ const Upgrade127 = () => {
     }
   };
 
+  const progress =
+    status?.state === "migrating" || status?.state === "cleaning"
+      ? {
+          value: displayedProgress,
+          label: phaseText,
+          detail: t(`${I18N_PREFIX}.progress_detail`, {
+            done: formatNumber(displayedDone),
+            total: formatNumber(displayedTotal),
+            points: formatNumber(displayedWritten),
+          }),
+          determinate: displayedTotal > 0,
+        }
+      : null;
+
   return (
-    <main className="min-h-screen bg-[var(--color-background)] text-[var(--gray-12)]">
-      <header
-        className="border-b bg-[var(--color-panel-solid)]"
-        style={{ borderColor: "var(--gray-a5)" }}
+    <>
+      <MigrationGuideShell
+        title={t(`${I18N_PREFIX}.title`)}
+        subtitle={t(`${I18N_PREFIX}.subtitle`)}
+        progress={progress}
+        footer={
+          status?.state === "completed" ? undefined : (
+            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+              <Button
+                variant="contained"
+                disabled={operating || !status}
+                endIcon={<ArrowRight size={18} />}
+                onClick={() => setStartOpen(true)}
+              >
+                {t(`${I18N_PREFIX}.start`)}
+              </Button>
+            </Stack>
+          )
+        }
       >
-        <Container size="3" px={{ initial: "4", sm: "6" }} py="3">
-          <GuideHeader />
-        </Container>
-      </header>
-
-      <Container
-        size="3"
-        px={{ initial: "4", sm: "6" }}
-        py={{ initial: "6", sm: "8" }}
-      >
-        <Flex direction="column" gap="5">
-          <div>
-            <Heading size="7" weight="bold">
-              {t(`${I18N_PREFIX}.title`)}
-            </Heading>
-            <Text as="p" size="2" color="gray" mt="2">
-              {t(`${I18N_PREFIX}.subtitle`)}
-            </Text>
-          </div>
-
-          {pageError && (
-            <Callout.Root color="red" variant="surface">
-              <Callout.Icon>
-                <AlertTriangle size={18} />
-              </Callout.Icon>
-              <Callout.Text>{pageError}</Callout.Text>
-            </Callout.Root>
-          )}
+        <Stack spacing={3}>
+          {pageError && !preview ? <Alert severity="error">{pageError}</Alert> : null}
 
           {status?.state === "completed" ? (
-            <Callout.Root color="green" variant="surface" size="3">
-              <Callout.Icon>
-                <CheckCircle2 size={22} />
-              </Callout.Icon>
-              <Callout.Text>
-                <Text as="div" weight="bold">
-                  {t(`${I18N_PREFIX}.completed_title`)}
-                </Text>
-                <Text as="div" mt="1">
-                  {t(`${I18N_PREFIX}.completed_description`)}
-                </Text>
-              </Callout.Text>
-            </Callout.Root>
+            <Alert severity="success">
+              <Typography variant="subtitle2">{t(`${I18N_PREFIX}.completed_title`)}</Typography>
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                {t(`${I18N_PREFIX}.completed_description`)}
+              </Typography>
+            </Alert>
           ) : (
-            <Flex direction="column" gap="5">
-              <Flex direction="column" gap="3">
-                <SettingCardLabel>
+            <>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1.25 }}>
                   {t(`${I18N_PREFIX}.overview`)}
-                </SettingCardLabel>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SettingCard title={t(`${I18N_PREFIX}.load_rows`)}>
-                    <Flex direction="column" gap="1" className="mt-2 w-full">
-                      <Text size="7" weight="bold" className="tabular-nums">
-                        {formatNumber(summary?.load_rows ?? 0)}{" "}
-                        <Text size="2" color="gray">
-                          {t(`${I18N_PREFIX}.rows`)}
-                        </Text>
-                      </Text>
-                      <Text size="1" color="gray">
-                        {t(`${I18N_PREFIX}.gpu_rows`, {
-                          count: summary?.gpu_rows ?? 0,
-                        })}
-                      </Text>
-                    </Flex>
-                  </SettingCard>
-                  <SettingCard title={t(`${I18N_PREFIX}.latency_rows`)}>
-                    <Flex direction="column" gap="1" className="mt-2 w-full">
-                      <Text size="7" weight="bold" className="tabular-nums">
-                        {formatNumber(summary?.latency_rows ?? 0)}{" "}
-                        <Text size="2" color="gray">
-                          {t(`${I18N_PREFIX}.rows`)}
-                        </Text>
-                      </Text>
-                    </Flex>
-                  </SettingCard>
-                </div>
-                <Text size="2" color="gray">
+                </Typography>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 2,
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  }}
+                >
+                  <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: "8px" }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t(`${I18N_PREFIX}.load_rows`)}
+                    </Typography>
+                    <Typography variant="h5" sx={{ mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
+                      {formatNumber(summary?.load_rows ?? 0)}
+                      <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 0.75 }}>
+                        {t(`${I18N_PREFIX}.rows`)}
+                      </Typography>
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {t(`${I18N_PREFIX}.gpu_rows`, { count: summary?.gpu_rows ?? 0 })}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: "8px" }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t(`${I18N_PREFIX}.latency_rows`)}
+                    </Typography>
+                    <Typography variant="h5" sx={{ mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
+                      {formatNumber(summary?.latency_rows ?? 0)}
+                      <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 0.75 }}>
+                        {t(`${I18N_PREFIX}.rows`)}
+                      </Typography>
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1.25 }}>
                   {t(`${I18N_PREFIX}.overview_detail`, {
                     points: formatNumber(summary?.estimated_points ?? 0),
                     days: summary?.retention_days ?? 0,
                     servers: summary?.server_count ?? 0,
                   })}
-                </Text>
-              </Flex>
+                </Typography>
+              </Box>
 
-              <Flex direction="column" gap="3">
-                <SettingCardLabel>
-                  {t(`${I18N_PREFIX}.target`)}
-                </SettingCardLabel>
-                <SettingCard
-                  title={t(`${I18N_PREFIX}.target`)}
-                  description={t(`${I18N_PREFIX}.target_description`)}
+              <Box>
+                <Typography variant="subtitle2">{t(`${I18N_PREFIX}.target`)}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+                  {t(`${I18N_PREFIX}.target_description`)}
+                </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  value={driver}
+                  onChange={handleDriver}
+                  disabled={operating}
+                  aria-label={t(`${I18N_PREFIX}.target`)}
+                  sx={{
+                    mb: 2,
+                    borderRadius: "8px",
+                    "& .MuiToggleButton-root": {
+                      minHeight: 48,
+                      px: { xs: 1.25, sm: 2 },
+                      borderColor: "divider",
+                      bgcolor: "background.paper",
+                      color: "text.primary",
+                      textTransform: "none",
+                      gap: 0.85,
+                      "&.Mui-selected": {
+                        bgcolor: `${alpha(theme.palette.primary.main, theme.palette.mode === "light" ? 0.09 : 0.16)} !important`,
+                        color: "primary.main",
+                        borderColor: alpha(theme.palette.primary.main, 0.48),
+                      },
+                    },
+                  }}
                 >
-                  <Flex direction="column" gap="3" className="mt-3 w-full">
-                    <SegmentedControl.Root
-                      value={driver}
-                      onValueChange={handleDriver}
-                      className="w-full"
-                    >
-                      <SegmentedControl.Item value="sqlite">
-                        <div className="flex flex-row items-center justify-center gap-1.5">
-                          <HardDrive size={15} />
-                          <span className="hidden sm:inline">
-                            {t(`${I18N_PREFIX}.sqlite_local`)}
-                          </span>
-                        </div>
-                        <span className="sm:hidden">SQLite</span>
-                      </SegmentedControl.Item>
-                      <SegmentedControl.Item value="mysql">
-                        <div className="flex flex-row items-center justify-center gap-1.5">
-                          <Server size={15} />
-                          <span className="hidden sm:inline">
-                            {t(`${I18N_PREFIX}.mysql_remote`)}
-                          </span>
-                          <span className="sm:hidden">MySQL</span>
-                        </div>
-                      </SegmentedControl.Item>
-                      <SegmentedControl.Item value="postgresql">
-                        <div className="flex flex-row items-center justify-center gap-1.5">
-                          <Server size={15} />
-                          <span className="hidden sm:inline">
-                            {t(`${I18N_PREFIX}.postgresql_remote`)}
-                          </span>
-                          <span className="sm:hidden">PG</span>
-                        </div>
-                      </SegmentedControl.Item>
-                    </SegmentedControl.Root>
+                  <ToggleButton value="sqlite">
+                    <HardDrive size={16} />
+                    <Typography variant="body2" color="inherit" sx={{ fontWeight: 600 }}>
+                      {t(`${I18N_PREFIX}.sqlite_local`)}
+                    </Typography>
+                  </ToggleButton>
+                  <ToggleButton value="mysql">
+                    <Server size={16} />
+                    <Typography variant="body2" color="inherit" sx={{ fontWeight: 600 }}>
+                      {t(`${I18N_PREFIX}.mysql_remote`)}
+                    </Typography>
+                  </ToggleButton>
+                  <ToggleButton value="postgresql">
+                    <Server size={16} />
+                    <Typography variant="body2" color="inherit" sx={{ fontWeight: 600 }}>
+                      {t(`${I18N_PREFIX}.postgresql_remote`)}
+                    </Typography>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+                <Typography variant="body2" sx={{ mb: 0.75, fontWeight: 600 }}>
+                  {t(`${I18N_PREFIX}.dsn`)}
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={dsn}
+                  onChange={(event) => setDSN(event.target.value)}
+                  disabled={operating}
+                  spellCheck={false}
+                  helperText={t(`${I18N_PREFIX}.example`, { example: examples[driver] })}
+                />
+                {driver === "sqlite" ? (
+                  <Alert severity="warning" sx={{ mt: 1.5 }}>
+                    {t(`${I18N_PREFIX}.sqlite_warning`)}
+                  </Alert>
+                ) : null}
+              </Box>
 
-                    <label>
-                      <Text as="div" size="2" weight="bold" mb="2">
-                        {t(`${I18N_PREFIX}.dsn`)}
-                      </Text>
-                      <TextField.Root
-                        size="3"
-                        value={dsn}
-                        onChange={(event) => setDSN(event.target.value)}
-                        disabled={operating}
-                        spellCheck={false}
-                      />
-                      <Text
-                        as="div"
-                        size="1"
-                        color="gray"
-                        mt="2"
-                        className="break-all"
-                      >
-                        {t(`${I18N_PREFIX}.example`, {
-                          example: examples[driver],
-                        })}
-                      </Text>
-                    </label>
-
-                    {driver === "sqlite" && (
-                      <Callout.Root color="amber" variant="surface">
-                        <Callout.Icon>
-                          <AlertTriangle size={18} />
-                        </Callout.Icon>
-                        <Callout.Text>
-                          {t(`${I18N_PREFIX}.sqlite_warning`)}
-                        </Callout.Text>
-                      </Callout.Root>
-                    )}
-                  </Flex>
-                </SettingCard>
-              </Flex>
-
-              <Flex direction="column" gap="3">
-                <SettingCardLabel>
-                  {t(`${I18N_PREFIX}.cleanup`)}
-                </SettingCardLabel>
-                <SettingCard
-                  title={t(`${I18N_PREFIX}.cleanup`)}
-                  description={t(`${I18N_PREFIX}.cleanup_description`)}
+              <Box>
+                <Typography variant="subtitle2">{t(`${I18N_PREFIX}.cleanup`)}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+                  {t(`${I18N_PREFIX}.cleanup_description`)}
+                </Typography>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1.5}
+                  sx={{ alignItems: { sm: "flex-end" } }}
                 >
-                  <div className="mt-3 grid w-full items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                    <label>
-                      <Text as="div" size="2" weight="bold" mb="2">
-                        {t(`${I18N_PREFIX}.before`)}
-                      </Text>
-                      <TextField.Root
-                        type="datetime-local"
-                        size="3"
-                        value={cutoff}
-                        onChange={(event) => setCutoff(event.target.value)}
-                        disabled={operating}
-                        max={new Date(
+                  <TextField
+                    fullWidth
+                    type="datetime-local"
+                    label={t(`${I18N_PREFIX}.before`)}
+                    value={cutoff}
+                    onChange={(event) => setCutoff(event.target.value)}
+                    disabled={operating}
+                    slotProps={{
+                      inputLabel: { shrink: true },
+                      htmlInput: {
+                        max: new Date(
                           Date.now() - new Date().getTimezoneOffset() * 60000,
                         )
                           .toISOString()
-                          .slice(0, 16)}
-                      />
-                    </label>
-                    <Button
-                      color="red"
-                      variant="soft"
-                      size="3"
-                      disabled={!cutoff || operating}
-                      onClick={() => setCleanupOpen(true)}
-                    >
-                      <Trash2 size={17} />
-                      {t(`${I18N_PREFIX}.cleanup_action`)}
-                    </Button>
-                  </div>
-                </SettingCard>
-              </Flex>
+                          .slice(0, 16),
+                      },
+                    }}
+                  />
+                  <Button
+                    color="error"
+                    variant="outlined"
+                    disabled={!cutoff || operating}
+                    startIcon={<Trash2 size={17} />}
+                    onClick={() => setCleanupOpen(true)}
+                    sx={{ flexShrink: 0, minHeight: 44 }}
+                  >
+                    {t(`${I18N_PREFIX}.cleanup_action`)}
+                  </Button>
+                </Stack>
+              </Box>
 
-              {(status?.state === "migrating" ||
-                status?.state === "cleaning") && (
-                <SettingCard
-                  title={t(`${I18N_PREFIX}.progress_title`)}
-                  description={phaseText}
-                >
-                  <Flex direction="column" gap="3" className="mt-3 w-full">
-                    <Flex justify="between" gap="3">
-                      <Text size="2" color="gray">
-                        {t(`${I18N_PREFIX}.progress_detail`, {
-                          done: formatNumber(displayedDone),
-                          total: formatNumber(displayedTotal),
-                          points: formatNumber(displayedWritten),
-                        })}
-                      </Text>
-                      <Text weight="bold" className="tabular-nums">
-                        {Math.round(displayedProgress)}%
-                      </Text>
-                    </Flex>
-                    <Progress value={displayedProgress} size="3" />
-                  </Flex>
-                </SettingCard>
-              )}
-
-              {status?.state === "failed" && (
-                <Callout.Root color="red" variant="surface">
-                  <Callout.Icon>
-                    <AlertTriangle size={18} />
-                  </Callout.Icon>
-                  <Callout.Text>
-                    <Text as="div" weight="bold">
-                      {t(`${I18N_PREFIX}.failed_title`)}
-                    </Text>
-                    <Text as="div" mt="1">
-                      {status.error}
-                    </Text>
-                    <Text as="div" mt="1">
-                      {t(`${I18N_PREFIX}.retry_hint`)}
-                    </Text>
-                  </Callout.Text>
-                </Callout.Root>
-              )}
-
-              <Flex justify="end">
-                <Button
-                  size="3"
-                  disabled={operating || !status}
-                  onClick={() => setStartOpen(true)}
-                >
-                  {t(`${I18N_PREFIX}.start`)}
-                  <ArrowRight size={18} />
-                </Button>
-              </Flex>
-            </Flex>
+              {status?.state === "failed" ? (
+                <Alert severity="error">
+                  <Typography variant="subtitle2">{t(`${I18N_PREFIX}.failed_title`)}</Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {status.error}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {t(`${I18N_PREFIX}.retry_hint`)}
+                  </Typography>
+                </Alert>
+              ) : null}
+            </>
           )}
-        </Flex>
-      </Container>
+        </Stack>
+      </MigrationGuideShell>
 
-      <RestrictedLoginDialog
-        auth={auth}
-        requestFailedKey={`${I18N_PREFIX}.request_failed`}
-        onAuthenticated={async () => {
-          const next = await refreshAuth();
-          if (next?.logged_in) await refreshStatus();
-        }}
-      />
-
-      <Dialog.Root open={cleanupOpen} onOpenChange={setCleanupOpen}>
-        <AppDialogContent maxWidth="480px">
-          <Dialog.Title>{t(`${I18N_PREFIX}.cleanup_title`)}</Dialog.Title>
-          <Dialog.Description>
+      <Dialog
+        open={cleanupOpen}
+        onClose={() => !busy && setCleanupOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>{t(`${I18N_PREFIX}.cleanup_title`)}</DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
             {t(`${I18N_PREFIX}.cleanup_confirm`, {
               date: cutoff ? new Date(cutoff).toLocaleString(locale) : "-",
             })}
-          </Dialog.Description>
-          <Flex justify="end" gap="3" mt="5" wrap="wrap">
-            <Dialog.Close>
-              <Button variant="soft" color="gray">
-                {t("cancel")}
-              </Button>
-            </Dialog.Close>
-            <Button color="red" disabled={busy} onClick={() => void cleanup()}>
-              {busy && <LoaderCircle size={16} className="animate-spin" />}
-              {t(`${I18N_PREFIX}.confirm_cleanup`)}
-            </Button>
-          </Flex>
-        </AppDialogContent>
-      </Dialog.Root>
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={busy} onClick={() => setCleanupOpen(false)}>
+            {t("cancel")}
+          </Button>
+          <Button color="error" variant="contained" disabled={busy} onClick={() => void cleanup()}>
+            {busy ? <CircularProgress size={16} /> : t(`${I18N_PREFIX}.confirm_cleanup`)}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      <Dialog.Root open={startOpen} onOpenChange={setStartOpen}>
-        <AppDialogContent maxWidth="520px">
-          <Dialog.Title>{t(`${I18N_PREFIX}.start_title`)}</Dialog.Title>
-          <Dialog.Description>
+      <Dialog
+        open={startOpen}
+        onClose={() => !busy && setStartOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{t(`${I18N_PREFIX}.start_title`)}</DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
             {t(`${I18N_PREFIX}.start_description`)}
-          </Dialog.Description>
-          <Flex direction="column" gap="3" mt="4">
-            {sqliteRisk && (
-              <label
-                className="flex items-start gap-3 border p-3"
-                style={{
-                  borderColor: "var(--amber-a6)",
-                  background: "var(--amber-a2)",
-                  borderRadius: "var(--radius-2)",
-                }}
-              >
-                <Checkbox
-                  checked={confirmSQLite}
-                  onCheckedChange={(checked) =>
-                    setConfirmSQLite(checked === true)
-                  }
-                  className="mt-1"
-                />
-                <span>
-                  <Text as="div" size="2">
-                    {t(`${I18N_PREFIX}.sqlite_risk`, {
-                      servers: summary?.server_count ?? 0,
-                      days: summary?.retention_days ?? 0,
-                    })}
-                  </Text>
-                  <Text as="div" size="2" weight="bold" mt="1">
-                    {t(`${I18N_PREFIX}.sqlite_confirm`)}
-                  </Text>
-                </span>
-              </label>
-            )}
-            {largeRisk && (
-              <label
-                className="flex items-start gap-3 border p-3"
-                style={{
-                  borderColor: "var(--red-a6)",
-                  background: "var(--red-a2)",
-                  borderRadius: "var(--radius-2)",
-                }}
-              >
-                <Checkbox
-                  checked={confirmLarge}
-                  onCheckedChange={(checked) =>
-                    setConfirmLarge(checked === true)
-                  }
-                  className="mt-1"
-                />
-                <span>
-                  <Text as="div" size="2">
-                    {t(`${I18N_PREFIX}.large_risk`)}
-                  </Text>
-                  <Text as="div" size="2" weight="bold" mt="1">
-                    {t(`${I18N_PREFIX}.large_confirm`)}
-                  </Text>
-                </span>
-              </label>
-            )}
-          </Flex>
-          <Flex justify="end" gap="3" mt="5" wrap="wrap">
-            <Dialog.Close>
-              <Button variant="soft" color="gray">
-                {t("cancel")}
-              </Button>
-            </Dialog.Close>
-            <Button
-              disabled={
-                busy ||
-                (sqliteRisk && !confirmSQLite) ||
-                (largeRisk && !confirmLarge)
-              }
-              onClick={() => void start()}
-            >
-              {busy && <LoaderCircle size={16} className="animate-spin" />}
-              {t(`${I18N_PREFIX}.confirm_start`)}
-            </Button>
-          </Flex>
-        </AppDialogContent>
-      </Dialog.Root>
-    </main>
+          </Typography>
+          {sqliteRisk ? (
+            <Alert severity="warning" sx={{ mb: 1.5, alignItems: "flex-start" }}>
+              <Typography variant="body2">
+                {t(`${I18N_PREFIX}.sqlite_risk`, {
+                  servers: summary?.server_count ?? 0,
+                  days: summary?.retention_days ?? 0,
+                })}
+              </Typography>
+              <FormControlLabel
+                sx={{ mt: 0.5, alignItems: "flex-start" }}
+                control={
+                  <Checkbox
+                    checked={confirmSQLite}
+                    onChange={(event) => setConfirmSQLite(event.target.checked)}
+                  />
+                }
+                label={t(`${I18N_PREFIX}.sqlite_confirm`)}
+              />
+            </Alert>
+          ) : null}
+          {largeRisk ? (
+            <Alert severity="error" sx={{ alignItems: "flex-start" }}>
+              <Typography variant="body2">{t(`${I18N_PREFIX}.large_risk`)}</Typography>
+              <FormControlLabel
+                sx={{ mt: 0.5, alignItems: "flex-start" }}
+                control={
+                  <Checkbox
+                    checked={confirmLarge}
+                    onChange={(event) => setConfirmLarge(event.target.checked)}
+                  />
+                }
+                label={t(`${I18N_PREFIX}.large_confirm`)}
+              />
+            </Alert>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={busy} onClick={() => setStartOpen(false)}>
+            {t("cancel")}
+          </Button>
+          <Button
+            variant="contained"
+            disabled={
+              busy ||
+              (sqliteRisk && !confirmSQLite) ||
+              (largeRisk && !confirmLarge)
+            }
+            onClick={() => void start()}
+          >
+            {busy ? <CircularProgress size={16} /> : t(`${I18N_PREFIX}.confirm_start`)}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

@@ -15,7 +15,7 @@ const globalStyles = readFileSync(
   "utf8",
 );
 
-for (const locale of ["en", "id_ID", "ja_JP", "zh_CN", "zh_TW"]) {
+for (const locale of ["en", "ja_JP", "zh_CN", "zh_TW"]) {
   test(`${locale} includes the complete current-load-alert copy`, () => {
     const messages = JSON.parse(
       readFileSync(
@@ -49,6 +49,7 @@ test("load notifications expose searchable configuration and current-alert tabs"
   assert.match(pageSource, /notification\.load\.silence_tips/);
   assert.match(pageSource, /<LoadListToolbar[\s\S]*showAdd[\s\S]*<LoadConfigurationTable/);
   assert.match(pageSource, /<LoadListToolbar[\s\S]*<CurrentLoadAlertsTable/);
+  assert.match(pageSource, /<AdminListShell/);
   assert.match(pageSource, /"off" \| "24h" \| "3d" \| "7d" \| "forever"/);
 });
 
@@ -67,8 +68,10 @@ test("current load alerts show the preferred node IP instead of the UUID", () =>
   );
 });
 
-test("load notification tabs animate normally and stop only for reduced motion", () => {
+test("load notification tabs keep the previous sheet until current alerts are ready", () => {
   assert.match(pageSource, /className="admin-tab-panel pt-3"/);
-  assert.match(globalStyles, /\.admin-tab-panel\[data-state="active"\][^{]*\{[^}]*animation: admin-tab-panel-enter 180ms/);
+  assert.match(pageSource, /useHeldTab\(view, currentReady\)/);
+  assert.match(pageSource, /value=\{displayView\}/);
+  assert.match(globalStyles, /\.admin-tab-panel\[data-state="active"\][^{]*\{[^}]*animation: none/);
   assert.match(globalStyles, /html\[data-reduce-motion="true"\][^,]*\.admin-tab-panel/);
 });

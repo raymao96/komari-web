@@ -1,4 +1,4 @@
-import { Badge, Flex } from "@radix-ui/themes";
+import { Badge, Flex } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import { currencyForDisplay } from "@/lib/currency";
 
@@ -10,6 +10,7 @@ const PriceTags = ({
   tags = "",
   ip4 = "",
   ip6 = "",
+  className,
   ...props
 }: {
   expired_at?: string | number | null;
@@ -24,7 +25,7 @@ const PriceTags = ({
 
   if (price == 0) {
     return (
-      <Flex gap="1" {...props} wrap="wrap">
+      <Flex gap="1" {...props} wrap="wrap" className={className}>
         <CustomTags tags={tags} />
       </Flex>
     );
@@ -43,7 +44,7 @@ const PriceTags = ({
     : price.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 
   return (
-    <Flex gap="1" {...props} wrap="wrap">
+    <Flex gap="1" wrap="wrap" {...props} className={className}>
       {ip4 && (
         <Badge size="1" variant="soft" className="text-sm" color="green">
           <label className="flex justify-center items-center gap-1 text-xs">
@@ -62,7 +63,7 @@ const PriceTags = ({
         </Badge>
       )}
 
-      <Badge color="iris" size="1" variant="soft" className="text-sm">
+      <Badge color="blue" size="1" variant="soft" className="text-sm">
         <label className="text-xs">
           {price == -1 ? t("common.free") : `${currencyForDisplay(currency)}${displayPrice}`}/
           {(() => {
@@ -123,7 +124,7 @@ const PriceTags = ({
   );
 };
 
-const CustomTags = ({ tags }: { tags?: string }) => {
+export const CustomTags = ({ tags }: { tags?: string }) => {
   if (!tags || tags.trim() === "") {
     return <></>;
   }
@@ -144,7 +145,6 @@ const CustomTags = ({ tags }: { tags?: string }) => {
     | "plum"
     | "purple"
     | "violet"
-    | "iris"
     | "indigo"
     | "blue"
     | "cyan"
@@ -171,7 +171,6 @@ const CustomTags = ({ tags }: { tags?: string }) => {
     "plum",
     "purple",
     "violet",
-    "iris",
     "indigo",
     "blue",
     "cyan",
@@ -190,9 +189,9 @@ const CustomTags = ({ tags }: { tags?: string }) => {
     if (colorMatch) {
       const color = colorMatch[1].toLowerCase();
       const text = tag.replace(/<\w+>$/, "");
-      // 检查颜色是否在支持的颜色列表中
-      if (colors.includes(color as any)) {
-        return { text, color: color as (typeof colors)[number] };
+      const resolved = color === "iris" ? "blue" : color;
+      if (colors.includes(resolved as any)) {
+        return { text, color: resolved as (typeof colors)[number] };
       }
     }
     return { text: tag, color: null };

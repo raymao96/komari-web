@@ -1,4 +1,3 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 import {
   Table,
@@ -8,7 +7,8 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { Button, Dialog, Flex } from "@radix-ui/themes";
+import {
+  AppDialogContent, Button, Dialog, Flex } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
@@ -81,7 +81,7 @@ const LogPage = () => {
           {t("logs.title")}
         </AdminPageTitle>
       </div>
-      <div className="overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
+      <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)]">
         <div className="overflow-x-auto">
         <Table className="min-w-[760px]">
           <TableHeader>

@@ -14,9 +14,27 @@ const trafficReportSource = readFileSync(
   "src/pages/admin/notification/traffic_report.tsx",
   "utf8",
 );
-const locales = ["en", "id_ID", "ja_JP", "zh_CN", "zh_TW"].map((locale) =>
+const locales = ["en", "ja_JP", "zh_CN", "zh_TW"].map((locale) =>
   JSON.parse(readFileSync(`src/i18n/locales/${locale}.json`, "utf8")),
 );
+
+test("offline and traffic-report pages wait for their first fetch before replacing the current admin page", () => {
+  const offlineContext = readFileSync(
+    "src/contexts/NotificationContext.tsx",
+    "utf8",
+  );
+  const trafficContext = readFileSync(
+    "src/contexts/TrafficReportContext.tsx",
+    "utf8",
+  );
+  assert.match(offlineContext, /useState<boolean>\(true\)/);
+  assert.match(trafficContext, /useState<boolean>\(true\)/);
+  assert.match(offlineSource, /if \(onLoading \|\| onNodeLoading\) \{\s*return <Loading/);
+  assert.match(
+    trafficReportSource,
+    /if \(onLoading \|\| onNodeLoading \|\| settingsLoading\) \{\s*return <Loading/,
+  );
+});
 
 test("notification pages expose future-server defaults through their edit fields", () => {
   assert.match(offlineSource, /Settings2/);

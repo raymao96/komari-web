@@ -1,6 +1,6 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
-import { Dialog, Button, Flex } from "@radix-ui/themes";
+import {
+  AppDialogContent, Dialog, Button, Flex } from "@/components/admin/ui";
 import NodeSelector from "./NodeSelector";
 import { useNodeDetails } from "@/contexts/NodeDetailsContext";
 import { useTranslation } from "react-i18next";
@@ -67,13 +67,13 @@ const NodeSelectorDialog: React.FC<NodeSelectorDialogProps> = ({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange} zIndex={1400}>
       <Dialog.Trigger>
         {children ? children : <Button>{title || t("common.select")}</Button>}
       </Dialog.Trigger>
-      <AppDialogContent style={{ maxWidth: 400 }}>
+      <AppDialogContent>
         <Dialog.Title>{title || t("common.select")}</Dialog.Title>
-        <Flex direction="column" gap="3">
+        <Flex direction="column" gap="4">
           <Flex justify="between" align="center" gap="2">
             <label className="text-sm text-gray-600">
               {t("common.selected_total", {

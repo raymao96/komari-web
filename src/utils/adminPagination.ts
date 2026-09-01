@@ -1,4 +1,4 @@
-export const ADMIN_LIST_PAGE_SIZE = 10;
+export const ADMIN_LIST_PAGE_SIZE = 20;
 export const ADMIN_LIST_PAGE_SIZE_MIN = 5;
 export const ADMIN_LIST_PAGE_SIZE_MAX = 100;
 
@@ -20,5 +20,5 @@ export function normalizeAdminPageSize(
 }
 
 export function adminPageSizeOptions(): number[] {
-  return [10, 50, 100];
+  return [10, 20, 50, 100];
 }

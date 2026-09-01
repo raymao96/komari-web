@@ -1,5 +1,5 @@
 import React from "react";
-import { TextField } from "@radix-ui/themes";
+import { TextField } from "@/components/admin/ui";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Checkbox } from "./ui/checkbox";
@@ -110,32 +110,36 @@ function SelectorInner<T>(props: SelectorProps<T>) {
 
   return (
     <div className={`flex flex-col ${className}`}>
-      <TextField.Root
-        className="mb-2 flex items-center gap-1"
-        placeholder={resolvedSearchPlaceholder}
-        value={search}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-          setSearch(e.target.value)
-        }
-      >
-        <TextField.Slot>
-          <Search size="16" />
-        </TextField.Slot>
-      </TextField.Root>
-      <div className="selector rounded-md overflow-hidden">
-        <Table>
+      <div className="km-search-before-content">
+        <TextField.Root
+          className="flex items-center gap-1"
+          placeholder={resolvedSearchPlaceholder}
+          value={search}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setSearch(e.target.value)
+          }
+        >
+          <TextField.Slot>
+            <Search size="16" />
+          </TextField.Slot>
+        </TextField.Root>
+      </div>
+      <div className="selector overflow-hidden rounded-md border border-[var(--gray-a5)]">
+        <Table container={false}>
           <TableHeader>
-            <TableHead>
-              {showHeaderSelectAll ? (
-                <Checkbox
-                  checked={checkAllState}
-                  onClick={(event) => event.stopPropagation()}
-                  onCheckedChange={(checked) => handleCheckAll(checked === true)}
-                  aria-label={t("common.select_all")}
-                />
-              ) : null}
-            </TableHead>
-            <TableHead>{resolvedHeaderLabel}</TableHead>
+            <TableRow>
+              <TableHead>
+                {showHeaderSelectAll ? (
+                  <Checkbox
+                    checked={checkAllState}
+                    onClick={(event) => event.stopPropagation()}
+                    onCheckedChange={(checked) => handleCheckAll(checked === true)}
+                    aria-label={t("common.select_all")}
+                  />
+                ) : null}
+              </TableHead>
+              <TableHead>{resolvedHeaderLabel}</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
             {processed.map((it) => {

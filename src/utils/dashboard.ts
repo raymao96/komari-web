@@ -58,6 +58,7 @@ export interface DashboardReturnRouteStatus {
   healthy: number;
   switched: number;
   abnormal: number;
+  suspected_blocked?: number;
   recent_events: number;
   latest_event?: DashboardReturnRouteEvent;
   error?: string;

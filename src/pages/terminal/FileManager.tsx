@@ -22,10 +22,18 @@ import {
   RefreshCw,
   Trash2,
   Upload,
-} from "lucide-react";
+} from "@/components/admin/muiIcons";
 import { Button, Dialog, IconButton, TextField } from "@radix-ui/themes";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatBytes } from "@/utils/unitHelper";
 
 export type FileEntry = {
@@ -691,11 +699,18 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         }}
       >
         {selectionBox && <div className="remote-file-selection-box" style={selectionBox} aria-hidden="true" />}
-        <table className="remote-file-table">
-          <thead><tr><th aria-label="选择" /><th>名称</th><th>大小</th><th>修改时间</th></tr></thead>
-          <tbody>
+        <Table container={false} className="remote-file-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead aria-label="选择" />
+              <TableHead>名称</TableHead>
+              <TableHead>大小</TableHead>
+              <TableHead>修改时间</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {visibleEntries.map((entry) => (
-              <tr
+              <TableRow
                 key={entry.path}
                 data-file-path={entry.path}
                 data-protected={entry.protected ? "true" : "false"}
@@ -710,18 +725,33 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
                   }
                 }}
               >
-                <td><Checkbox checked={selected.has(entry.path)} disabled={entry.protected} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()} onCheckedChange={() => toggleSelected(entry)} aria-label={`选择 ${entry.name}`} /></td>
-                <td title={entry.protected ? "SQLite 数据库已受保护" : undefined}>
+                <TableCell>
+                  <Checkbox
+                    checked={selected.has(entry.path)}
+                    disabled={entry.protected}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onCheckedChange={() => toggleSelected(entry)}
+                    aria-label={`选择 ${entry.name}`}
+                  />
+                </TableCell>
+                <TableCell title={entry.protected ? "SQLite 数据库已受保护" : undefined}>
                   {entry.protected ? <LockKeyhole size={15} /> : entry.directory ? <Folder size={15} /> : <FileIcon size={15} />}
                   <span>{entry.name}</span>
-                </td>
-                <td>{entry.directory ? "-" : formatBytes(entry.size)}</td>
-                <td>{formatDate(entry.modified_at)}</td>
-              </tr>
+                </TableCell>
+                <TableCell>{entry.directory ? "-" : formatBytes(entry.size)}</TableCell>
+                <TableCell>{formatDate(entry.modified_at)}</TableCell>
+              </TableRow>
             ))}
-            {!loading && visibleEntries.length === 0 && <tr><td colSpan={4} className="remote-file-empty"><HardDrive size={18} /> 当前目录为空</td></tr>}
-          </tbody>
-        </table>
+            {!loading && visibleEntries.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="remote-file-empty">
+                  <HardDrive size={18} /> 当前目录为空
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       {contextMenu && (

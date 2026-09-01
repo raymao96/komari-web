@@ -35,7 +35,9 @@ export function syncSubMenuForLocation(
     ),
   );
 
-  if (!activeGroup) return current;
+  if (!activeGroup) {
+    return Object.keys(current).length === 0 ? current : {};
+  }
   if (
     current[activeGroup.path] &&
     Object.keys(current).every((path) => path === activeGroup.path)

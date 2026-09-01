@@ -1,7 +1,8 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import React, { useState } from "react";
-import { Info } from "lucide-react";
-import { Popover, Dialog, Box } from "@radix-ui/themes";
+import Tooltip from "@mui/material/Tooltip";
+import Box from "@mui/material/Box";
+import { Info } from "@/components/admin/muiIcons";
+import { AppDialogContent, Dialog } from "@/components/admin/ui";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TipsProps {
@@ -26,70 +27,38 @@ const Tips: React.FC<TipsProps & React.HTMLAttributes<HTMLDivElement>> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
-
-  // determine whether to render a Dialog instead of a Popover
   const isDialog = mode === "dialog" || (mode === "auto" && isMobile);
+  const icon = trigger ?? <Info color={color} size={size} />;
 
-  const handleInteraction = () => {
-    // toggle when using Dialog (click) or on mobile (click)
-    if (isDialog || isMobile) {
-      setIsOpen(!isOpen);
-    }
-  };
-
-  return (
-    <div className="relative inline-block" {...props}>
-      {isDialog ? (
+  if (isDialog) {
+    return (
+      <div className="relative inline-block" {...props}>
         <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
           <Dialog.Trigger aria-label={ariaLabel}>
-            <div
-              className={`flex items-center justify-center rounded-full font-bold cursor-pointer `}
-              onClick={handleInteraction}
-            >
-              {trigger ?? <Info color={color} size={size} />}
+            <div className="flex cursor-pointer items-center justify-center rounded-full font-bold">
+              {icon}
             </div>
           </Dialog.Trigger>
           <AppDialogContent>
             <div className="flex flex-col gap-2">
-              {/* <label className="text-xl font-bold">Tips</label> */}
               <div>{children}</div>
             </div>
           </AppDialogContent>
         </Dialog.Root>
-      ) : (
-        <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
-          <Popover.Trigger aria-label={ariaLabel}>
-            <div
-              className={`flex items-center justify-center rounded-full font-bold cursor-pointer `}
-              onClick={isMobile ? handleInteraction : undefined}
-              onMouseEnter={!isMobile ? () => setIsOpen(true) : undefined}
-              onMouseLeave={!isMobile ? () => setIsOpen(false) : undefined}
-            >
-              {trigger ?? <Info color={color} size={size} />}
-            </div>
-          </Popover.Trigger>
-          <Popover.Content
-            side={side}
-            sideOffset={5}
-            onMouseEnter={!isMobile ? () => setIsOpen(true) : undefined}
-            onMouseLeave={!isMobile ? () => setIsOpen(false) : undefined}
-            // style={{
-            //   padding: "0.5rem",
-            //   border: "none",
-            //   boxShadow:
-            //     "hsl(206 22% 7% / 35%) 0px 10px 38px -10px, hsl(206 22% 7% / 20%) 0px 10px 20px -15px",
-            //   borderRadius: "var(--radius-3)",
-            //   zIndex: 5,
-            //   minWidth: isMobile ? "12rem" : "16rem",
-            //   maxWidth: isMobile ? "80vw" : "16rem",
-            //   backgroundColor: "var(--accent-3)",
-            //   color: "var(--gray-12)",
-            // }}
-          >
-            <Box className="relative text-sm min-w-48">{children}</Box>
-          </Popover.Content>
-        </Popover.Root>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative inline-block" {...props}>
+      <Tooltip title={<Box sx={{ fontSize: 13 }}>{children}</Box>} placement={side}>
+        <span
+          className="inline-flex cursor-pointer items-center justify-center rounded-full font-bold"
+          aria-label={ariaLabel}
+        >
+          {icon}
+        </span>
+      </Tooltip>
     </div>
   );
 };

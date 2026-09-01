@@ -26,6 +26,10 @@ function activeSessionStorage(): DashboardSessionStorage | null {
 }
 
 function storageKey(kind: DashboardSessionKind, accountKey: string): string {
+  return `lite:admin-dashboard:v1:${encodeURIComponent(accountKey || "authenticated")}:${kind}`;
+}
+
+function legacyStorageKey(kind: DashboardSessionKind, accountKey: string): string {
   return `komari:admin-dashboard:v1:${encodeURIComponent(accountKey || "authenticated")}:${kind}`;
 }
 
@@ -42,8 +46,9 @@ export function readDashboardSession<T>(
   const storage = options?.storage === undefined ? activeSessionStorage() : options.storage;
   if (!storage) return null;
   const key = storageKey(kind, accountKey);
+  const legacyKey = legacyStorageKey(kind, accountKey);
   try {
-    const raw = storage.getItem(key);
+    const raw = storage.getItem(key) ?? storage.getItem(legacyKey);
     if (!raw) return null;
     const record = JSON.parse(raw) as Partial<DashboardSessionRecord<T>>;
     const now = options?.now ?? Date.now();
@@ -57,11 +62,13 @@ export function readDashboardSession<T>(
       || !("data" in record)
     ) {
       storage.removeItem(key);
+      storage.removeItem(legacyKey);
       return null;
     }
     return record.data as T;
   } catch {
     storage.removeItem(key);
+    storage.removeItem(legacyKey);
     return null;
   }
 }
@@ -81,6 +88,7 @@ export function writeDashboardSession<T>(
       savedAt: options?.now ?? Date.now(),
       data,
     } satisfies DashboardSessionRecord<T>));
+    storage.removeItem(legacyStorageKey(kind, accountKey));
   } catch {
     // A full or disabled session store must not block dashboard rendering.
   }

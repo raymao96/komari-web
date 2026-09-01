@@ -9,13 +9,18 @@ import {
 
 const page = readFileSync("src/pages/admin/settings/reverse-proxy.tsx", "utf8");
 const api = readFileSync("src/lib/https.ts", "utf8");
-const localeFiles = ["en.json", "id_ID.json", "ja_JP.json", "zh_CN.json", "zh_TW.json"];
+const localeFiles = ["en.json", "ja_JP.json", "zh_CN.json", "zh_TW.json"];
 
 test("reverse proxy separates built-in HTTPS and Cloudflare Tunnel", () => {
   assert.match(page, /<Tabs\.Trigger value="https"/);
   assert.match(page, /<Tabs\.Trigger value="cloudflare"/);
-  assert.match(page, /<HTTPSPanel \/>/);
-  assert.match(page, /<CloudflareTunnelPanel \/>/);
+  assert.match(page, /<HTTPSPanel onReady=\{markHttpsReady\} \/>/);
+  assert.match(page, /<CloudflareTunnelPanel onReady=\{markCloudflareReady\} \/>/);
+  assert.match(page, /useHeldTab\(activeTab, tabReady\)/);
+  assert.match(page, /hidden=\{displayTab !== "https"\}/);
+  assert.match(page, /hidden=\{displayTab !== "cloudflare"\}/);
+  assert.match(page, /data-admin-route-pending=\{routePending \? "true" : undefined\}/);
+  assert.doesNotMatch(page, /SettingsPageSkeleton/);
 });
 
 test("built-in HTTPS reads certificates only from server paths", () => {
@@ -26,7 +31,7 @@ test("built-in HTTPS reads certificates only from server paths", () => {
   assert.doesNotMatch(page, /letsencrypt/i);
   assert.doesNotMatch(page, /type="file"/);
   assert.doesNotMatch(page, /uploadHTTPSCertificate/);
-  assert.match(page, /:35938/);
+  assert.match(page, /:36888/);
   assert.match(page, /https_listen: `:\$\{numericPort\}`/);
   assert.doesNotMatch(api, /\/api\/admin\/settings\/https\/upload/);
   assert.match(api, /\/api\/admin\/settings\/https\/reload/);
@@ -95,16 +100,16 @@ test("enabling ready built-in HTTPS enters the matching secure page", () => {
   assert.match(page, /window\.location\.replace\(secureURL\)/);
 
   assert.equal(
-    buildHTTPSRedirectURL("https://[2001:db8::12]:35938", {
+    buildHTTPSRedirectURL("https://[2001:db8::12]:36888", {
       protocol: "http:",
       pathname: "/admin/settings/reverse-proxy",
       search: "?tab=https",
       hash: "#certificate",
     }),
-    "https://[2001:db8::12]:35938/admin/settings/reverse-proxy?tab=https#certificate",
+    "https://[2001:db8::12]:36888/admin/settings/reverse-proxy?tab=https#certificate",
   );
   assert.equal(
-    buildHTTPSRedirectURL("https://panel.example.com:35938", {
+    buildHTTPSRedirectURL("https://panel.example.com:36888", {
       protocol: "https:",
       pathname: "/admin",
       search: "",
@@ -113,7 +118,7 @@ test("enabling ready built-in HTTPS enters the matching secure page", () => {
     null,
   );
   assert.equal(
-    buildHTTPSRedirectURL("http://panel.example.com:35938", {
+    buildHTTPSRedirectURL("http://panel.example.com:36888", {
       protocol: "http:",
       pathname: "/admin",
       search: "",
@@ -155,4 +160,13 @@ test("Cloudflare token guidance keeps readable vertical rhythm", () => {
   assert.match(page, /mt-3 flex flex-col gap-2/);
   assert.match(page, /cloudflare_token_help[\s\S]*block leading-6/);
   assert.match(page, /token_guide[\s\S]*ExternalLink/);
+});
+
+test("hover preload fills reverse-proxy data before the page mounts", () => {
+  const routes = readFileSync("src/routes.ts", "utf8");
+  const cloudflared = readFileSync("src/lib/cloudflared.ts", "utf8");
+  assert.match(routes, /prefetchHTTPSSettings/);
+  assert.match(routes, /prefetchCloudflaredStatus/);
+  assert.match(api, /getHTTPSSettingsSnapshot/);
+  assert.match(cloudflared, /getCloudflaredStatusSnapshot/);
 });

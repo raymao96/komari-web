@@ -2,46 +2,79 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(
-  "src/components/admin/AdminPanelBar.tsx",
-  "utf8",
-);
-const brandSource = readFileSync(
-  "src/components/KomariLiteBrand.tsx",
-  "utf8",
-);
+import {
+  GITHUB_ALERT_LABELS,
+  remarkGithubAlerts,
+} from "../src/utils/githubMarkdown.ts";
+
+test("github alerts become styled callouts instead of raw markers", () => {
+  const tree = {
+    type: "root",
+    children: [
+      {
+        type: "blockquote",
+        children: [
+          {
+            type: "paragraph",
+            children: [
+              {
+                type: "text",
+                value: "[!IMPORTANT]\nLite 2.3.0 版本 目前仍处于管理页面UI焕新阶段。",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  remarkGithubAlerts()(tree);
+  const quote = tree.children[0];
+  assert.equal(quote.data?.hProperties?.["data-alert"], "important");
+  assert.deepEqual(quote.data?.hProperties?.className, [
+    "km-md-alert",
+    "km-md-alert--important",
+  ]);
+  assert.equal(
+    quote.children?.[0]?.children?.[0]?.value,
+    "Lite 2.3.0 版本 目前仍处于管理页面UI焕新阶段。",
+  );
+  assert.equal(GITHUB_ALERT_LABELS.important, "Important");
+});
+
+
+const source = [
+  "src/components/admin/shell/AdminShell.tsx",
+  "src/components/admin/shell/AdminSidebar.tsx",
+  "src/components/admin/shell/AdminTopbar.tsx",
+  "src/components/admin/shell/UpdateReleaseDialog.tsx",
+  "src/components/admin/shell/useAdminShell.ts",
+]
+  .map((file) => readFileSync(file, "utf8"))
+  .join("\n");
+const brandSource = readFileSync("src/components/LiteBrand.tsx", "utf8");
 const globalStyles = readFileSync("src/global.css", "utf8");
 const appSource = readFileSync("src/main.tsx", "utf8");
 
-test("admin branding keeps Lite smaller and green on desktop and mobile", () => {
-  assert.match(source, /<KomariLiteBrand size=\{isMobile \? "sm" : "md"\} \/>/);
-  assert.match(brandSource, /text-\[var\(--green-9\)\]/);
+test("admin branding shows Lite in accent blue", () => {
+  assert.match(source, /<LiteBrand size=\{isMobile \? "sm" : "md"\} \/>/);
+  assert.match(brandSource, /color: LITE_BLUE/);
+  assert.match(brandSource, /LITE_NAME/);
+  assert.doesNotMatch(brandSource, /Komari</);
   assert.doesNotMatch(brandSource, /bg-\[var\(--green-a3\)\]/);
-  assert.match(brandSource, /lite: "text-\[13px\]"/);
-  assert.match(brandSource, /lite: "text-base"/);
 });
 
 test("the version link is shared by the desktop and mobile sidebar", () => {
   assert.match(source, /data-testid="sidebar-version"/);
   assert.match(source, /<Github/);
-  assert.match(source, /flex h-5 w-4 shrink-0 items-center justify-center/);
-  assert.match(source, /className="h-4 w-4"/);
   assert.match(source, /strokeWidth=\{1\.5\}/);
-  assert.match(source, /text-\[var\(--gray-12\)\]/);
-  assert.match(source, /group flex min-h-10 w-full items-center gap-2 rounded-md/);
-  assert.match(source, /border-l-\[4px\] border-transparent p-2/);
-  assert.match(source, /hover:bg-\[var\(--accent-a3\)\]/);
-  assert.match(source, /hover:text-\[var\(--accent-11\)\]/);
-  assert.doesNotMatch(source, /hover:bg-\[var\(--gray-a3\)\]/);
-  assert.doesNotMatch(source, />\s*v\{formatVersion\(/);
   assert.match(
     source,
-    /github\.com\/nuomiiiii\/komari\/releases\/tag\/\$\{encodeURIComponent\(currentVersion\)\}/,
+    /github\.com\/nuomiiiii\/Lite\/releases\/tag\/\$\{encodeURIComponent\(currentVersion\)\}/,
   );
   assert.match(source, /target="_blank"/);
+  assert.match(source, /rel="noopener noreferrer"/);
   assert.doesNotMatch(source, /\{!isMobile && currentVersion/);
   assert.doesNotMatch(source, /hidden=\{isMobile\}/);
-  assert.doesNotMatch(source, /data-testid="sidebar-version"[\s\S]{0,120}border-t/);
 });
 
 test("snapshot versions use the compact wrapped layout on desktop and mobile", () => {
@@ -49,45 +82,42 @@ test("snapshot versions use the compact wrapped layout on desktop and mobile", (
   assert.match(source, /text-sm font-normal leading-5/);
   assert.match(source, /<span className="block">Snapshot<\/span>/);
   assert.match(source, /whitespace-nowrap text-base font-normal leading-5/);
-  assert.doesNotMatch(source, /<SidebarVersionLabel[\s\S]{0,160}isMobile=\{isMobile\}/);
-});
-
-test("mobile navigation uses a partial overlay without hiding the page", () => {
-  assert.match(source, /const MOBILE_SIDEBAR_WIDTH = "clamp\(184px, 42vw, 244px\)"/);
-  assert.match(source, /open:\s*\{\s*x: 0,/);
-  assert.match(source, /closed:\s*\{\s*x: "-100%",/);
-  assert.match(
-    source,
-    /width: isMobile\s*\? MOBILE_SIDEBAR_WIDTH\s*:\s*sidebarOpen\s*\? `\$\{DESKTOP_SIDEBAR_WIDTH\}px`\s*:\s*"0px"/,
-  );
-  assert.match(source, /willChange: isMobile \? "transform" : undefined/);
-  assert.doesNotMatch(source, /open:\s*\{\s*width: isMobile/);
-  assert.match(source, /data-testid="mobile-sidebar-trigger"/);
-  assert.match(source, /data-testid="mobile-sidebar-close"/);
-  assert.match(source, /key="mobile-sidebar-backdrop"/);
-  assert.match(source, /onClick=\{\(\) => setSidebarOpen\(false\)\}/);
-  assert.match(source, /backgroundColor: "var\(--accent-3\)"[\s\S]{0,100}display: "block"/);
   assert.doesNotMatch(
     source,
-    /backgroundColor: "var\(--accent-3\)"[\s\S]{0,100}display: isMobile && sidebarOpen \? "none"/,
+    /<SidebarVersionLabel[\s\S]{0,160}isMobile=\{isMobile\}/,
   );
+});
+
+test("mobile navigation uses a drawer without hiding the page chrome", () => {
+  assert.match(source, /testId="mobile-sidebar-trigger"/);
+  assert.match(source, /testId="mobile-sidebar-close"/);
+  assert.match(
+    source,
+    /variant=\{isMobile \? "temporary" : "permanent"\}/,
+  );
+  assert.match(source, /onClose=\{\(\) => setSidebarOpen\(false\)\}/);
 });
 
 test("admin shell owns the viewport while the mobile drawer locks only main content", () => {
-  assert.match(source, /initial: "auto minmax\(0, 1fr\)"/);
-  assert.match(source, /md: "auto minmax\(0, 1fr\)"/);
   assert.match(source, /height: "var\(--app-viewport-height, 100vh\)"/);
-  assert.match(source, /width: "100%",\s+overflow: "hidden",\s+overscrollBehavior: "none"/);
-  assert.match(source, /key="mobile-sidebar-backdrop"[\s\S]*className="[^"]*touch-none/);
-  assert.match(source, /data-admin-scroll-container[\s\S]*overflowY: isMobile && sidebarOpen \? "hidden" : "auto"/);
-  assert.match(source, /overflowY: "auto",\s+overflowX: "hidden",\s+overscrollBehaviorY: "contain"/);
+  assert.match(
+    source,
+    /width: "100%",\s+overflow: "hidden",\s+overscrollBehavior: "none"/,
+  );
+  assert.match(
+    source,
+    /data-admin-scroll-container[\s\S]*overflowY: isMobile && sidebarOpen \? "hidden" : "auto"/,
+  );
   assert.match(globalStyles, /--app-viewport-height: 100vh/);
-  assert.match(globalStyles, /@supports \(height: 100dvh\)[\s\S]*--app-viewport-height: 100dvh/);
+  assert.match(
+    globalStyles,
+    /@supports \(height: 100dvh\)[\s\S]*--app-viewport-height: 100dvh/,
+  );
   assert.match(appSource, /minHeight: "var\(--app-viewport-height, 100vh\)"/);
 });
 
 test("mobile navigation label is localized in every admin language", () => {
-  for (const locale of ["zh_CN", "zh_TW", "en", "ja_JP", "id_ID"]) {
+  for (const locale of ["zh_CN", "zh_TW", "en", "ja_JP"]) {
     const messages = JSON.parse(
       readFileSync(`src/i18n/locales/${locale}.json`, "utf8"),
     );
@@ -97,19 +127,61 @@ test("mobile navigation label is localized in every admin language", () => {
 });
 
 test("desktop update dialog gives release notes enough space", () => {
+  assert.match(source, /data-testid="admin-update-button"/);
+  assert.match(source, /data-testid="admin-update-dialog"/);
   assert.match(source, /min\(920px, calc\(100vw - 3rem\)\)/);
-  assert.match(source, /max-h-\[min\(62dvh,620px\)\] overflow-y-auto/);
+  assert.match(source, /maxHeight: "min\(86dvh, 760px\)"/);
+  assert.match(source, /overflow: "auto !important"/);
+  assert.match(source, /flexShrink: 0/);
+});
+
+test("account menu reserves the destructive treatment for logout", () => {
+  assert.match(source, /data-testid="admin-user-menu-button"/);
+  assert.match(source, /data-testid="admin-account-security-menu-item"/);
+  assert.match(
+    source,
+    /data-testid="admin-logout-menu-item"[\s\S]*?bgcolor: "rgba\(255, 86, 48, 0\.14\)"[\s\S]*?<Logout/,
+  );
+  assert.doesNotMatch(
+    source,
+    /data-testid="admin-logout-menu-item"[\s\S]*?navigate\("\/admin\/settings\/account-security/,
+  );
+});
+
+test("update chrome uses a red new-release chip instead of a download tray", () => {
+  const topbar = readFileSync("src/components/admin/shell/AdminTopbar.tsx", "utf8");
+  const dialog = readFileSync(
+    "src/components/admin/shell/UpdateReleaseDialog.tsx",
+    "utf8",
+  );
+  assert.match(topbar, /<Chip/);
+  assert.match(topbar, /color="error"/);
+  assert.match(topbar, /label=\{t\("common\.update_available"\)\}/);
+  assert.doesNotMatch(topbar, /SystemUpdateAlt/);
+  assert.doesNotMatch(topbar, /from "@mui\/icons-material\/Upgrade"/);
+  assert.doesNotMatch(topbar, /from "@mui\/icons-material\/NewReleases"/);
+  assert.doesNotMatch(dialog, /from "@mui\/icons-material\/NewReleases"/);
+  assert.doesNotMatch(dialog, /from "@mui\/icons-material\/Upgrade"/);
+  assert.doesNotMatch(dialog, /SystemUpdateAlt/);
+  assert.doesNotMatch(dialog, /from "@mui\/icons-material\/Download"/);
 });
 
 test("update dialog keeps its title, release body, and actions separated", () => {
-  assert.match(source, /<header className="border-b/);
-  assert.match(source, /<div className="divide-y text-sm">/);
-  assert.match(source, /<footer className="flex items-center justify-end gap-2 border-t/);
+  assert.match(source, /<DialogTitle/);
+  assert.match(source, /<DialogContent[\s\S]*?dividers/);
+  assert.match(source, /<DialogActions/);
+  assert.match(source, /data-testid="admin-update-release"/);
+  assert.match(source, /<Divider/);
+  assert.match(source, /<Chip/);
+  assert.doesNotMatch(source, /className="divide-y/);
+  assert.doesNotMatch(source, /--gray-11/);
 });
 
-test("release notes render GitHub-flavored Markdown", () => {
+test("release notes render GitHub-flavored Markdown without raw HTML", () => {
   assert.match(source, /<ReactMarkdown/);
-  assert.match(source, /remarkPlugins=\{\[remarkGfm\]\}/);
-  assert.match(source, /overflow-x-auto rounded-md border/);
+  assert.match(source, /remarkGfm, remarkGithubAlerts/);
+  assert.match(source, /skipHtml/);
+  assert.match(source, /km-md-alert--/);
   assert.doesNotMatch(source, /whitespace-pre-wrap/);
+  assert.match(source, /rel="noopener noreferrer"/);
 });

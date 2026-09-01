@@ -10,6 +10,7 @@ import type {
 } from "../types/rpc2";
 import { RPC2ConnectionState } from "../types/rpc2";
 import i18n from "../i18n/config";
+import { sameOriginApiPath, sameOriginFetchInit } from "../utils/security";
 
 /**
  * RPC2 客户端类
@@ -36,7 +37,7 @@ export class RPC2Client {
     baseUrl = "/api/rpc2",
     options: RPC2ConnectionOptions = {}
   ) {
-    this.baseUrl = baseUrl;
+    this.baseUrl = sameOriginApiPath(baseUrl);
     this.options = {
       autoConnect: true,
       autoReconnect: true,
@@ -55,6 +56,14 @@ export class RPC2Client {
     if (this.options.autoConnect) {
       this.autoConnect();
     }
+  }
+
+  /**
+   * 登录后打开套接字时恢复自动连接/重连。
+   */
+  private enableSessionReconnect(): void {
+    this.options.autoConnect = true;
+    this.options.autoReconnect = true;
   }
 
   /**
@@ -79,6 +88,7 @@ export class RPC2Client {
    * 建立 WebSocket 连接
    */
   async connect(): Promise<void> {
+    this.enableSessionReconnect();
     if (this.connectionState === RPC2ConnectionState.CONNECTED ||
         this.connectionState === RPC2ConnectionState.CONNECTING) {
       return;
@@ -139,10 +149,23 @@ export class RPC2Client {
   }
 
   /**
+   * 暂停套接字（登录页 / 登出）：关掉连接，且不要立刻重连。
+   * 之后 connect() 会重新打开自动重连。
+   */
+  pause(): void {
+    this.options.autoConnect = false;
+    this.options.autoReconnect = false;
+    this.closeSocket();
+  }
+
+  /**
    * 断开 WebSocket 连接
    */
   disconnect(): void {
-    this.options.autoReconnect = false;
+    this.pause();
+  }
+
+  private closeSocket(): void {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = undefined;
@@ -222,12 +245,15 @@ export class RPC2Client {
     };
 
     try {
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: this.options.headers,
-        body: JSON.stringify(request),
-        signal: options.timeout ? AbortSignal.timeout(options.timeout) : undefined,
-      });
+      const response = await fetch(
+        this.baseUrl,
+        sameOriginFetchInit({
+          method: "POST",
+          headers: this.options.headers,
+          body: JSON.stringify(request),
+          signal: options.timeout ? AbortSignal.timeout(options.timeout) : undefined,
+        }),
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -268,11 +294,14 @@ export class RPC2Client {
     }));
 
     try {
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: this.options.headers,
-        body: JSON.stringify(batchRequest),
-      });
+      const response = await fetch(
+        this.baseUrl,
+        sameOriginFetchInit({
+          method: "POST",
+          headers: this.options.headers,
+          body: JSON.stringify(batchRequest),
+        }),
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

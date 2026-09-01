@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import {
+  AppDialogContent,
   Text,
   Card,
   Button,
@@ -12,7 +13,7 @@ import {
   TextField,
   Callout,
   Separator,
-} from "@radix-ui/themes";
+} from "@/components/admin/ui";
 import { useState, useEffect, useRef } from "react";
 import {
   Upload,
@@ -25,24 +26,31 @@ import {
   AlertTriangle,
   Loader2,
   Store,
-} from "lucide-react";
+} from "@/components/admin/muiIcons";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
-import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import { useSettings } from "@/lib/api";
-import AppDialogContent from "@/components/AppDialogContent";
 import ThemePreviewImage from "@/components/ThemePreviewImage";
-import { themePreviewSrc } from "@/utils/themePreviewImage";
+import {
+  installedThemePreviewPath,
+  themePreviewSrc,
+} from "@/utils/themePreviewImage";
 import UploadDialog from "@/components/UploadDialog";
 import {
   getThemeConfigurationType,
   THEME_CONFIGURATION_MANAGED,
 } from "@/utils/themeConfiguration";
+import { fetchThemeManifest } from "@/utils/themeManifest";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { uploadArchive } from "@/utils/archiveUpload";
 import { resolveI18nText, type I18nText } from "@/utils/i18nText";
 import { clearThemeNavigationCache } from "@/utils/themeCache";
+import {
+  getInstalledThemesSnapshot,
+  prefetchInstalledThemes,
+  refreshInstalledThemes,
+} from "@/lib/themeList";
 import {
   UPLOAD_COMPLETED_VISIBLE_MS,
   UPLOAD_DIALOG_EXIT_MS,
@@ -64,15 +72,20 @@ interface Theme {
   configuration?: any;
 }
 
-const THEME_CHANGE_STORAGE_KEY = "komari-active-theme-changed";
+const THEME_CHANGE_STORAGE_KEY = "lite-active-theme-changed";
+const LEGACY_THEME_CHANGE_STORAGE_KEY = "komari-active-theme-changed";
 
 const ThemePage = () => {
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage || i18n.language;
   const displayText = (value?: I18nText) =>
     resolveI18nText(value, currentLanguage) || "";
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [themesLoading, setThemesLoading] = useState(true);
+  const [themes, setThemes] = useState<Theme[]>(
+    () => (getInstalledThemesSnapshot() as Theme[] | null) ?? [],
+  );
+  const [themesLoading, setThemesLoading] = useState(
+    () => getInstalledThemesSnapshot() === null,
+  );
   const [uploadState, setUploadState] = useState<UploadProgressState | null>(
     null,
   );
@@ -136,7 +149,7 @@ const ThemePage = () => {
       }
       try {
         // 强制不缓存
-        const resp = await fetch(`/themes/${themeShort}/komari-theme.json`, {
+        const resp = await fetchThemeManifest(themeShort, {
           cache: "no-cache",
         });
         if (!resp.ok) {
@@ -168,22 +181,9 @@ const ThemePage = () => {
   }, [currentTheme, publicInfo?.theme]);
 
   const loading = themesLoading || settingsLoading || !currentTheme;
-  // 获取主题列表
   const fetchThemes = async () => {
     try {
-      const response = await fetch("/api/admin/theme/list");
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      const themeList = data.data || [];
-
-      // 根据 settings 中的 theme 设置活跃状态
-      const updatedThemes = themeList.map((theme: Theme) => ({
-        ...theme,
-        active: theme.short === currentTheme,
-      }));
-
+      const updatedThemes = (await refreshInstalledThemes(currentTheme)) as Theme[];
       setThemes(updatedThemes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch themes");
@@ -256,10 +256,9 @@ const ThemePage = () => {
 
       await clearThemeNavigationCache();
       try {
-        window.localStorage.setItem(
-          THEME_CHANGE_STORAGE_KEY,
-          `${themeShort}:${Date.now()}`,
-        );
+        const stamp = `${themeShort}:${Date.now()}`;
+        window.localStorage.setItem(THEME_CHANGE_STORAGE_KEY, stamp);
+        window.localStorage.setItem(LEGACY_THEME_CHANGE_STORAGE_KEY, stamp);
       } catch {
         // Theme switching still works when browser storage is unavailable.
       }
@@ -355,10 +354,9 @@ const ThemePage = () => {
       if (themeShort === currentTheme) {
         await clearThemeNavigationCache();
         try {
-          window.localStorage.setItem(
-            THEME_CHANGE_STORAGE_KEY,
-            `${payload?.data?.theme || "fallback"}:${Date.now()}`,
-          );
+          const stamp = `${payload?.data?.theme || "fallback"}:${Date.now()}`;
+          window.localStorage.setItem(THEME_CHANGE_STORAGE_KEY, stamp);
+          window.localStorage.setItem(LEGACY_THEME_CHANGE_STORAGE_KEY, stamp);
         } catch {
           // Other public tabs will update on their next navigation.
         }
@@ -438,8 +436,13 @@ const ThemePage = () => {
 
   // 同步活跃状态
   useEffect(() => {
-    fetchThemes();
-  }, [currentTheme]);
+    prefetchInstalledThemes()
+      .then((list) => setThemes(list as Theme[]))
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to fetch themes");
+      })
+      .finally(() => setThemesLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!settingsLoading && themes.length > 0) {
@@ -453,7 +456,7 @@ const ThemePage = () => {
   }, [currentTheme, settingsLoading, themes.length]);
 
   if (loading) {
-    return <SettingsPageSkeleton />;
+    return <div data-admin-route-pending="true" />;
   }
 
   if (error) {
@@ -471,10 +474,10 @@ const ThemePage = () => {
         >
           {t("theme.title")}
         </AdminPageTitle>
-        <Flex gap="2" wrap="wrap" className="w-full sm:w-auto [&>button]:min-w-[8rem] [&>button]:flex-1 sm:[&>button]:min-w-0 sm:[&>button]:flex-none">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
           <Button
             variant="soft"
-            className="gap-2"
+            className="w-full justify-center gap-2 whitespace-nowrap sm:w-auto"
             onClick={() => navigate("/admin/market/themes")}
           >
             <Store size={16} />
@@ -483,31 +486,34 @@ const ThemePage = () => {
           {activeThemeHasConfig && (
             <Button
               variant="soft"
-              className="gap-2"
+              className="w-full justify-center gap-2 whitespace-nowrap sm:w-auto"
               onClick={() => navigate("/admin/theme_managed")}
             >
               <Settings size={16} />
-              {`${currentTheme}设置`}
+              {t("theme.configure", "主题设置")}
             </Button>
           )}
-          <Button onClick={() => setUploadDialogOpen(true)} className="gap-2">
+          <Button
+            onClick={() => setUploadDialogOpen(true)}
+            className="w-full justify-center gap-2 whitespace-nowrap sm:w-auto"
+          >
             <Upload size={16} />
             {t("theme.upload")}
           </Button>
           <Button
             variant="soft"
+            className="w-full justify-center gap-2 whitespace-nowrap sm:w-auto"
             onClick={() => {
               setImportDialogOpen(true);
               setImportUrl("");
               setImportPreview(null);
               setImportError(null);
             }}
-            className="gap-2"
           >
             <Download size={16} />
             {t("theme.import")}
           </Button>
-        </Flex>
+        </div>
       </Flex>
 
       {/* 主题卡片网格 */}
@@ -536,12 +542,10 @@ const ThemePage = () => {
                 className="aspect-video bg-gradient-to-br rounded-t-lg overflow-hidden relative "
               >
                 <ThemePreviewImage
-                  src={themePreviewSrc(
-                    theme.preview
-                      ? `/themes/${theme.short}/${theme.preview}`
-                      : undefined,
-                    { card: true, version: theme.version },
-                  )}
+                  src={themePreviewSrc(installedThemePreviewPath(theme), {
+                    card: true,
+                    version: theme.version,
+                  })}
                   alt={displayText(theme.name)}
                   loading="eager"
                   fetchPriority={index < 8 ? "high" : "low"}
@@ -645,12 +649,9 @@ const ThemePage = () => {
           <Box className="space-y-4 mt-4">
             <Box className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative">
               <ThemePreviewImage
-                src={themePreviewSrc(
-                  selectedTheme?.preview
-                    ? `/themes/${selectedTheme.short}/${selectedTheme.preview}`
-                    : undefined,
-                  { version: selectedTheme?.version },
-                )}
+                src={themePreviewSrc(installedThemePreviewPath(selectedTheme), {
+                  version: selectedTheme?.version,
+                })}
                 alt={displayText(selectedTheme?.name)}
                 loading="eager"
                 containerClassName="w-full h-full"

@@ -1,4 +1,4 @@
-export const isKomariThemeCacheEntry = (
+export const isLiteThemeCacheEntry = (
   rawUrl: string,
   currentOrigin: string,
   mode?: RequestMode,
@@ -16,6 +16,7 @@ export const isKomariThemeCacheEntry = (
     url.pathname === "/index.html" ||
     url.pathname === "/manifest.json" ||
     url.pathname === "/favicon.ico" ||
+    url.pathname === "/favicon.png" ||
     url.pathname.startsWith("/themes/") ||
     url.pathname.startsWith("/system-assets/")
   );
@@ -30,7 +31,7 @@ export async function clearThemeNavigationCache(): Promise<void> {
       await registration?.unregister();
     }
   } catch (reason) {
-    console.warn("Unable to unregister the current Komari service worker", reason);
+    console.warn("Unable to unregister the current Lite service worker", reason);
   }
 
   try {
@@ -42,12 +43,12 @@ export async function clearThemeNavigationCache(): Promise<void> {
       await Promise.all(
         requests
           .filter((request) =>
-            isKomariThemeCacheEntry(request.url, currentOrigin, request.mode),
+            isLiteThemeCacheEntry(request.url, currentOrigin, request.mode),
           )
           .map((request) => cache.delete(request)),
       );
     }
   } catch (reason) {
-    console.warn("Unable to clear cached Komari theme documents", reason);
+    console.warn("Unable to clear cached Lite theme documents", reason);
   }
 }

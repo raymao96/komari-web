@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from "react";
-import { Box, Button, Card, Flex, Text, Spinner, Dialog } from "@radix-ui/themes";
-import { CheckCircle2, LoaderCircle, Upload as UploadIcon, XCircle } from "lucide-react";
-import AppDialogContent from "@/components/AppDialogContent";
+import {
+  AppDialogContent, Box, Button, Card, Flex, Text, Spinner, Dialog } from "@/components/admin/ui";
+import { CheckCircle2, LoaderCircle, Upload as UploadIcon, XCircle } from "@/components/admin/muiIcons";
 import {
   createUploadingUploadState,
   formatUploadBytes,

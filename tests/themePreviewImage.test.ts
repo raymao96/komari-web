@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { resolveThemePreviewStatus, themePreviewSrc } from "../src/utils/themePreviewImage.ts";
+import {
+  installedThemePreviewPath,
+  resolveThemePreviewStatus,
+  themePreviewSrc,
+} from "../src/utils/themePreviewImage.ts";
 
 const previewImageSource = readFileSync(
   "src/components/ThemePreviewImage.tsx",
@@ -48,6 +52,17 @@ test("preview image syncs cached complete state after layout", () => {
 });
 
 test("theme cards request resized previews and market images go through the local cache", () => {
+  assert.equal(
+    installedThemePreviewPath({ short: "lite-theme", preview: "preview.png" }),
+    "/themes/lite-theme/preview.png",
+  );
+  assert.equal(
+    themePreviewSrc(installedThemePreviewPath({
+      short: "lite-theme",
+      preview: "preview.png",
+    }), { card: true, version: "1.0.5" }),
+    "/themes/lite-theme/preview.png?card=1&v=1.0.5",
+  );
   assert.equal(
     themePreviewSrc("/themes/glass/preview.png", { card: true, version: "1.0.7" }),
     "/themes/glass/preview.png?card=1&v=1.0.7",

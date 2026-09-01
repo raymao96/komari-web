@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Text } from "@radix-ui/themes";
+import { Text } from "@/components/admin/ui";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import {
   SettingCardButton,
@@ -8,12 +8,11 @@ import {
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
 import { toast } from "sonner";
-import Loading from "@/components/loading";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import React from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { renderProviderInputs } from "@/utils/renderProviders";
-import { SquareArrowOutUpRight } from "lucide-react";
+import { SquareArrowOutUpRight } from "@/components/admin/muiIcons";
 import { Link } from "react-router-dom";
 
 const NotificationSettings = () => {
@@ -23,13 +22,12 @@ const NotificationSettings = () => {
   const [messageList, setMessageList] = React.useState<string[]>([]);
   const [currentMessageSender, setCurrentMessageSender] = React.useState<string>("");
   const [messageValues, setMessageValues] = React.useState<any>({});
-  const [messageLoading, setMessageLoading] = React.useState(false);
+  const [hydrated, setHydrated] = React.useState(false);
   const [messageError, setMessageError] = React.useState("");
 
   // 拉取所有 message sender 及字段定义
   React.useEffect(() => {
     if (loading) return;
-    setMessageLoading(true);
     fetch("/api/admin/settings/message-sender")
       .then((res) => res.json())
       .then((data) => {
@@ -42,18 +40,21 @@ const NotificationSettings = () => {
               ? settings.notification_method
               : "";
           setCurrentMessageSender(initialSender);
+          if (!initialSender) setHydrated(true);
         } else {
           setMessageError(data.message || t("settings.notification.provider_fetch_failed"));
+          setHydrated(true);
         }
       })
-      .catch(() => setMessageError(t("settings.notification.provider_fetch_failed")))
-      .finally(() => setMessageLoading(false));
+      .catch(() => {
+        setMessageError(t("settings.notification.provider_fetch_failed"));
+        setHydrated(true);
+      });
   }, [loading, settings.notification_method, t]);
 
   // 拉取当前 message sender 的设置
   React.useEffect(() => {
     if (!currentMessageSender) return;
-    setMessageLoading(true);
     fetch(`/api/admin/settings/message-sender?provider=${currentMessageSender}`)
       .then((res) => res.json())
       .then((data) => {
@@ -68,12 +69,11 @@ const NotificationSettings = () => {
         }
       })
       .catch(() => setMessageError(t("settings.notification.provider_settings_fetch_failed")))
-      .finally(() => setMessageLoading(false));
+      .finally(() => setHydrated(true));
   }, [currentMessageSender, t]);
 
   // 处理保存
   const handleMessageSave = async (values: any) => {
-    setMessageLoading(true);
     setMessageError("");
     const body = {
       name: currentMessageSender,
@@ -95,9 +95,8 @@ const NotificationSettings = () => {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
-    setMessageLoading(false);
   };
-  if (loading || (!messageLoading && messageList.length === 0 && !messageError)) {
+  if (loading) {
     return <SettingsPageSkeleton />;
   }
   if (error) {
@@ -109,6 +108,9 @@ const NotificationSettings = () => {
 
   return (
     <>
+      {hydrated ? null : (
+        <div data-admin-route-pending="true" hidden />
+      )}
       <AdminPageTitle
         description={t(
           "settings.notification.page_description",
@@ -145,7 +147,7 @@ const NotificationSettings = () => {
           setCurrentMessageSender(val);
         }}
       />
-      {messageLoading ? <Loading /> : renderProviderInputs({
+      {renderProviderInputs({
         currentProvider: currentMessageSender,
         providerDefs: messageDefs,
         providerValues: messageValues,

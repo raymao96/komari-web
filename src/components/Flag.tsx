@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Box } from "@radix-ui/themes";
 import { getRegionCode } from "@/utils/regionHelper";
 import { getAppAssetUrl } from "@/utils/assetUrl";
 
@@ -10,17 +9,17 @@ interface FlagProps {
 }
 
 /**
- * 算法：将由两个区域指示符符号组成的 emoji 转换为对应的两字母国家代码。
+ * 算法：将由两个区域指示符符号组成的 emoji 转换为对应的两字母国家\地区代码。
  * 例如：🇸🇬 (由两个区域指示符组成) -> SG
  * @param emoji 输入的 emoji 字符串
- * @returns 转换后的两字母国家代码（例如 "SG"），如果不是有效的旗帜 emoji 则返回 null。
+ * @returns 转换后的两字母国家\地区代码（例如 "SG"），如果不是有效的旗帜 emoji 则返回 null。
  */
 const getCountryCodeFromFlagEmoji = (emoji?: string | null): string | null => {
   // 使用 Array.from() 来正确处理 Unicode 代理对，将 emoji 字符串拆分为逻辑上的字符数组。
-  // 对于一个国家旗帜 emoji，chars 数组的长度将是 2 (每个元素是一个区域指示符字符)。
+  // 对于一个国家\地区旗帜 emoji，chars 数组的长度将是 2 (每个元素是一个区域指示符字符)。
   const chars = Array.from(emoji ?? "");
 
-  // 国家旗帜 emoji 应该由且仅由两个区域指示符字符组成
+  // 国家\地区旗帜 emoji 应该由且仅由两个区域指示符字符组成
   if (chars.length !== 2) {
     return null;
   }
@@ -53,8 +52,7 @@ const Flag = React.memo(({ flag, size, compact = false }: FlagProps) => {
   const altText = `地区旗帜: ${resolvedFlagFileName}`;
 
   return (
-    <Box
-      as="span"
+    <span
       className={
         compact
           ? "shrink-0 self-center"
@@ -72,7 +70,7 @@ const Flag = React.memo(({ flag, size, compact = false }: FlagProps) => {
         alt={altText}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
       />
-    </Box>
+    </span>
   );
 });
 

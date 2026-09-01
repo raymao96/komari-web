@@ -1,8 +1,8 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import { formatBytes } from "@/utils/unitHelper";
 import { getDatabaseRuntimeHealth } from "@/lib/databaseRuntime";
-import { Badge, Button, Dialog, Flex, Progress, Text } from "@radix-ui/themes";
-import { Activity, DatabaseZap, RefreshCw } from "lucide-react";
+import {
+  AppDialogContent, Badge, Button, Dialog, Flex, Progress, Text } from "@/components/admin/ui";
+import { Activity, DatabaseZap, RefreshCw } from "@/components/admin/muiIcons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -83,6 +83,12 @@ type DatabaseOverview = z.infer<typeof databaseOverviewSchema>;
 type DatabaseMaintenanceResult = z.infer<typeof maintenanceResultSchema>;
 type TranslationFunction = ReturnType<typeof useTranslation>["t"];
 
+let databaseOverviewSnapshot: DatabaseOverview | null = null;
+
+export function getDatabaseOverviewSnapshot(): DatabaseOverview | null {
+  return databaseOverviewSnapshot;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -115,6 +121,22 @@ async function requestAdminData(
   }
 
   return payload.data;
+}
+
+export async function prefetchDatabaseOverview(): Promise<DatabaseOverview | null> {
+  if (databaseOverviewSnapshot) return databaseOverviewSnapshot;
+  try {
+    const data = await requestAdminData(
+      "/api/admin/database/size",
+      "Failed to load database overview",
+    );
+    const parsed = databaseOverviewSchema.safeParse(data);
+    if (!parsed.success) return databaseOverviewSnapshot;
+    databaseOverviewSnapshot = parsed.data;
+    return parsed.data;
+  } catch {
+    return databaseOverviewSnapshot;
+  }
 }
 
 function driverLabel(driver: string): string {
@@ -524,14 +546,17 @@ export function DatabaseMaintenanceCard({
   mode?: "overview" | "maintenance";
 }) {
   const { t } = useTranslation();
-  const [overview, setOverview] = React.useState<DatabaseOverview | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const snapshot = getDatabaseOverviewSnapshot();
+  const [overview, setOverview] = React.useState<DatabaseOverview | null>(
+    snapshot,
+  );
+  const [loading, setLoading] = React.useState(() => snapshot === null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [maintaining, setMaintaining] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const fetchOverview = React.useCallback(async (silent = false) => {
-    if (!silent) {
+    if (!silent && !databaseOverviewSnapshot) {
       setLoading(true);
       setLoadError(null);
     }
@@ -548,6 +573,7 @@ export function DatabaseMaintenanceCard({
       }
 
       setOverview(parsed.data);
+      databaseOverviewSnapshot = parsed.data;
       setLoadError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

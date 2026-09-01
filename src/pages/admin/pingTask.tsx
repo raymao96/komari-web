@@ -1,25 +1,36 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
+import {
+  AdminListFiltersBar,
+  AdminListSearch,
+  AdminListShell,
+} from "@/components/admin/AdminListShell";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
 import { useNodeDetails } from "@/contexts/NodeDetailsContext";
-import { usePingTask, type PingTask } from "@/contexts/PingTaskContext";
+import { usePingTask } from "@/contexts/PingTaskContext";
 import {
-  Box,
+  AppDialogContent,
   Button,
   Dialog,
   Flex,
   Select,
   Tabs,
   TextField,
-} from "@radix-ui/themes";
+} from "@/components/admin/ui";
+import Stack from "@mui/material/Stack";
 import { Checkbox } from "@/components/ui/checkbox";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { CheckCircle2, Radar, Search, Server } from "lucide-react";
+import { CheckCircle2, Radar, Server } from "@/components/admin/muiIcons";
+import MuiButton from "@mui/material/Button";
+import { ADMIN_LIST_ACTION_SX } from "@/components/admin/adminListLayout";
+import { useAdminTabParam } from "@/hooks/useAdminTabParam";
 import { TaskView } from "./pingTask_Task";
 import { ServerView } from "./pingTask_Server";
+
+const PING_TASK_TABS = ["task", "server"] as const;
 
 const PingTask = () => <InnerLayout />;
 
@@ -31,6 +42,7 @@ const InnerLayout = () => {
     error: nodeDetailError,
   } = useNodeDetails();
   const { t } = useTranslation();
+  const [view, setView] = useAdminTabParam(PING_TASK_TABS, "task");
   const [search, setSearch] = React.useState("");
   const taskList = React.useMemo(() => pingTasks ?? [], [pingTasks]);
   const serverNamesByUuid = React.useMemo(
@@ -79,7 +91,7 @@ const InnerLayout = () => {
     return <div>{error || nodeDetailError}</div>;
   }
   return (
-    <Flex direction="column" gap="4" className="p-0 md:p-4">
+    <Stack spacing={2.5} className="p-0 md:p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <AdminPageTitle description={t("ping.description")}>
           {t("ping.title")}
@@ -103,46 +115,47 @@ const InnerLayout = () => {
           icon={<CheckCircle2 size={20} />}
         />
       </div>
-      <Tabs.Root defaultValue="task">
-        <div className="flex w-full flex-wrap items-end gap-3">
-          <div className="min-w-[16rem] flex-[1_1_16rem] overflow-x-auto pb-1">
-            <Tabs.List className="w-max min-w-full">
-              <Tabs.Trigger value="task" className="min-w-[8rem] flex-1">
-                {t("ping.task_view")}
-              </Tabs.Trigger>
-              <Tabs.Trigger value="server" className="min-w-[8rem] flex-1">
-                {t("ping.server_view")}
-              </Tabs.Trigger>
-            </Tabs.List>
-          </div>
-          <div className="ml-auto flex min-w-0 items-center gap-2 pb-2">
-            <TextField.Root
-              className="w-36 sm:w-64"
-              value={search}
-              placeholder={t("common.search")}
-              aria-label={t("common.search")}
-              onChange={(event) => setSearch(event.target.value)}
+      <Tabs.Root value={view} onValueChange={setView}>
+        <AdminSheetTabs>
+          <Tabs.List>
+            <Tabs.Trigger value="task">
+              <AdminTabLabel icon={<Radar size={18} />}>{t("ping.task_view")}</AdminTabLabel>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="server">
+              <AdminTabLabel icon={<Server size={18} />}>{t("ping.server_view")}</AdminTabLabel>
+            </Tabs.Trigger>
+          </Tabs.List>
+        </AdminSheetTabs>
+        <AdminListShell className="mt-3">
+          <AdminListFiltersBar>
+            <Stack
+              direction="row"
+              spacing={1.5}
+              useFlexGap
+              sx={{ flexWrap: "wrap", alignItems: "center" }}
             >
-              <TextField.Slot>
-                <Search size={16} />
-              </TextField.Slot>
-            </TextField.Root>
-            <AddButton />
-          </div>
-        </div>
-        <Box pt="3">
-          <Tabs.Content value="task">
+              <AdminListSearch
+                value={search}
+                onChange={setSearch}
+                placeholder={t("common.search")}
+              />
+              <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "center" }}>
+                <AddButton />
+              </Stack>
+            </Stack>
+          </AdminListFiltersBar>
+          <Tabs.Content value="task" className="admin-tab-panel">
             <TaskView
               pingTasks={filteredTasks}
               reorderEnabled={!search.trim()}
             />
           </Tabs.Content>
-          <Tabs.Content value="server">
+          <Tabs.Content value="server" className="admin-tab-panel">
             <ServerView pingTasks={taskList} search={search} />
           </Tabs.Content>
-        </Box>
+        </AdminListShell>
       </Tabs.Root>
-    </Flex>
+    </Stack>
   );
 };
 
@@ -230,8 +243,14 @@ const AddButton: React.FC = () => {
   };
   return (
     <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
-      <Dialog.Trigger>
-        <Button className="w-full sm:w-auto">{t("common.add")}</Button>
+      <Dialog.Trigger asChild>
+        <MuiButton
+          type="button"
+          variant="contained"
+          sx={ADMIN_LIST_ACTION_SX}
+        >
+          {t("common.add")}
+        </MuiButton>
       </Dialog.Trigger>
       <AppDialogContent>
         <Dialog.Title>{t("common.add")}</Dialog.Title>

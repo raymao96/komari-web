@@ -1,8 +1,11 @@
 import React from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Flex, IconButton, Select, Text } from "@radix-ui/themes";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import ChevronLeft from "@mui/icons-material/ChevronLeft";
+import ChevronRight from "@mui/icons-material/ChevronRight";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 import { useTranslation } from "react-i18next";
+import { adminMenuProps } from "@/components/admin/adminMenu";
 import { useAdminDefaultPageSize } from "@/hooks/useAdminDefaultPageSize";
 import {
   ADMIN_LIST_PAGE_SIZE,
@@ -65,18 +68,16 @@ type PageButtonProps = {
 const PageButton = ({ direction, disabled, label, onClick }: PageButtonProps) => {
   const Icon = direction === "previous" ? ChevronLeft : ChevronRight;
   return (
-    <IconButton
+    <button
       type="button"
-      size="2"
-      variant="soft"
-      color="gray"
+      className="admin-pagination-btn"
       disabled={disabled}
       title={label}
       aria-label={label}
       onClick={onClick}
     >
-      <Icon size={16} />
-    </IconButton>
+      <Icon sx={{ fontSize: 16 }} />
+    </button>
   );
 };
 
@@ -91,22 +92,17 @@ const PageDropButton = ({
   });
   const Icon = props.direction === "previous" ? ChevronLeft : ChevronRight;
   return (
-    <IconButton
+    <button
       ref={setNodeRef}
       type="button"
-      size="2"
-      variant={isOver ? "solid" : "soft"}
-      color={isOver ? undefined : "gray"}
+      className={`admin-pagination-btn${dragging && !props.disabled ? " is-drop-target" : ""}${isOver ? " is-over" : ""}`}
       disabled={props.disabled}
-      className={
-        dragging && !props.disabled ? "ring-1 ring-[var(--accent-a7)]" : undefined
-      }
       title={props.label}
       aria-label={props.label}
       onClick={props.onClick}
     >
-      <Icon size={16} />
-    </IconButton>
+      <Icon sx={{ fontSize: 16 }} />
+    </button>
   );
 };
 
@@ -134,6 +130,7 @@ export const AdminPagination = ({
   showSummary?: boolean;
 }) => {
   const { t } = useTranslation();
+  const [pageSizeAnchor, setPageSizeAnchor] = React.useState<HTMLElement | null>(null);
   if (total === 0) return null;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -155,9 +152,9 @@ export const AdminPagination = ({
   };
 
   return (
-    <div className={`admin-pagination flex flex-wrap items-center gap-3 border-t border-[var(--gray-a5)] bg-[var(--color-panel-solid)] px-4 py-3 ${showSummary ? "justify-between" : "justify-end"}`}>
+    <div className="admin-pagination px-3 py-1.5">
       {showSummary ? (
-        <Text size="2" color="gray">
+        <span className="admin-pagination-text">
           {summary ??
             t("admin.nodeTable.pageSummary", {
               start: pageStart + 1,
@@ -165,47 +162,58 @@ export const AdminPagination = ({
               total,
               defaultValue: "显示 {{start}}-{{end}}，共 {{total}} 台",
             })}
-        </Text>
+        </span>
       ) : null}
-      <Flex align="center" gap="2">
-        {onPageSizeChange ? (
-          <Select.Root
-            value={String(pageSize)}
-            onValueChange={(value) => onPageSizeChange(Number(value))}
+      {onPageSizeChange ? (
+        <>
+          <button
+            type="button"
+            className="admin-pagination-size"
+            aria-label={t("admin.nodeTable.pageSize", "每页条数")}
+            aria-haspopup="listbox"
+            aria-expanded={Boolean(pageSizeAnchor)}
+            onClick={(event) => setPageSizeAnchor(event.currentTarget)}
           >
-            <Select.Trigger aria-label={t("admin.nodeTable.pageSize", "每页条数")} />
-            <Select.Content>
-              {usesCustomPageSize ? (
-                <Select.Item
-                  value={String(pageSize)}
-                  className="hidden"
-                  aria-hidden="true"
-                >
-                  {pageSize} {t("admin.nodeTable.itemsPerPage", "条/页")}
-                </Select.Item>
-              ) : null}
-              {pageSizeOptions.map((option) => (
-                <Select.Item key={option} value={String(option)}>
-                  {option} {t("admin.nodeTable.itemsPerPage", "条/页")}
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Root>
-        ) : null}
+            <span className="admin-pagination-text">
+              {pageSize} {t("admin.nodeTable.itemsPerPage", "条/页")}
+            </span>
+          </button>
+          <Menu
+            {...adminMenuProps}
+            anchorEl={pageSizeAnchor}
+            open={Boolean(pageSizeAnchor)}
+            onClose={() => setPageSizeAnchor(null)}
+          >
+            {(usesCustomPageSize ? [pageSize, ...pageSizeOptions.filter((option) => option !== pageSize)] : pageSizeOptions).map((option) => (
+              <MenuItem
+                key={option}
+                selected={option === pageSize}
+                onClick={() => {
+                  onPageSizeChange(option);
+                  setPageSizeAnchor(null);
+                }}
+              >
+                {option} {t("admin.nodeTable.itemsPerPage", "条/页")}
+              </MenuItem>
+            ))}
+          </Menu>
+        </>
+      ) : null}
+      <span className="admin-pagination-nav">
         {previousDropId ? (
           <PageDropButton id={previousDropId} dragging={dragging} {...previousProps} />
         ) : (
           <PageButton {...previousProps} />
         )}
-        <Text size="2" className="min-w-16 text-center tabular-nums">
+        <span className="admin-pagination-text">
           {currentPage} / {totalPages}
-        </Text>
+        </span>
         {nextDropId ? (
           <PageDropButton id={nextDropId} dragging={dragging} {...nextProps} />
         ) : (
           <PageButton {...nextProps} />
         )}
-      </Flex>
+      </span>
     </div>
   );
 };

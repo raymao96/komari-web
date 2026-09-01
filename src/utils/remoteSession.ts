@@ -2,9 +2,9 @@ export const remoteAgentWaitTimeoutMs = 30_000;
 
 const remoteErrorMessages: Record<string, string> = {
   "Remote control is disabled on this agent": "此 Agent 已关闭远程控制",
-  "Remote control is disabled because the Komari Server endpoint resolves to this node":
+  "Remote control is disabled because the Lite Server endpoint resolves to this node":
     "出于本机地址保护，Agent 拒绝了远程控制",
-  "Remote control is disabled because the Komari Server endpoint matches this node's reported address":
+  "Remote control is disabled because the Lite Server endpoint matches this node's reported address":
     "出于本机地址保护，Agent 拒绝了远程控制",
   "Remote session authorization failed": "远程会话验证失败，请重新连接",
   "Client is offline": "客户端当前离线",

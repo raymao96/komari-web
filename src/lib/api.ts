@@ -1,5 +1,8 @@
 import React from "react";
 import { toast } from "sonner";
+import { useOptionalAccount } from "@/contexts/AccountContext";
+import { planAdminSettingsFetch } from "@/utils/adminAuth";
+import { sameOriginApiPath, sameOriginFetchInit } from "@/utils/security";
 
 /**
  * API utility functions for settings management
@@ -25,7 +28,7 @@ export interface SettingsResponse {
 const createDefaultSettings = (): SettingsResponse => ({
   sitename: "",
   description: "",
-  admin_default_page_size: 10,
+  admin_default_page_size: 20,
   reduce_motion: false,
   cors_origin_check_enabled: true,
   auto_order_new_clients_by_region: false,
@@ -55,7 +58,10 @@ function getSettingsDeduplicated(): Promise<SettingsResponse> {
  */
 export async function getSettings(): Promise<SettingsResponse> {
   try {
-    const response = await fetch("/api/admin/settings");
+    const response = await fetch(
+      sameOriginApiPath("/api/admin/settings"),
+      sameOriginFetchInit(),
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -81,7 +87,10 @@ export async function getSettings(): Promise<SettingsResponse> {
 
     return settings as SettingsResponse;
   } catch (error) {
-    console.error("Failed to fetch settings:", error);
+    const status = error instanceof Error ? error.message : "";
+    if (!status.includes("401") && !status.includes("403")) {
+      console.error("Failed to fetch settings:", error);
+    }
     throw error;
   }
 }
@@ -94,13 +103,16 @@ export async function getSettings(): Promise<SettingsResponse> {
 export async function updateSettings(
   settings: Partial<SettingsResponse>
 ): Promise<void> {
-  const response = await fetch("/api/admin/settings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(settings),
-  });
+  const response = await fetch(
+    sameOriginApiPath("/api/admin/settings"),
+    sameOriginFetchInit({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(settings),
+    }),
+  );
 
   if (!response.ok) {
     let message = `HTTP error! status: ${response.status}`;
@@ -151,16 +163,31 @@ export async function updateSingleSetting<K extends keyof SettingsResponse>(
  * Hook for managing settings state and API calls
  */
 function useSettingsController() {
+  const accountState = useOptionalAccount();
   const [settings, setSettings] = React.useState<SettingsResponse>(
     createDefaultSettings,
   );
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const hasAccountContext = accountState !== undefined;
+  const accountLoading = accountState?.loading ?? false;
+  const loggedIn = Boolean(accountState?.account?.logged_in);
 
-  // Fetch settings on mount
   React.useEffect(() => {
     let cancelled = false;
+    const plan = planAdminSettingsFetch({
+      hasAccountContext,
+      accountLoading,
+      loggedIn,
+    });
+
+    if (plan === "reset") {
+      setSettings(createDefaultSettings());
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     const fetchSettings = async () => {
       setLoading(true);
@@ -171,6 +198,7 @@ function useSettingsController() {
         setSettings(data);
       } catch (err) {
         if (cancelled) return;
+        setSettings(createDefaultSettings());
         setError(
           err instanceof Error ? err.message : "Failed to fetch settings"
         );
@@ -184,7 +212,7 @@ function useSettingsController() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [accountLoading, hasAccountContext, loggedIn]);
 
   // Update a single setting
   const updateSetting = async <K extends keyof SettingsResponse>(
@@ -240,8 +268,7 @@ type SettingsContextValue = ReturnType<typeof useSettingsController>;
 const SettingsContext = React.createContext<SettingsContextValue | null>(null);
 
 export function useReduceMotionPreference(): boolean {
-  const context = React.useContext(SettingsContext);
-  return Boolean(context?.settings.reduce_motion);
+  return false;
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {

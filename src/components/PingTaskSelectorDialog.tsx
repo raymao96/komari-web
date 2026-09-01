@@ -1,6 +1,6 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
-import { Button, Dialog, Flex, Text } from "@radix-ui/themes";
+import {
+  AppDialogContent, Button, Dialog, Flex, Text } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import Selector from "@/components/Selector";
 import { usePingTask } from "@/contexts/PingTaskContext";
@@ -43,9 +43,9 @@ export default function PingTaskSelectorDialog({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger>{children}</Dialog.Trigger>
-      <AppDialogContent maxWidth="440px">
+      <AppDialogContent>
         <Dialog.Title>{title || t("common.select")}</Dialog.Title>
-        <Flex direction="column" gap="3">
+        <Flex direction="column" gap="4">
           <Text size="2" color="gray">
             {t("common.selected_total", {
               count: temporary.length,

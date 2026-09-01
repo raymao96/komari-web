@@ -1,18 +1,18 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import React from "react";
 
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useAccount } from "@/contexts/AccountContext";
 import {
+  AppDialogContent,
   Badge,
   Button,
   Dialog,
   Flex,
   Skeleton,
   TextField,
-} from "@radix-ui/themes";
-import { Github, Globe, User } from "lucide-react";
+} from "@/components/admin/ui";
+import { Github, Globe, User } from "@/components/admin/muiIcons";
 import Loading from "@/components/loading";
 import { SettingCardLabel } from "@/components/admin/SettingCard";
 import { AdminSectionTitle } from "@/components/admin/AdminPageTitle";

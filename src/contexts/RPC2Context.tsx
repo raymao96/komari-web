@@ -6,9 +6,11 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { useOptionalAccount } from "./AccountContext";
 import { RPC2Client } from "../lib/rpc2";
 import type { RPC2ConnectionStateType } from "../types/rpc2";
 import i18n from "../i18n/config";
+import { shouldOpenRpc2Socket } from "../utils/adminAuth";
 
 interface RPC2ContextType {
   client: RPC2Client;
@@ -26,15 +28,26 @@ let __rpc2_singleton__: RPC2Client | null = null;
 let __rpc2_refcount = 0;
 
 export const RPC2Provider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 创建/复用客户端实例，默认启用自动连接
+  const account = useOptionalAccount();
+  const loggedIn = Boolean(account?.account?.logged_in);
+
+  // 登录页不拉 WebSocket；确认登录后再连，call() 在连上前走 HTTP。
   const [client] = useState(() => {
     if (!__rpc2_singleton__) {
-      __rpc2_singleton__ = new RPC2Client("/api/rpc2", { autoConnect: true });
+      __rpc2_singleton__ = new RPC2Client("/api/rpc2", { autoConnect: false });
     }
     return __rpc2_singleton__;
   });
   const [connectionState, setConnectionState] = useState(client.state);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (shouldOpenRpc2Socket(loggedIn)) {
+      void client.connect().catch(() => undefined);
+      return;
+    }
+    client.pause();
+  }, [client, loggedIn]);
 
   useEffect(() => {
     __rpc2_refcount++;

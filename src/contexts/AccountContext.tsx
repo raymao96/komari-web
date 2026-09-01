@@ -53,7 +53,6 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...(preferences.language
                 ? { language: preferences.language }
                 : {}),
-              ...(preferences.color ? { color: preferences.color } : {}),
             }
           : current,
       );

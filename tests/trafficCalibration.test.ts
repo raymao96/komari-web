@@ -42,7 +42,7 @@ test("all admin languages include the complete traffic calibration copy", () => 
     "targetUp", "targetDown", "syncNotice", "history", "save", "saved",
     "invalidValue", "resetDayRequired",
   ];
-  for (const locale of ["en", "id_ID", "ja_JP", "zh_CN", "zh_TW"]) {
+  for (const locale of ["en", "ja_JP", "zh_CN", "zh_TW"]) {
     const translations = JSON.parse(
       readFileSync(path.resolve(`src/i18n/locales/${locale}.json`), "utf8"),
     );

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import { useReduceMotionPreference } from "@/lib/api";
+import { LITE_BLUE, NODE_OFFLINE, NODE_ONLINE } from "@/theme/brand";
 
 export type AdminNodeStatusFilter = "all" | "online" | "offline";
 
@@ -26,19 +27,19 @@ export default function AdminNodeStatusSummary({
     {
       label: t("admin.nodeTable.allNodes", "全部节点"),
       count: total,
-      color: "var(--accent-9)",
+      color: LITE_BLUE,
       filter: "all" as const,
     },
     {
       label: t("nodeCard.online", "在线"),
       count: available ? online : "--",
-      color: "var(--green-9)",
+      color: NODE_ONLINE,
       filter: "online" as const,
     },
     {
       label: t("nodeCard.offline", "离线"),
       count: available ? offline : "--",
-      color: "var(--red-9)",
+      color: NODE_OFFLINE,
       filter: "offline" as const,
     },
   ];
@@ -46,15 +47,13 @@ export default function AdminNodeStatusSummary({
   return (
     <div
       data-testid="node-status-summary"
-      className="grid w-full grid-cols-3 overflow-hidden rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] md:w-auto"
+      className="flex h-12 min-w-0 items-stretch md:w-auto"
     >
-      {items.map(({ label, count, color, filter }, index) => (
+      {items.map(({ label, count, color, filter }) => (
         <motion.button
           key={filter}
           type="button"
-          className={`relative isolate flex h-10 items-center justify-center gap-2 px-3 text-left transition-[color,box-shadow] duration-150 hover:bg-[var(--accent-a2)] disabled:cursor-not-allowed disabled:opacity-60 md:min-w-28 md:px-4 ${
-            index > 0 ? "border-l border-[var(--gray-a5)]" : ""
-          }`}
+          className="relative isolate flex h-12 items-center justify-center gap-2 px-3 text-left transition-colors duration-150 hover:text-[var(--gray-12)] disabled:cursor-not-allowed disabled:opacity-60 md:min-w-24 md:px-3.5"
           aria-pressed={value === filter}
           disabled={filter !== "all" && !available}
           onClick={() => onValueChange(filter)}
@@ -64,7 +63,7 @@ export default function AdminNodeStatusSummary({
           {value === filter ? (
             <motion.span
               aria-hidden="true"
-              className="absolute inset-0 -z-10 bg-[var(--accent-a3)] shadow-[inset_0_-2px_0_var(--accent-a7)]"
+              className="absolute inset-x-0 bottom-[-1px] -z-10 h-0.5 bg-[#1e293b]"
               layoutId={reduceMotion ? undefined : "admin-node-status-highlight"}
               initial={false}
               transition={
@@ -79,7 +78,7 @@ export default function AdminNodeStatusSummary({
             style={{ backgroundColor: color }}
           />
           <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
-            <strong className="shrink-0 text-sm font-medium leading-5 tabular-nums">
+            <strong className="shrink-0 text-sm font-semibold leading-5 tabular-nums">
               {count}
             </strong>
             <span className="min-w-0 truncate text-sm leading-5 text-muted-foreground">

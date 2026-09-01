@@ -1,59 +1,82 @@
-import React from "react";
-import {
-  Bolt,
-  Home,
-  BarChart2,
-  CircleArrowRight,
-  MessageCircleMore,
-  Ellipsis,
-  Bell,
-  Unplug,
-  TrendingUp,
-  Users,
-  UserCircle,
-  FileText,
-  AtSign,
-  Book,
-  Server,
-  Activity,
-  Palette,
-  Code,
-  Globe,
-  Terminal,
-  Database,
-  WifiOff,
-  Store,
-  Route,
-  LayoutDashboard,
-} from "lucide-react";
+import type { SvgIconComponent } from "@mui/icons-material";
+import type { SvgIconProps } from "@mui/material/SvgIcon";
+import AccountBalanceWalletOutlined from "@mui/icons-material/AccountBalanceWalletOutlined";
+import AccountCircleOutlined from "@mui/icons-material/AccountCircleOutlined";
+import AlternateEmailOutlined from "@mui/icons-material/AlternateEmailOutlined";
+import AltRouteOutlined from "@mui/icons-material/AltRouteOutlined";
+import ArrowCircleRightOutlined from "@mui/icons-material/ArrowCircleRightOutlined";
+import BarChartOutlined from "@mui/icons-material/BarChartOutlined";
+import ChatOutlined from "@mui/icons-material/ChatOutlined";
+import CodeOutlined from "@mui/icons-material/CodeOutlined";
+import DashboardOutlined from "@mui/icons-material/DashboardOutlined";
+import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
+import DnsOutlined from "@mui/icons-material/DnsOutlined";
+import GroupOutlined from "@mui/icons-material/GroupOutlined";
+import HomeOutlined from "@mui/icons-material/HomeOutlined";
+import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
+import MoreHoriz from "@mui/icons-material/MoreHoriz";
+import NotificationsOutlined from "@mui/icons-material/NotificationsOutlined";
+import PaletteOutlined from "@mui/icons-material/PaletteOutlined";
+import PowerOffOutlined from "@mui/icons-material/PowerOffOutlined";
+import PublicOutlined from "@mui/icons-material/PublicOutlined";
+import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
+import ShowChartOutlined from "@mui/icons-material/ShowChartOutlined";
+import StorageOutlined from "@mui/icons-material/StorageOutlined";
+import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
+import TerminalOutlined from "@mui/icons-material/TerminalOutlined";
+import TrendingUpOutlined from "@mui/icons-material/TrendingUpOutlined";
+import WifiOffOutlined from "@mui/icons-material/WifiOffOutlined";
+import { createElement, type SVGProps } from "react";
 
-
-// Map icon names defined in menuConfig.json to their components
-export const iconMap: Record<string, React.ComponentType<any>> = {
-  Server,
-  Bolt,
-  Home,
-  BarChart2,
-  CircleArrowRight,
-  MessageCircleMore,
-  Ellipsis,
-  Bell,
-  Unplug,
-  TrendingUp,
-  Users,
-  UserCircle,
-  FileText,
-  AtSign,
-  Book,
-  Activity,
-  Palette,
-  Code,
-  Globe,
-  Terminal,
-  Database,
-  WifiOff,
-  Store,
-  Route,
-  LayoutDashboard,
+export type AdminIconProps = SVGProps<SVGSVGElement> & {
+  size?: number | string;
+  strokeWidth?: number;
 };
 
+export function wrapMuiIcon(Icon: SvgIconComponent) {
+  function WrappedIcon({ size, color, ...props }: AdminIconProps) {
+    const fontSize = size == null || size === "" ? 18 : Number(size) || 18;
+    return createElement(Icon, {
+      ...props,
+      sx: {
+        fontSize,
+        width: "1em",
+        height: "1em",
+        color: color || "inherit",
+        display: "block",
+        flexShrink: 0,
+      },
+    } as SvgIconProps);
+  }
+  WrappedIcon.displayName = Icon.name || "MuiIcon";
+  return WrappedIcon;
+}
+
+export const iconMap: Record<string, ReturnType<typeof wrapMuiIcon>> = {
+  Server: wrapMuiIcon(DnsOutlined),
+  Bolt: wrapMuiIcon(SettingsOutlined),
+  Home: wrapMuiIcon(HomeOutlined),
+  BarChart2: wrapMuiIcon(BarChartOutlined),
+  CircleArrowRight: wrapMuiIcon(ArrowCircleRightOutlined),
+  MessageCircleMore: wrapMuiIcon(ChatOutlined),
+  Ellipsis: wrapMuiIcon(MoreHoriz),
+  Bell: wrapMuiIcon(NotificationsOutlined),
+  Unplug: wrapMuiIcon(PowerOffOutlined),
+  TrendingUp: wrapMuiIcon(TrendingUpOutlined),
+  Users: wrapMuiIcon(GroupOutlined),
+  UserCircle: wrapMuiIcon(AccountCircleOutlined),
+  FileText: wrapMuiIcon(DescriptionOutlined),
+  AtSign: wrapMuiIcon(AlternateEmailOutlined),
+  Book: wrapMuiIcon(MenuBookOutlined),
+  Activity: wrapMuiIcon(ShowChartOutlined),
+  Palette: wrapMuiIcon(PaletteOutlined),
+  Code: wrapMuiIcon(CodeOutlined),
+  Globe: wrapMuiIcon(PublicOutlined),
+  Terminal: wrapMuiIcon(TerminalOutlined),
+  Database: wrapMuiIcon(StorageOutlined),
+  WifiOff: wrapMuiIcon(WifiOffOutlined),
+  Store: wrapMuiIcon(StorefrontOutlined),
+  Route: wrapMuiIcon(AltRouteOutlined),
+  LayoutDashboard: wrapMuiIcon(DashboardOutlined),
+  Payments: wrapMuiIcon(AccountBalanceWalletOutlined),
+};

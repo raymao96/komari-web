@@ -5,9 +5,8 @@ import {
   SettingCardSwitch,
 } from "@/components/admin/SettingCard";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
-import { Button, Text } from "@radix-ui/themes";
+import { Button, Text } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
-import Loading from "@/components/loading";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import React from "react";
 import { renderProviderInputs } from "@/utils/renderProviders";
@@ -21,14 +20,13 @@ export default function SignOnSettings() {
   const [providerList, setProviderList] = React.useState<string[]>([]);
   const [currentProvider, setCurrentProvider] = React.useState<string>("");
   const [providerValues, setProviderValues] = React.useState<any>({});
-  const [providerLoading, setProviderLoading] = React.useState(false);
+  const [hydrated, setHydrated] = React.useState(false);
   const [providerError, setProviderError] = React.useState("");
 
 
   // 拉取所有 provider 及字段定义
   React.useEffect(() => {
     if (loading) return;
-    setProviderLoading(true);
     fetch("/api/admin/settings/oidc")
       .then((res) => res.json())
       .then((data) => {
@@ -41,18 +39,21 @@ export default function SignOnSettings() {
               ? settings.o_auth_provider
               : "";
           setCurrentProvider(initialProvider);
+          if (!initialProvider) setHydrated(true);
         } else {
           setProviderError(data.message || t("settings.sso.provider_fetch_failed"));
+          setHydrated(true);
         }
       })
-      .catch(() => setProviderError(t("settings.sso.provider_fetch_failed")))
-      .finally(() => setProviderLoading(false));
+      .catch(() => {
+        setProviderError(t("settings.sso.provider_fetch_failed"));
+        setHydrated(true);
+      });
   }, [loading, settings.o_auth_provider, t]);
 
   // 拉取当前 provider 的设置
   React.useEffect(() => {
     if (!currentProvider) return;
-    setProviderLoading(true);
     fetch(`/api/admin/settings/oidc?provider=${currentProvider}`)
       .then((res) => res.json())
       .then((data) => {
@@ -67,12 +68,11 @@ export default function SignOnSettings() {
         }
       })
       .catch(() => setProviderError(t("settings.sso.provider_settings_fetch_failed")))
-      .finally(() => setProviderLoading(false));
+      .finally(() => setHydrated(true));
   }, [currentProvider, t]);
 
   // 处理保存
   const handleOidcSave = async (values: any) => {
-    setProviderLoading(true);
     setProviderError("");
     const body = {
       name: currentProvider,
@@ -93,12 +93,11 @@ export default function SignOnSettings() {
     } catch {
       setProviderError(t("settings.sso.provider_save_failed"));
     }
-    setProviderLoading(false);
   };
 
   // 渲染 provider 的输入项已抽象到 utils/renderProviders.tsx 中
 
-  if (loading || (!providerLoading && providerList.length === 0 && !providerError)) {
+  if (loading) {
     return <SettingsPageSkeleton />;
   }
   if (error) {
@@ -110,6 +109,9 @@ export default function SignOnSettings() {
 
   return (
     <>
+      {hydrated ? null : (
+        <div data-admin-route-pending="true" hidden />
+      )}
       <AdminSectionTitle>{t("settings.sign_on.title")}</AdminSectionTitle>
       <SettingCardSwitch
         title={t("settings.sign_on.disable_password")}
@@ -138,7 +140,7 @@ export default function SignOnSettings() {
           setCurrentProvider(val);
         }}
       />
-      {providerLoading ? <Loading /> : renderProviderInputs({
+      {renderProviderInputs({
         currentProvider,
         providerDefs,
         providerValues,
@@ -164,7 +166,7 @@ const ApiCard = () => {
   // 生成32位随机字符串
   const generateRandomString = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = 'komari-';
+    let result = 'lite-';
     for (let i = 0; i < 32; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }

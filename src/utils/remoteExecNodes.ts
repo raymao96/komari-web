@@ -7,10 +7,6 @@ export type RemoteExecNodeSearchItem = {
   ipv6?: string;
   group?: string;
   remark?: string;
-  price?: number;
-  billing_cycle?: number;
-  currency?: string;
-  expired_at?: string;
   tags?: string;
   weight?: number | null;
   created_at?: string | null;
@@ -21,23 +17,8 @@ const normalizeSearchValue = (value: unknown) =>
     ? ""
     : String(value).trim().toLocaleLowerCase();
 
-export function remoteExecNodeSearchText(
-  node: RemoteExecNodeSearchItem,
-  billingDisplayTerms: readonly unknown[] = [],
-): string {
-  return [
-    node.name,
-    node.ipv4,
-    node.ipv6,
-    node.group,
-    node.remark,
-    node.price,
-    node.billing_cycle,
-    node.currency,
-    node.expired_at,
-    node.tags,
-    ...billingDisplayTerms,
-  ]
+export function remoteExecNodeSearchText(node: RemoteExecNodeSearchItem): string {
+  return [node.name, node.ipv4, node.ipv6, node.group, node.remark, node.tags]
     .map(normalizeSearchValue)
     .filter(Boolean)
     .join("\n");
@@ -46,12 +27,11 @@ export function remoteExecNodeSearchText(
 export function matchesRemoteExecNode(
   node: RemoteExecNodeSearchItem,
   query: string,
-  billingDisplayTerms: readonly unknown[] = [],
 ): boolean {
   const normalizedQuery = normalizeSearchValue(query);
   return (
     normalizedQuery === "" ||
-    remoteExecNodeSearchText(node, billingDisplayTerms).includes(normalizedQuery)
+    remoteExecNodeSearchText(node).includes(normalizedQuery)
   );
 }
 

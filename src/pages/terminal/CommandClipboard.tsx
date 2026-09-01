@@ -17,7 +17,7 @@ import {
   TextArea,
   TextField,
 } from "@radix-ui/themes";
-import { PlusIcon, Trash2Icon, Edit2Icon } from "lucide-react";
+import { PlusIcon, Trash2Icon, Edit2Icon } from "@/components/admin/muiIcons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";

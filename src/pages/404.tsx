@@ -1,32 +1,70 @@
-import React from "react";
-import { Flex, Text, Button } from "@radix-ui/themes";
-import { Link } from "react-router-dom";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
-const NotFound: React.FC = () => {
-  React.useEffect(() => {
-    //document.title = "404 - Page Not Found";
-  }, []);
-  const [t] = useTranslation();
+import { getAppAssetUrl } from "@/utils/assetUrl";
+
+export default function NotFound() {
+  const { t } = useTranslation();
+
   return (
-    <Flex
-      direction="column"
-      align="center"
-      justify="center"
-      style={{ height: '100vh', padding: '16px', textAlign: 'center' }}
-      gap="3"
+    <Box
+      component="main"
+      sx={{
+        minHeight: "var(--app-viewport-height, 100vh)",
+        display: "grid",
+        placeItems: "center",
+        px: 2.5,
+        py: 6,
+        bgcolor: "background.default",
+      }}
     >
-      <Text size="9" weight="bold">
-        404
-      </Text>
-      <Text size="4">
-        {t("page_not_found")}
-      </Text>
-      <Link to="/">
-        <Button variant="soft">{t("go_to_home")}</Button>
-      </Link>
-    </Flex>
-  );
-};
+      <Stack
+        spacing={2}
+        sx={{
+          width: "100%",
+          maxWidth: 520,
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
+        <Box
+          component="img"
+          src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
+          alt="Lite"
+          sx={{ width: 64, height: 64, mb: 1, objectFit: "contain" }}
+        />
 
-export default NotFound;
+        <Typography
+          component="h1"
+          sx={{
+            color: "text.primary",
+            fontSize: { xs: 64, sm: 80 },
+            fontWeight: 700,
+            lineHeight: 1,
+            letterSpacing: 0,
+          }}
+        >
+          404
+        </Typography>
+        <Typography
+          variant="body1"
+          sx={{ maxWidth: 420, color: "text.secondary" }}
+        >
+          {t("page_not_found")}
+        </Typography>
+        <Button
+          component={Link}
+          to="/"
+          variant="contained"
+          sx={{ mt: 1, minHeight: 38, px: 2.5 }}
+        >
+          {t("go_to_home")}
+        </Button>
+      </Stack>
+    </Box>
+  );
+}

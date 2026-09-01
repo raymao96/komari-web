@@ -1,3 +1,5 @@
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import type { ReactNode } from "react";
 
 export default function AdminPageTitle({
@@ -8,23 +10,41 @@ export default function AdminPageTitle({
   description?: ReactNode;
 }) {
   return (
-    <div className="min-w-0">
-      <h1 className="text-xl font-semibold leading-7 text-foreground">
-        {children}
-      </h1>
-      {description ? (
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+    <Box sx={{ minWidth: 0 }}>
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{ fontWeight: 700, fontSize: 24, letterSpacing: 0, lineHeight: "36px" }}
+        >
+          {children}
+        </Typography>
+        {description ? (
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 0.5,
+              maxWidth: 720,
+              fontSize: 14,
+              fontWeight: 400,
+              lineHeight: 1.6,
+              color: "text.secondary",
+            }}
+          >
           {description}
-        </p>
+        </Typography>
       ) : null}
-    </div>
+    </Box>
   );
 }
 
 export function AdminSectionTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="text-base font-semibold leading-6 text-foreground">
+    <Typography
+      variant="subtitle1"
+      component="h2"
+      sx={{ fontWeight: 600, lineHeight: 1.5 }}
+    >
       {children}
-    </h2>
+    </Typography>
   );
 }

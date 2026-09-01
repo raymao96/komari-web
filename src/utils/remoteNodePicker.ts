@@ -8,6 +8,7 @@ export type RemoteNodePickerItem = {
   ipv4?: string;
   ipv6?: string;
   group?: string;
+  tags?: string;
   region?: string;
   region_override?: string;
   weight?: number | null;
@@ -18,7 +19,7 @@ const normalizeSearchValue = (value: string | undefined) =>
   value?.trim().toLocaleLowerCase() ?? "";
 
 export function remoteNodeSearchText(node: RemoteNodePickerItem): string {
-  return [node.name, node.ipv4, node.ipv6, node.group]
+  return [node.name, node.ipv4, node.ipv6, node.group, node.tags]
     .map(normalizeSearchValue)
     .filter(Boolean)
     .join("\n");

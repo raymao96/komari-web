@@ -1,4 +1,5 @@
-const remoteLaunchKey = "komari.remote.launch";
+const remoteLaunchKey = "lite.remote.launch";
+const legacyRemoteLaunchKey = "komari.remote.launch";
 
 type RemoteLaunchTarget = {
   uuid: string;
@@ -49,7 +50,10 @@ export function getRemoteLaunchTarget(): string | null {
 
   // Compatibility for an already-open admin page that still launches the
   // terminal with the pre-hash handoff used by older frontend bundles.
-  const raw = window.sessionStorage.getItem(remoteLaunchKey);
+  const raw =
+    window.sessionStorage.getItem(remoteLaunchKey) ??
+    window.sessionStorage.getItem(legacyRemoteLaunchKey);
   window.sessionStorage.removeItem(remoteLaunchKey);
+  window.sessionStorage.removeItem(legacyRemoteLaunchKey);
   return parseLegacyRemoteLaunchTarget(raw);
 }
