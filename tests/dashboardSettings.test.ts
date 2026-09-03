@@ -120,7 +120,7 @@ test("summary cards link to their pages and cost-center keeps its card on first 
   );
   assert.match(
     adminDashboardSource,
-    /case "cost_center":[\s\S]*?flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1/,
+    /case "cost_center":[\s\S]*?<SummaryFooter>/,
   );
   assert.doesNotMatch(
     adminDashboardSource,

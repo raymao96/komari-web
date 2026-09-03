@@ -28,6 +28,7 @@ import type { NodeDetail } from "@/contexts/NodeDetailsContext";
 import type { Record as LiveRecord } from "@/types/LiveData";
 import { nodeTrafficType, trafficUsed } from "@/utils/trafficAccounting";
 import { formatTrafficResetRangeLabel } from "@/utils/trafficCycle";
+import { dashboardTrafficAxisWidth } from "@/utils/dashboard";
 import { formatBytes } from "@/utils/unitHelper";
 import { LITE_BLUE } from "@/theme/brand";
 import {
@@ -99,14 +100,6 @@ function dailyFromNetworkRecords(rows: LoadRecord[]): DailyTrafficPoint[] {
   });
 }
 
-function trafficAxisWidth(values: number[]) {
-  const longest = values.reduce((width, value) => {
-    const label = formatBytes(Number(value) || 0).replace(" ", "");
-    return Math.max(width, label.length);
-  }, 4);
-  return Math.min(72, Math.max(40, longest * 7));
-}
-
 type DailyTrafficPoint = {
   day: string;
   label: string;
@@ -114,6 +107,14 @@ type DailyTrafficPoint = {
   down: number;
   billable: number;
 };
+
+function dailyTrafficAxisValues(daily: DailyTrafficPoint[]) {
+  const values = daily.flatMap((point) => [point.up, point.down]);
+  const max = values.reduce((highest, value) => Math.max(highest, Number(value) || 0), 0);
+  if (!(max > 0)) return values;
+  // Recharts ticks are interpolated, so "83.82GB" can be wider than any bar label.
+  return [...values, 0, max * 0.25, max * 0.5, max * 0.75, max];
+}
 
 function UsageCard({
   icon,
@@ -420,7 +421,7 @@ export default function NodeUsageStats({
   );
 
   const dailyAxisWidth = useMemo(
-    () => trafficAxisWidth(daily.flatMap((point) => [point.up, point.down])),
+    () => dashboardTrafficAxisWidth(dailyTrafficAxisValues(daily)),
     [daily],
   );
 
@@ -843,12 +844,19 @@ export default function NodeUsageStats({
         {daily.length ? (
         <ChartContainer
           config={{ down: { label: "In", color: "#FF5630" }, up: { label: "Out", color: LITE_BLUE } }}
-          className="h-[200px] w-full aspect-auto"
+          className="h-[200px] w-full aspect-auto [&_.recharts-wrapper]:overflow-visible [&_.recharts-surface]:overflow-visible"
         >
           <BarChart data={daily} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis tickLine={false} axisLine={false} width={dailyAxisWidth} tickFormatter={(value) => formatBytes(Number(value)).replace(" ", "")} />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              width={dailyAxisWidth}
+              tickMargin={4}
+              tick={{ fontSize: 11 }}
+              tickFormatter={(value) => formatBytes(Number(value)).replace(" ", "")}
+            />
             <Tooltip
               content={({ active, payload, label }) =>
                 active && payload?.length ? (

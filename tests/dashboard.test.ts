@@ -7,6 +7,7 @@ import {
   dashboardOnlinePercent,
   dashboardRuntimeStorageTotal,
   dashboardTrafficAxisWidth,
+  groupByVisualRow,
   shortDashboardDay,
   type DashboardData,
 } from "../src/utils/dashboard.ts";
@@ -91,10 +92,12 @@ test("formats Beijing ledger day keys for chart labels", () => {
 test("reserves enough chart space for complete traffic labels on desktop and mobile", () => {
   const value = 558.79 * 1024 ** 3;
   const sixDigitGigabytes = 1001.55 * 1024 ** 3;
+  const twoDecimalGigabytes = 90_000_000_000;
   assert.ok(dashboardTrafficAxisWidth([value]) > 58);
-  assert.equal(dashboardTrafficAxisWidth([]), 68);
-  assert.ok(dashboardTrafficAxisWidth([sixDigitGigabytes]) >= 88);
-  assert.ok(dashboardTrafficAxisWidth([Number.MAX_VALUE]) <= 104);
+  assert.equal(dashboardTrafficAxisWidth([]), 56);
+  assert.ok(dashboardTrafficAxisWidth([sixDigitGigabytes]) >= 72);
+  assert.ok(dashboardTrafficAxisWidth([twoDecimalGigabytes]) >= 60);
+  assert.ok(dashboardTrafficAxisWidth([Number.MAX_VALUE]) <= 76);
 });
 
 test("dashboard alert links reuse existing destination filters", () => {
@@ -149,6 +152,48 @@ test("billing alert labels distinguish overdue and upcoming states", () => {
   const now = Date.parse("2026-08-08T00:00:00Z");
   assert.equal(formatBillingAlertStatus("2026-08-11T00:00:00Z", "zh-CN", now), "3 天后到期");
   assert.equal(formatBillingAlertStatus("2026-08-07T12:00:00Z", "zh-CN", now), "已到期 1 天");
+});
+
+test("database usage summary stacks like traffic when the footer wraps", () => {
+  const source = readFileSync(new URL("../src/pages/admin/dashboard.tsx", import.meta.url), "utf8");
+  const block = source.match(/case "storage_summary":[\s\S]*?case "cost_center":/);
+  assert.ok(block);
+  assert.match(block[0], /<SummaryFooter>/);
+  assert.equal((block[0].match(/whitespace-nowrap/g) ?? []).length, 2);
+});
+
+test("server status summary follows sibling footer wrap instead of stacking alone", () => {
+  const source = readFileSync(new URL("../src/pages/admin/dashboard.tsx", import.meta.url), "utf8");
+  const block = source.match(/case "server_status":[\s\S]*?case "traffic_summary":/);
+  assert.ok(block);
+  assert.match(block[0], /<SummaryFooter>/);
+  assert.doesNotMatch(block[0], /flex-col/);
+  assert.match(block[0], /admin_dashboard\.online_count/);
+  assert.match(block[0], /admin_dashboard\.offline_count/);
+  assert.match(source, /useSyncedSummaryFooters/);
+  const css = readFileSync(new URL("../src/global.css", import.meta.url), "utf8");
+  assert.match(css, /km-summary-footer--stack/);
+});
+
+test("summary footers in the same visual row share a wrap decision", () => {
+  const groups = groupByVisualRow(
+    [{ id: "server", top: 10 }, { id: "traffic", top: 12 }, { id: "alerts", top: 96 }],
+    (item) => item.top,
+  );
+  assert.deepEqual(groups.map((group) => group.map((item) => item.id)), [["server", "traffic"], ["alerts"]]);
+});
+
+test("cost center uses the this-month-cost title and banknote badge without an overlapping aside", () => {
+  const source = readFileSync(new URL("../src/pages/admin/dashboard.tsx", import.meta.url), "utf8");
+  const block = source.match(/case "cost_center":[\s\S]*?case "resource_ranking":/);
+  assert.ok(block);
+  assert.match(block[0], /summary\.month\.total/);
+  assert.match(block[0], /label=\{t\("admin_dashboard\.cost_this_month"\)\}/);
+  assert.match(block[0], /icon=\{<PaymentsOutlined/);
+  assert.doesNotMatch(block[0], /valueAside/);
+  assert.match(block[0], /admin_dashboard\.cost_year/);
+  assert.match(block[0], /billing\.metrics\.remainingValue/);
+  assert.doesNotMatch(block[0], /admin_dashboard\.cost_month/);
 });
 
 test("today's billable summary always lists upload and download together", () => {

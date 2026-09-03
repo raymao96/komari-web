@@ -43,7 +43,7 @@ test("registers and preloads the billing center after the server menu", () => {
   assert.match(preloadSource, /"\/admin\/billing"/);
   assert.match(menuSource, /"icon": "Payments"/);
   assert.match(iconHelperSource, /Payments: wrapMuiIcon\(AccountBalanceWalletOutlined\)/);
-  assert.match(dashboardSource, /icon=\{<AccountBalanceWalletOutlined/);
+  assert.match(dashboardSource, /icon=\{<PaymentsOutlined/);
 });
 
 test("keeps financial query values as decimal strings and CSV filters", () => {

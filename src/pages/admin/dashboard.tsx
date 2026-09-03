@@ -8,7 +8,7 @@ import ArrowUpward from "@mui/icons-material/ArrowUpward";
 import CreditCardOutlined from "@mui/icons-material/CreditCardOutlined";
 import DnsOutlined from "@mui/icons-material/DnsOutlined";
 import ErrorOutlined from "@mui/icons-material/ErrorOutlined";
-import AccountBalanceWalletOutlined from "@mui/icons-material/AccountBalanceWalletOutlined";
+import PaymentsOutlined from "@mui/icons-material/PaymentsOutlined";
 import Refresh from "@mui/icons-material/Refresh";
 import StorageOutlined from "@mui/icons-material/StorageOutlined";
 import { useTranslation } from "react-i18next";
@@ -33,8 +33,10 @@ import {
   ReturnRouteStatusPanel,
   StoragePanel,
   SummaryCardSkeleton,
+  SummaryFooter,
   SummaryPanel,
   TrafficTrendPanel,
+  useSyncedSummaryFooters,
 } from "@/components/admin/DashboardPanels";
 import { useDashboardSettings } from "@/hooks/useDashboardSettings";
 import {
@@ -297,6 +299,20 @@ export default function AdminDashboard() {
     return () => window.cancelAnimationFrame(animationFrame);
   }, [accountKey, settingsLoading, viewKey]);
 
+  useSyncedSummaryFooters(dashboardRootRef, [
+    viewKey,
+    i18n.language,
+    data?.servers.online,
+    data?.servers.offline,
+    data?.storage.database_files,
+    data?.storage.wal,
+    data?.storage.shm,
+    charts?.traffic.today_up,
+    charts?.traffic.today_down,
+    billing?.summary.year.total,
+    billing?.summary.remaining_value,
+  ].join(":"));
+
   React.useEffect(() => {
     const saveBeforePageHide = () => saveDashboardView();
     const saveWhenHidden = () => {
@@ -343,15 +359,16 @@ export default function AdminDashboard() {
               value={`${data.servers.online} / ${data.servers.total}`}
               tone={data.servers.offline > 0 ? "orange" : "green"}
             >
-              <div className="flex items-center justify-between gap-3">
-                <span>{t("admin_dashboard.online_count", { count: data.servers.online })}</span>
+              <SummaryFooter>
+                <span className="whitespace-nowrap">{t("admin_dashboard.online_count", { count: data.servers.online })}</span>
                 <Box
                   component="span"
+                  className="whitespace-nowrap"
                   sx={{ color: data.servers.offline > 0 ? "warning.main" : "success.main" }}
                 >
                   {t("admin_dashboard.offline_count", { count: data.servers.offline })}
                 </Box>
-              </div>
+              </SummaryFooter>
             </SummaryPanel>
           </Link>
         ) : <SummaryCardSkeleton />;
@@ -364,7 +381,7 @@ export default function AdminDashboard() {
             tone="accent"
           >
             {charts && !charts.traffic.error ? (
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <SummaryFooter>
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   <ArrowUpward sx={{ fontSize: 14, color: "text.secondary" }} className="shrink-0" />
                   <span className="whitespace-nowrap">{t("admin_dashboard.upload")} {formatBytes(charts.traffic.today_up)}</span>
@@ -373,7 +390,7 @@ export default function AdminDashboard() {
                   <ArrowDownward sx={{ fontSize: 14, color: "text.secondary" }} className="shrink-0" />
                   <span className="whitespace-nowrap">{t("admin_dashboard.download")} {formatBytes(charts.traffic.today_down)}</span>
                 </span>
-              </div>
+              </SummaryFooter>
             ) : <span>{chartsError ? t("admin_dashboard.data_unavailable") : t("admin_dashboard.chart_loading")}</span>}
           </SummaryPanel>
         );
@@ -388,10 +405,10 @@ export default function AdminDashboard() {
                 ? t("admin_dashboard.external_storage")
                 : formatBytes(dashboardLocalStorageTotal(data) ?? 0)}
             >
-              <div className="flex items-center justify-between gap-3">
-                <span>{t("admin_dashboard.database_files")} {formatBytes(data.storage.database_files)}</span>
-                <span>WAL + SHM {formatBytes(dashboardRuntimeStorageTotal(data))}</span>
-              </div>
+              <SummaryFooter>
+                <span className="whitespace-nowrap">{t("admin_dashboard.database_files")} {formatBytes(data.storage.database_files)}</span>
+                <span className="whitespace-nowrap">WAL + SHM {formatBytes(dashboardRuntimeStorageTotal(data))}</span>
+              </SummaryFooter>
             </SummaryPanel>
           </Link>
         ) : <SummaryCardSkeleton />;
@@ -399,16 +416,16 @@ export default function AdminDashboard() {
         return (
           <Link to="/admin/billing" className="group block h-full min-w-0 text-inherit no-underline">
             <SummaryPanel
-              icon={<AccountBalanceWalletOutlined />}
-              label={t("admin_dashboard.cost_center")}
+              icon={<PaymentsOutlined />}
+              label={t("admin_dashboard.cost_this_month")}
               value={billing ? formatBillingMoney(billing.summary.month.total, billingCurrency) : "-"}
               tone="accent"
             >
               {billing ? (
-                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <SummaryFooter>
                   <span className="whitespace-nowrap">{t("admin_dashboard.cost_year")} {formatBillingMoney(billing.summary.year.total, billingCurrency)}</span>
                   <span className="whitespace-nowrap">{t("billing.metrics.remainingValue")} {formatBillingMoney(billing.summary.remaining_value, billingCurrency)}</span>
-                </div>
+                </SummaryFooter>
               ) : (
                 <span>{t("admin_dashboard.chart_loading")}</span>
               )}

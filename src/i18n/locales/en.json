@@ -375,6 +375,7 @@
     "chart_loading": "Loading chart data",
     "cost_center": "Cost Center",
     "cost_month": "Month to date",
+    "cost_this_month": "This month's cost",
     "cost_year": "Year to date",
     "current_alerts": "Current alerts",
     "current_minute": "Current",

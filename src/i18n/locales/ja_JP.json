@@ -375,6 +375,7 @@
     "chart_loading": "グラフデータを読み込み中",
     "cost_center": "コストセンター",
     "cost_month": "今月累計",
+    "cost_this_month": "今月の費用",
     "cost_year": "年間累計",
     "current_alerts": "現在のアラート",
     "current_minute": "現在の分",

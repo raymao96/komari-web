@@ -1289,6 +1289,17 @@ html.dark [data-admin-shell] .km-theme-config-tabs-trigger[data-state="active"] 
   box-shadow: none;
 }
 
+[data-admin-shell] .km-summary-footer--stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+[data-admin-shell] .km-summary-footer--measure {
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+}
+
 [data-admin-shell] .km-admin-node-list {
   overflow: hidden;
   border: 1px solid rgba(145, 158, 171, 0.2);

@@ -38,6 +38,8 @@ import {
   type DashboardData,
   type DashboardDatabaseStatus,
   type DashboardResourceRankItem,
+  SUMMARY_FOOTER_CLASS,
+  syncSummaryFooters,
 } from "@/utils/dashboard";
 import {
   dashboardAlertCategoryPath,
@@ -77,12 +79,14 @@ export function SummaryPanel({
   icon,
   label,
   value,
+  valueAside,
   children,
   tone = "accent",
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  valueAside?: React.ReactNode;
   children: React.ReactNode;
   tone?: "accent" | "green" | "orange" | "muted";
 }) {
@@ -120,10 +124,77 @@ export function SummaryPanel({
           {icon}
         </Box>
       </div>
-      <div className="mt-2 text-2xl font-bold tabular-nums text-foreground">{value}</div>
+      <div className="mt-2 flex min-w-0 items-baseline gap-1">
+        <div className="min-w-0 text-2xl font-bold tabular-nums text-foreground">{value}</div>
+        {valueAside ? (
+          <span className="shrink-0 whitespace-nowrap text-sm font-medium text-muted-foreground">（{valueAside}）</span>
+        ) : null}
+      </div>
       <div className="mt-2 min-w-0 text-sm text-muted-foreground">{children}</div>
     </section>
   );
+}
+
+export function SummaryFooter({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`${SUMMARY_FOOTER_CLASS} flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1${className ? ` ${className}` : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+export function useSyncedSummaryFooters(
+  rootRef: React.RefObject<HTMLElement | null>,
+  refreshKey: string,
+) {
+  React.useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    let frame = 0;
+    const run = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => syncSummaryFooters(root));
+    };
+
+    const observer = new ResizeObserver(run);
+    const observeTargets = () => {
+      observer.disconnect();
+      observer.observe(root);
+      for (const el of root.querySelectorAll(`.${SUMMARY_FOOTER_CLASS}`)) {
+        observer.observe(el);
+      }
+    };
+
+    observeTargets();
+    run();
+    const mutations = new MutationObserver((records) => {
+      const footerChanged = records.some((record) => {
+        const nodes = [...record.addedNodes, ...record.removedNodes];
+        return nodes.some((node) => (
+          node instanceof Element
+          && (node.classList.contains(SUMMARY_FOOTER_CLASS) || node.querySelector(`.${SUMMARY_FOOTER_CLASS}`))
+        ));
+      });
+      if (!footerChanged) return;
+      observeTargets();
+      run();
+    });
+    mutations.observe(root, { childList: true, subtree: true });
+    window.addEventListener("resize", run);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      mutations.disconnect();
+      window.removeEventListener("resize", run);
+    };
+  }, [refreshKey, rootRef]);
 }
 
 function DashboardChip({
@@ -1213,9 +1284,9 @@ function LegacyAdminDashboard() {
               value={`${data.servers.online} / ${data.servers.total}`}
               tone={data.servers.offline > 0 ? "orange" : "green"}
             >
-              <div className="flex items-center justify-between gap-3">
-                <span>{t("admin_dashboard.online_count", { count: data.servers.online })}</span>
-                <span className={data.servers.offline > 0 ? "text-[var(--orange-11)]" : "text-[var(--green-11)]"}>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="whitespace-nowrap">{t("admin_dashboard.online_count", { count: data.servers.online })}</span>
+                <span className={`whitespace-nowrap ${data.servers.offline > 0 ? "text-[var(--orange-11)]" : "text-[var(--green-11)]"}`}>
                   {t("admin_dashboard.offline_count", { count: data.servers.offline })}
                 </span>
               </div>
@@ -1245,9 +1316,9 @@ function LegacyAdminDashboard() {
               label={t("admin_dashboard.database_usage")}
               value={dashboardLocalStorageTotal(data) === null ? t("admin_dashboard.external_storage") : formatBytes(dashboardLocalStorageTotal(data) ?? 0)}
             >
-              <div className="flex items-center justify-between gap-3">
-                <span>{t("admin_dashboard.database_files")} {formatBytes(data.storage.database_files)}</span>
-                <span>WAL + SHM {formatBytes(dashboardRuntimeStorageTotal(data))}</span>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="whitespace-nowrap">{t("admin_dashboard.database_files")} {formatBytes(data.storage.database_files)}</span>
+                <span className="whitespace-nowrap">WAL + SHM {formatBytes(dashboardRuntimeStorageTotal(data))}</span>
               </div>
             </SummaryPanel>
           </div>

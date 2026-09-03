@@ -1,3 +1,5 @@
+import { formatBytes } from "./unitHelper.ts";
+
 export interface DashboardOfflineNode {
   uuid: string;
   name: string;
@@ -249,6 +251,48 @@ export function dashboardTrafficAxisWidth(values: readonly number[]): number {
     const label = formatBytes(Math.max(0, value)).replace(" ", "");
     return Math.max(longest, label.length);
   }, 0);
-  return Math.min(104, Math.max(68, longestLabel * 8 + 16));
+  // Right-aligned ticks: extra width becomes a blank column to the left of the labels.
+  return Math.min(76, Math.max(56, longestLabel * 7 + 12));
 }
-import { formatBytes } from "./unitHelper.ts";
+
+export const SUMMARY_FOOTER_CLASS = "km-summary-footer";
+export const SUMMARY_FOOTER_STACK_CLASS = "km-summary-footer--stack";
+export const SUMMARY_FOOTER_MEASURE_CLASS = "km-summary-footer--measure";
+
+export function groupByVisualRow<T>(
+  items: readonly T[],
+  topOf: (item: T) => number,
+  threshold = 8,
+): T[][] {
+  const groups: T[][] = [];
+  for (const item of items) {
+    const top = topOf(item);
+    const group = groups.find((candidate) => Math.abs(topOf(candidate[0]) - top) <= threshold);
+    if (group) group.push(item);
+    else groups.push([item]);
+  }
+  return groups;
+}
+
+export function summaryFooterNaturallyWraps(el: HTMLElement): boolean {
+  el.classList.add(SUMMARY_FOOTER_MEASURE_CLASS);
+  const kids = Array.from(el.children) as HTMLElement[];
+  const wrapped = kids.length >= 2 && kids[1].offsetTop > kids[0].offsetTop + 1;
+  el.classList.remove(SUMMARY_FOOTER_MEASURE_CLASS);
+  return wrapped;
+}
+
+export function syncSummaryFooters(root: ParentNode): void {
+  const footers = Array.from(root.querySelectorAll<HTMLElement>(`.${SUMMARY_FOOTER_CLASS}`));
+  if (footers.length === 0) return;
+  const groups = groupByVisualRow(footers, (el) => {
+    const card = el.closest<HTMLElement>("[data-dashboard-module]");
+    return (card ?? el).getBoundingClientRect().top;
+  });
+  for (const group of groups) {
+    const shouldStack = group.some(summaryFooterNaturallyWraps);
+    for (const el of group) {
+      el.classList.toggle(SUMMARY_FOOTER_STACK_CLASS, shouldStack);
+    }
+  }
+}

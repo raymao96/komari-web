@@ -376,6 +376,7 @@
     "chart_loading": "图表数据加载中",
     "cost_center": "成本中心",
     "cost_month": "本月累计",
+    "cost_this_month": "本月费用",
     "cost_year": "年度累计",
     "current_alerts": "当前告警",
     "current_minute": "当前分钟",
