@@ -74,7 +74,7 @@ export function useAdminShell() {
     : (publicInfo as { version?: string } | undefined)?.version ||
       versionInfo?.version;
   const currentReleaseURL = currentVersion
-    ? `https://github.com/nuomiiiii/Lite/releases/tag/${encodeURIComponent(currentVersion)}`
+    ? `https://github.com/raymao96/komari/releases/tag/${encodeURIComponent(currentVersion)}`
     : undefined;
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export function useAdminShell() {
     const release = {
       tag_name: "2.2.3",
       name: "Lite 2.2.3",
-      html_url: "https://github.com/nuomiiiii/Lite/releases/tag/2.2.3",
+      html_url: "https://github.com/raymao96/komari/releases/tag/2.2.3",
       published_at: new Date().toISOString(),
       body: [
         "<!-- lite-version-hash: b2c3d4e -->",
@@ -137,13 +137,13 @@ export function useAdminShell() {
         "Linux 一键安装：",
         "",
         "```",
-        "curl -fsSL https://raw.githubusercontent.com/nuomiiiii/lite/main/install-lite.sh -o install-lite.sh && chmod +x install-lite.sh && sudo ./install-lite.sh",
+        "curl -fsSL https://raw.githubusercontent.com/raymao96/komari/github-nuomiiiii/install-lite.sh -o install-lite.sh && chmod +x install-lite.sh && sudo ./install-lite.sh",
         "```",
         "",
         "Docker：",
         "",
         "```",
-        "docker run -d --name lite -p 27777:27777 ghcr.io/nuomiiiii/lite:latest",
+        "docker run -d --name lite -p 27777:27777 ghcr.io/raymao96/komari:latest",
         "```",
         "",
         "预览填充段落，用来把说明撑出滚动条：",
