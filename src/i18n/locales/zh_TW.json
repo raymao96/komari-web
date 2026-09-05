@@ -355,8 +355,7 @@
       "trafficUsedShort": "已用",
       "twoFactorCode": "動態密碼（未啟用 2FA 可留空）",
       "twoFactorInvalid": "動態密碼錯誤",
-      "ungrouped": "未分組",
-      "disableWebSsh": "停用 Web SSH"
+      "ungrouped": "未分組"
     },
     "notification": {
       "expire_enable": "是否啟用到期提醒",
