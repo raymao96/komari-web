@@ -256,12 +256,25 @@ export function billingQuery(
   return query ? `${path}?${query}` : path;
 }
 
-export function isLongTermExpiry(value?: string | null): boolean {
-  if (!value) return true;
-  const date = new Date(value);
+export function isLongTermExpiry(value?: string | number | Date | null): boolean {
+  if (value === null || value === undefined || value === "") return true;
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return false;
   const year = date.getUTCFullYear();
   return year < 2 || year > 2200;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export function remainingExpiryDays(
+  expiredAt?: string | number | Date | null,
+  nowMs = Date.now(),
+): number | null {
+  if (isLongTermExpiry(expiredAt)) return null;
+  const expired =
+    expiredAt instanceof Date ? expiredAt : new Date(expiredAt as string | number);
+  if (Number.isNaN(expired.getTime())) return null;
+  return Math.round((expired.getTime() - nowMs) / MS_PER_DAY);
 }
 
 export function formatBillingMoney(

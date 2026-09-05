@@ -30,3 +30,16 @@ test("terminal workspace no longer opens the legacy clients websocket", () => {
   assert.doesNotMatch(source, /new WebSocket\([^\n]*\/api\/clients/);
   assert.match(source, /common:getNodesLatestStatus/);
 });
+
+test("terminal waits for login before using RPC2", () => {
+  const source = readFileSync("src/pages/terminal/index.tsx", "utf8");
+  const outer = source.slice(
+    source.indexOf("export default function TerminalWorkspace"),
+    source.indexOf("function TerminalWorkspaceInner"),
+  );
+  const inner = source.slice(source.indexOf("function TerminalWorkspaceInner"));
+  assert.match(outer, /resolveAdminAuthView/);
+  assert.doesNotMatch(outer, /useRPC2Call/);
+  assert.match(inner, /useRPC2Call/);
+  assert.match(inner, /authorization !== "authorized"/);
+});

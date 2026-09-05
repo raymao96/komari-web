@@ -158,14 +158,51 @@ export type PasswordLoginResult =
   | { ok: true }
   | { ok: false; message: string; requiresTwoFactor: boolean };
 
+export const loginTwoFactorRequiredMessage = "2FA code is required";
+
+const loginErrorKeys: Record<string, string> = {
+  "Invalid credentials": "login.invalid_credentials",
+  "invalid credentials": "login.invalid_credentials",
+  "Password login is disabled": "login.password_login_disabled",
+  "2FA code is required": "login.two_factor_prompt",
+  "Failed to verify login": "login.failed",
+  "系统繁忙，请稍后重试": "login.busy",
+};
+
+export function passwordLoginRequiresTwoFactor(message?: string) {
+  return message === loginTwoFactorRequiredMessage;
+}
+
+export function loginErrorI18nKey(message?: string) {
+  const text = message?.trim() ?? "";
+  if (!text) return "login.failed";
+  const mapped = loginErrorKeys[text];
+  if (mapped) return mapped;
+  if (/^Login failed \(\d+\)$/.test(text)) return "login.failed";
+  if (text.startsWith("Failed to create session")) return "login.failed";
+  if (text.startsWith("Invalid request body")) {
+    return /username and password/i.test(text)
+      ? "login.required"
+      : "login.failed";
+  }
+  return "login.failed";
+}
+
+export function localizeLoginError(
+  message: string | undefined,
+  t: (key: string) => string,
+) {
+  return t(loginErrorI18nKey(message));
+}
+
 export async function submitPasswordLogin({
   username,
   password,
   twoFactorCode,
-  twoFactorEnabled,
   fetcher = fetch,
   refreshAccount,
 }: PasswordLoginInput): Promise<PasswordLoginResult> {
+  const code = twoFactorCode?.trim();
   const response = await fetcher(
     sameOriginApiPath("/api/login"),
     sameOriginFetchInit({
@@ -176,9 +213,7 @@ export async function submitPasswordLogin({
       body: JSON.stringify({
         username,
         password,
-        ...(twoFactorCode && !twoFactorEnabled
-          ? { "2fa_code": twoFactorCode }
-          : {}),
+        ...(code ? { "2fa_code": code } : {}),
       }),
     }),
   );
@@ -190,7 +225,7 @@ export async function submitPasswordLogin({
     return {
       ok: false,
       message: data.message || `Login failed (${response.status})`,
-      requiresTwoFactor: data.message === "2FA code is required",
+      requiresTwoFactor: passwordLoginRequiresTwoFactor(data.message),
     };
   }
 

@@ -1,6 +1,7 @@
 import { Badge, Flex } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import { currencyForDisplay } from "@/lib/currency";
+import { remainingExpiryDays } from "@/utils/billing";
 
 const PriceTags = ({
   price = 0,
@@ -31,17 +32,34 @@ const PriceTags = ({
     );
   }
 
-  const expirationDays = (() => {
-    if (expired_at === null || expired_at === undefined || expired_at === "") {
-      return null;
-    }
-    const timestamp = new Date(expired_at).getTime();
-    if (!Number.isFinite(timestamp)) return null;
-    return Math.ceil((timestamp - Date.now()) / (1000 * 60 * 60 * 24));
-  })();
+  const expirationDays = remainingExpiryDays(expired_at);
+  const isFree = price == -1;
   const displayPrice = Number.isInteger(price)
     ? String(price)
     : price.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  const cycleLabel = (() => {
+    if (billing_cycle >= 27 && billing_cycle <= 32) {
+      return t("common.monthly");
+    } else if (billing_cycle >= 87 && billing_cycle <= 95) {
+      return t("common.quarterly");
+    } else if (billing_cycle >= 175 && billing_cycle <= 185) {
+      return t("common.semi_annual");
+    } else if (billing_cycle >= 360 && billing_cycle <= 370) {
+      return t("common.annual");
+    } else if (billing_cycle >= 720 && billing_cycle <= 750) {
+      return t("common.biennial");
+    } else if (billing_cycle >= 1080 && billing_cycle <= 1150) {
+      return t("common.triennial");
+    } else if (billing_cycle >= 1800 && billing_cycle <= 1850) {
+      return t("common.quinquennial");
+    } else if (billing_cycle == -1) {
+      return t("common.once");
+    }
+    return `${billing_cycle} ${t("nodeCard.time_day")}`;
+  })();
+  const priceLabel = isFree
+    ? t("common.free")
+    : `${currencyForDisplay(currency)}${displayPrice}/${cycleLabel}`;
 
   return (
     <Flex gap="1" wrap="wrap" {...props} className={className}>
@@ -64,30 +82,7 @@ const PriceTags = ({
       )}
 
       <Badge color="blue" size="1" variant="soft" className="text-sm">
-        <label className="text-xs">
-          {price == -1 ? t("common.free") : `${currencyForDisplay(currency)}${displayPrice}`}/
-          {(() => {
-            if (billing_cycle >= 27 && billing_cycle <= 32) {
-              return t("common.monthly");
-            } else if (billing_cycle >= 87 && billing_cycle <= 95) {
-              return t("common.quarterly");
-            } else if (billing_cycle >= 175 && billing_cycle <= 185) {
-              return t("common.semi_annual");
-            } else if (billing_cycle >= 360 && billing_cycle <= 370) {
-              return t("common.annual");
-            } else if (billing_cycle >= 720 && billing_cycle <= 750) {
-              return t("common.biennial");
-            } else if (billing_cycle >= 1080 && billing_cycle <= 1150) {
-              return t("common.triennial");
-            } else if (billing_cycle >= 1800 && billing_cycle <= 1850) {
-              return t("common.quinquennial");
-            } else if (billing_cycle == -1) {
-              return t("common.once");
-            } else {
-              return `${billing_cycle} ${t("nodeCard.time_day")}`;
-            }
-          })()}
-        </label>
+        <label className="text-xs">{priceLabel}</label>
       </Badge>
       <Badge
         color={(() => {
@@ -107,7 +102,7 @@ const PriceTags = ({
       >
         <label className="text-xs">
           {(() => {
-            if (expirationDays === null || expirationDays > 36500) {
+            if (expirationDays === null) {
               return t("common.long_term");
             } else if (expirationDays <= 0) {
               return t("common.expired");

@@ -98,7 +98,7 @@ test("account backup hint points to the actual site settings page", () => {
     "Looking for backups? They are now under System Settings > Site.",
     "バックアップは「システム設定 > サイト」に移動しました。",
     "正在寻找备份？现已迁移至「系统设置 > 站点」。",
-    "正在尋找備份？現已移至【系統設定】->【網站】。",
+    "尋找備份功能嗎？現已移至【系統設定】->【網站設定】。",
   ]);
 });
 

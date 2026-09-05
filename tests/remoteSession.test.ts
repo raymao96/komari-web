@@ -44,7 +44,12 @@ test("localizes known server and agent remote errors", () => {
     ["Remote session not found", "远程会话不存在或已失效"],
     ["Failed to create secure remote session", "无法创建安全的远程会话"],
     ["client is being deleted", "客户端正在删除，暂时无法建立远程连接"],
-    ["Failed to start terminal: fork/exec /bin/sh: permission denied", "终端启动失败：fork/exec /bin/sh: permission denied"],
+    ["administrator password is incorrect", "管理员密码不正确"],
+    ["administrator password is required", "请输入管理员密码"],
+    ["No clients connected", "所选节点均未连接"],
+    ["Command cannot be empty", "命令不能为空"],
+    ["Command is too long", "命令过长"],
+    ["clients is required", "请选择至少一个节点"],
   ];
 
   for (const [input, expected] of cases) {
@@ -52,8 +57,31 @@ test("localizes known server and agent remote errors", () => {
   }
 });
 
+test("uses the caller translator for remote errors", () => {
+  const t = (key: string) =>
+    key === "terminal.session.errors.client_offline" ? "offline-en" : key;
+  assert.equal(localizeRemoteError("Client is offline", t), "offline-en");
+  assert.equal(
+    localizeRemoteError("No clients connected", (key) =>
+      key === "exec.errors.noClientsConnected" ? "所选节点均未连接" : key,
+    ),
+    "所选节点均未连接",
+  );
+});
+
 test("keeps unknown remote diagnostics visible", () => {
   assert.equal(localizeRemoteError("custom agent diagnostic"), "custom agent diagnostic");
+});
+
+test("strips terminal control sequences from remote error text", () => {
+  assert.equal(
+    localizeRemoteError("\u001b[31mClient is offline\u001b[0m"),
+    "客户端当前离线",
+  );
+  assert.equal(
+    localizeRemoteError("\u001b]52;c;QUFBQQ==\u0007hidden"),
+    "hidden",
+  );
 });
 
 test("mobile terminal input avoids iOS zoom and refits around the keyboard", () => {
@@ -79,10 +107,31 @@ test("mobile terminal drag scrolls terminal history without moving the browser p
   assert.match(terminalCss, /html\.remote-terminal-open body,[\s\S]*overflow: hidden;[\s\S]*overscroll-behavior: none;/);
 });
 
-test("terminal context menu gives select all the same icon treatment", () => {
-  assert.match(terminalSource, /TextSelect,/);
+test("file picker checkbox column is a fixed centered 48px column", () => {
   assert.match(
-    terminalSource,
-    /terminal\.current\?\.selectAll\(\);[\s\S]*<TextSelect size=\{15\} \/>/,
+    terminalCss,
+    /\.remote-file-table th:first-child,[\s\S]*\.remote-file-table td:first-child \{[\s\S]*width: 48px;/,
   );
+  assert.match(terminalCss, /\.remote-file-select \{[\s\S]*justify-content: center;/);
+});
+
+test("remote session no longer treats the Lite host as a protected node", () => {
+  assert.doesNotMatch(terminalSource, /remote_control_protected/);
+  assert.doesNotMatch(terminalSource, /local_address_blocked/);
+});
+
+test("remote sessions submit a page grant instead of a 2FA code", () => {
+  assert.match(terminalSource, /grant,/);
+  assert.match(terminalSource, /page_id: pageId/);
+  assert.doesNotMatch(terminalSource, /2fa_code/);
+  assert.doesNotMatch(terminalSource, /otpCode/);
+});
+
+test("terminal workspace clears credentials before waiting on authorize", () => {
+  const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
+  const cleared = workspace.indexOf('setPasswordInput("");');
+  const authorize = workspace.indexOf('fetch("/api/admin/client/remote/authorize"');
+  assert.ok(cleared >= 0 && authorize > cleared);
+  assert.match(workspace, /page_id: pageInstanceIdRef\.current/);
+  assert.match(workspace, /expires_at/);
 });

@@ -106,10 +106,20 @@ test("collapses long selected-node summaries into an inspectable popover", () =>
   assert.match(execPageSource, /selectedNodeNames\.map/);
 });
 
-test("keeps remote execution protected by account 2FA", () => {
+test("keeps remote execution behind a page grant", () => {
   assert.match(execPageSource, /const \{ account \} = useAccount\(\)/);
   assert.match(execPageSource, /Boolean\(account\?\.\["2fa_enabled"\]\)/);
-  assert.match(execPageSource, /placeholder=\{t\("admin\.nodeTable\.twoFactorCode"\)\}/);
-  assert.match(execPageSource, /"2fa_code": twoFaCode/);
-  assert.match(execPageSource, /twoFaEnabled && !twoFaCode\.trim\(\)/);
+  assert.match(execPageSource, /scope: "exec"/);
+  assert.match(execPageSource, /page_id: pageInstanceIdRef\.current/);
+  assert.match(execPageSource, /grant: usedGrant/);
+  assert.match(execPageSource, /next_grant/);
+  assert.match(execPageSource, /setPasswordInput\(""\)/);
+  assert.doesNotMatch(execPageSource, /"2fa_code": twoFaCode/);
+  const passwordCopied = execPageSource.indexOf("const password = passwordInput;");
+  const passwordCleared = execPageSource.indexOf('setPasswordInput("");', passwordCopied);
+  const authorizeFetch = execPageSource.indexOf(
+    'await fetch("/api/admin/client/remote/authorize"',
+  );
+  assert.ok(passwordCopied >= 0 && passwordCleared > passwordCopied);
+  assert.ok(authorizeFetch > passwordCleared);
 });

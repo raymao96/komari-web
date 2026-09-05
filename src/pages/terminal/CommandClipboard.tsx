@@ -1,5 +1,4 @@
 import AppDialogContent from "@/components/AppDialogContent";
-import LanguageSwitch from "@/components/Language";
 import Loading from "@/components/loading";
 import {
   CommandClipboardProvider,
@@ -33,7 +32,7 @@ const CommandClipboardContent = ({ className }: CommandClipboardPanelProps) => {
     return <Loading />;
   }
   if (error) {
-    return <div>Error loading commands: {error.message}</div>;
+    return <div>{t("command_clipboard.load_failed", { message: error.message })}</div>;
   }
   return (
     <Flex
@@ -51,7 +50,6 @@ const CommandClipboardContent = ({ className }: CommandClipboardPanelProps) => {
       </Flex>
       <Flex justify="between" align="center" className="mr-2">
         <AddButton />
-        <LanguageSwitch />
       </Flex>
 
       {[...commands]
@@ -89,7 +87,7 @@ const AddButton = () => {
       setOpen(false);
       toast.success(t("common.added_successfully"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      toast.error(error instanceof Error ? error.message : t("common.unexpected_error"));
     } finally {
       setAdding(false);
     }
@@ -97,7 +95,7 @@ const AddButton = () => {
   return (
     <Dialog.Root open={isOpen} onOpenChange={setOpen}>
       <Dialog.Trigger>
-        <IconButton aria-label="Add Command">
+        <IconButton aria-label={t("common.add")}>
           <PlusIcon size="16" />
         </IconButton>
       </Dialog.Trigger>
@@ -146,7 +144,7 @@ const DeleteButton = ({ id }: { id: number }) => {
       toast.success(t("common.deleted_successfully"));
       setOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      toast.error(error instanceof Error ? error.message : t("common.unexpected_error"));
     } finally {
       setDeleting(false);
     }
@@ -154,7 +152,7 @@ const DeleteButton = ({ id }: { id: number }) => {
   return (
     <Dialog.Root open={isOpen} onOpenChange={setOpen}>
       <Dialog.Trigger>
-        <IconButton aria-label="Delete Command" color="red">
+        <IconButton aria-label={t("common.delete")} color="red">
           <Trash2Icon size="16" />
         </IconButton>
       </Dialog.Trigger>
@@ -200,7 +198,7 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
       setOpen(false);
       toast.success(t("common.updated_successfully"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      toast.error(error instanceof Error ? error.message : t("common.unexpected_error"));
     } finally {
       setUpdating(false);
     }
@@ -208,7 +206,7 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
   return (
     <Dialog.Root open={isOpen} onOpenChange={setOpen}>
       <Dialog.Trigger>
-        <IconButton aria-label="Edit Command">
+        <IconButton aria-label={t("common.edit")}>
           <Edit2Icon size="16" />
         </IconButton>
       </Dialog.Trigger>

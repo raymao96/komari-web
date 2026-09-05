@@ -26,10 +26,18 @@ import {
 
 export default function GeneralSettings() {
   const { t } = useTranslation();
-  const { settings, loading, error, refetch } = useSettings();
+  const { settings, loading, error, refetch, setSettings } = useSettings();
   const [geoip_testResult, setGeoipTestResult] = React.useState<string | null>(
     null
   );
+
+  React.useEffect(() => {
+    if (loading || window.location.hash !== "#remote-management") return;
+    document.getElementById("remote-management")?.scrollIntoView({
+      block: "start",
+    });
+  }, [loading]);
+
   if (loading) {
     return <SettingsPageSkeleton />;
   }
@@ -76,6 +84,26 @@ export default function GeneralSettings() {
           await refetch();
         }}
       />
+      <div id="remote-management">
+        <SettingCardLabel>
+          {t("navigation.remote_management")}
+        </SettingCardLabel>
+        <SettingCardSwitch
+          title={t("settings.general.allow_remote_management")}
+          description={t("settings.general.allow_remote_management_description")}
+          defaultChecked={Boolean(settings.allow_remote_management)}
+          onChange={async (checked) => {
+            await updateSettingsWithToast(
+              { allow_remote_management: checked },
+              t,
+            );
+            setSettings((current) => ({
+              ...current,
+              allow_remote_management: checked,
+            }));
+          }}
+        />
+      </div>
       <SettingCardLabel>
         {t("settings.general.auto_discovery")}
       </SettingCardLabel>

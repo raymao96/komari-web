@@ -24,6 +24,10 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
 import LiteBrand from "@/components/LiteBrand";
+import {
+  guardRemoteManagementNav,
+  useOptionalRemoteManagementGate,
+} from "@/components/admin/RemoteManagementGate";
 import { getAppAssetUrl } from "@/utils/assetUrl";
 import type { MenuItem as AdminMenuItem } from "@/types/menu";
 import { iconMap } from "@/utils/iconHelper";
@@ -129,6 +133,7 @@ function NavLinkItem({
 }) {
   const { t } = useTranslation();
   const location = useLocation();
+  const remoteGate = useOptionalRemoteManagementGate();
   const label = item.rawLabel || t(item.labelKey);
   const isExternal = item.path.startsWith("http://") || item.path.startsWith("https://");
   const active = !isExternal && navActive(location.pathname, item.path);
@@ -136,6 +141,15 @@ function NavLinkItem({
     item.newTab === true || (isExternal && item.newTab !== false);
   const preload = () => {
     if (!isExternal && !item.reloadDocument) void preloadAdminRoute(item.path);
+  };
+  const handleNavigateClick = (event: MouseEvent<HTMLElement>) => {
+    if (
+      remoteGate &&
+      guardRemoteManagementNav(event, item.path, remoteGate.ensureEnabled)
+    ) {
+      return;
+    }
+    onNavigate();
   };
 
   const itemSx = mini ? miniItemSx : nested ? nestedNavRowSx : navRowSx;
@@ -174,7 +188,7 @@ function NavLinkItem({
       data-admin-reload-document={item.reloadDocument ? "true" : undefined}
       target={openInNewTab ? "_blank" : undefined}
       rel={openInNewTab ? "noopener noreferrer" : undefined}
-      onClick={onNavigate}
+      onClick={handleNavigateClick}
       selected={false}
       sx={itemSx}
     >
@@ -188,7 +202,7 @@ function NavLinkItem({
       onPointerEnter={preload}
       onFocus={preload}
       onTouchStart={preload}
-      onClick={onNavigate}
+      onClick={handleNavigateClick}
       sx={itemSx}
     >
       {content}
@@ -333,6 +347,7 @@ function MiniFlyoutMenu({
 }) {
   const { t } = useTranslation();
   const location = useLocation();
+  const remoteGate = useOptionalRemoteManagementGate();
   const open = Boolean(flyout);
   const item = flyout?.item ?? null;
   const [slide, setSlide] = useState(false);
@@ -490,7 +505,17 @@ function MiniFlyoutMenu({
                       child.reloadDocument ? "true" : undefined
                     }
                     selected={active}
-                    onClick={() => {
+                    onClick={(event) => {
+                      if (
+                        remoteGate &&
+                        guardRemoteManagementNav(
+                          event,
+                          child.path,
+                          remoteGate.ensureEnabled,
+                        )
+                      ) {
+                        return;
+                      }
                       onClose();
                       onNavigate();
                     }}
@@ -509,7 +534,17 @@ function MiniFlyoutMenu({
                   onPointerEnter={() => {
                     if (!isExternal) void preloadAdminRoute(child.path);
                   }}
-                  onClick={() => {
+                  onClick={(event) => {
+                    if (
+                      remoteGate &&
+                      guardRemoteManagementNav(
+                        event,
+                        child.path,
+                        remoteGate.ensureEnabled,
+                      )
+                    ) {
+                      return;
+                    }
                     onClose();
                     onNavigate();
                   }}

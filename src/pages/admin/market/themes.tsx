@@ -45,6 +45,8 @@ import { toast } from "sonner";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ThemePreviewImage from "@/components/ThemePreviewImage";
 import { themePreviewSrc } from "@/utils/themePreviewImage";
+import { localizeThemeMarketMessage } from "@/utils/themeMarketI18n";
+import { invalidateInstalledThemes } from "@/lib/themeList";
 import {
   AdminPagination,
   useAdminPagination,
@@ -120,7 +122,9 @@ export default function ThemeMarketPage() {
   useEffect(() => {
     prefetchThemeMarket()
       .then(applySnapshot)
-      .catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
+      .catch((error) =>
+        toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t)),
+      )
       .finally(() => setLoading(false));
   }, [applySnapshot]);
 
@@ -144,7 +148,7 @@ export default function ThemeMarketPage() {
       await loadCatalog(true);
       toast.success(t("market.refresh_success", "Theme sources refreshed"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     } finally {
       setRefreshing(false);
     }
@@ -154,15 +158,16 @@ export default function ThemeMarketPage() {
     const key = `${theme.source_id}:${theme.short}`;
     setInstalling(key);
     try {
-      const payload = await request("/api/admin/theme/market/install", {
+      await request("/api/admin/theme/market/install", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_id: theme.source_id, short: theme.short }),
       });
-      toast.success(payload.message || t("market.install_success", "Theme installed"));
+      toast.success(t("market.install_success"));
+      invalidateInstalledThemes();
       await loadCatalog();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     } finally {
       setInstalling(null);
     }
@@ -175,7 +180,7 @@ export default function ThemeMarketPage() {
       await refetchSettings();
       toast.success(t("theme.set_success", "Theme activated"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     } finally {
       setSettingTheme(null);
     }
@@ -189,11 +194,12 @@ export default function ThemeMarketPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ short: theme.short }),
       });
+      invalidateInstalledThemes();
       await Promise.all([loadCatalog(), refetchSettings()]);
       setSelectedTheme(null);
       toast.success(t("market.uninstall_success", "Theme uninstalled"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     } finally {
       setDeletingTheme(null);
     }
@@ -231,7 +237,7 @@ export default function ThemeMarketPage() {
       startCreateSource();
       await Promise.all([loadSources(), loadCatalog(true)]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     } finally {
       setSavingSource(false);
     }
@@ -246,7 +252,7 @@ export default function ThemeMarketPage() {
       });
       await Promise.all([loadSources(), loadCatalog(true)]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     }
   };
 
@@ -259,7 +265,7 @@ export default function ThemeMarketPage() {
       toast.success(t("market.source_deleted", "Source deleted"));
       await Promise.all([loadSources(), loadCatalog(true)]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(localizeThemeMarketMessage(error instanceof Error ? error.message : String(error), t));
     }
   };
 

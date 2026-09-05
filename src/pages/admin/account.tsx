@@ -388,8 +388,11 @@ const TwoFactorDisabled = () => {
       return;
     }
     setSaving(true);
-    fetch(`/api/admin/2fa/enable?code=${encodeURIComponent(code)}`, {
+    fetch("/api/admin/2fa/enable", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ code }),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -467,8 +470,11 @@ const TwoFactorEnabled = () => {
       return;
     }
     setSaving(true);
-    fetch(`/api/admin/2fa/disable?2fa_code=${encodeURIComponent(code)}`, {
+    fetch("/api/admin/2fa/disable", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ "2fa_code": code }),
     })
       .then(async (response) => {
         if (!response.ok) {

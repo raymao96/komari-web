@@ -23,14 +23,16 @@ export function AdminTabLabel({
   icon,
   children,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <span className="km-admin-tab-label">
-      <span className="km-admin-tab-label-icon" aria-hidden="true">
-        {icon}
-      </span>
+      {icon ? (
+        <span className="km-admin-tab-label-icon" aria-hidden="true">
+          {icon}
+        </span>
+      ) : null}
       <span>{children}</span>
     </span>
   );

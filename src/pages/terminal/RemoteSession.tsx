@@ -11,7 +11,6 @@ import {
   Dialog,
   IconButton,
   TextArea,
-  TextField,
 } from "@radix-ui/themes";
 import {
   ClipboardCopy,
@@ -40,6 +39,7 @@ import {
 } from "@/hooks/useXtermjsSettings";
 import CommandClipboardPanel from "./CommandClipboard";
 import FileManager, { type FileManagerHandle } from "./FileManager";
+import { useTranslation } from "react-i18next";
 
 export type RemoteNode = {
   uuid: string;
@@ -52,7 +52,8 @@ export type RemoteNode = {
   region_override?: string;
   mem_total?: number;
   disk_total?: number;
-  remote_control_protected?: boolean;
+  remote_protocol?: number;
+  remote_control_enabled?: boolean;
 };
 
 type Props = {
@@ -60,6 +61,8 @@ type Props = {
   live?: LiveRecord;
   online: boolean;
   active: boolean;
+  grant: string;
+  pageId: string;
   onDuplicate: () => void;
 };
 
@@ -106,14 +109,24 @@ async function writeClipboardText(text: string) {
   if (!copied) throw new Error("clipboard unavailable");
 }
 
-function stateLabel(state: ConnectionState) {
+function stateLabel(state: ConnectionState, t: (key: string) => string) {
   switch (state) {
-    case "connected": return "已连接";
-    case "waiting": return "等待 Agent";
-    case "connecting": return "正在连接";
-    case "error": return "连接失败";
-    default: return "已断开";
+    case "connected": return t("terminal.session.connected");
+    case "waiting": return t("terminal.session.waiting_agent");
+    case "connecting": return t("terminal.session.connecting");
+    case "error": return t("terminal.session.connection_failed");
+    default: return t("terminal.disconnect");
   }
+}
+
+function isPermanentRemoteError(message: string, t: (key: string) => string) {
+  const keys = [
+    "terminal.session.errors.agent_too_old",
+    "terminal.session.errors.agent_disabled",
+    "terminal.session.errors.server_disabled",
+    "terminal.session.errors.grant_required",
+  ];
+  return keys.some((key) => message === t(key));
 }
 
 function isEditableElement(element: Element | null) {
@@ -124,7 +137,8 @@ function isEditableElement(element: Element | null) {
     Boolean(element?.closest('[role="dialog"]'));
 }
 
-export default function RemoteSession({ node, live, online, active, onDuplicate }: Props) {
+export default function RemoteSession({ node, live, online, active, grant, pageId, onDuplicate }: Props) {
+  const { t } = useTranslation();
   const { settings, loading: settingsLoading, error: settingsError } = useXtermjsSettings();
   const terminalHost = useRef<HTMLDivElement>(null);
   const terminal = useRef<Terminal | null>(null);
@@ -141,9 +155,6 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
   const [sidePanel, setSidePanel] = useState<SidePanel>(() => window.innerWidth >= 900 ? "files" : null);
   const [sideWidth, setSideWidth] = useState(400);
   const [reconnectKey, setReconnectKey] = useState(0);
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [otpInput, setOtpInput] = useState("");
-  const [otpCode, setOtpCode] = useState<string | undefined>();
   const [remoteReady, setRemoteReady] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [manualPasteOpen, setManualPasteOpen] = useState(false);
@@ -170,7 +181,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
   const copyTerminalSelection = useCallback(async () => {
     const instance = terminal.current;
     if (!instance?.hasSelection()) {
-      toast.info("请先选中终端内容");
+      toast.info(t("terminal.session.select_content_first"));
       instance?.focus();
       return;
     }
@@ -178,11 +189,11 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
       await writeClipboardText(instance.getSelection());
       instance.clearSelection();
     } catch {
-      toast.error("浏览器未授权写入剪贴板");
+      toast.error(t("terminal.session.paste_clipboard_denied"));
     } finally {
       instance.focus();
     }
-  }, []);
+  }, [t]);
 
   const sendTerminalText = useCallback((text: string) => {
     const ws = socket.current;
@@ -446,30 +457,34 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
       remoteReadyRef.current = false;
       setRemoteReady(false);
       try {
+        if (!grant) {
+          throw new Error(t("terminal.session.errors.grant_required"));
+        }
+        if (node.remote_protocol !== 2) {
+          throw new Error(t("terminal.session.errors.agent_too_old"));
+        }
+        if (node.remote_control_enabled === false) {
+          throw new Error(t("terminal.session.errors.agent_disabled"));
+        }
         const response = await fetch("/api/admin/client/remote/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uuid: node.uuid, ...(otpCode ? { "2fa_code": otpCode } : {}) }),
+          credentials: "same-origin",
+          body: JSON.stringify({ uuid: node.uuid, grant, page_id: pageId }),
           signal: abortController.signal,
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-          if (response.status === 401) {
-            setOtpOpen(true);
-            setConnectionState("waiting");
-            return;
-          }
           if (response.status === 429) {
-            throw new Error("远程会话数量已满，请关闭不用的终端后重试");
+            throw new Error(t("terminal.session.session_full"));
           }
-          throw new Error(localizeRemoteError(payload?.message || "无法创建远程会话"));
+          throw new Error(localizeRemoteError(payload?.message, t));
         }
         sessionLease = createRemoteSessionLease(payload.data.session_id);
         if (disposed) {
           sessionLease.release();
           return;
         }
-        setOtpOpen(false);
         const sessionID = sessionLease.sessionID;
         const browserTicket = payload.data.browser_ticket;
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -485,7 +500,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
           setConnectionState("waiting");
           agentWaitTimeout = window.setTimeout(() => {
             if (disposed || remoteReadyRef.current) return;
-            const message = "Agent 未在 30 秒内建立远程连接，请确认客户端在线、版本支持远程管理且代理未拦截连接";
+            const message = t("terminal.session.agent_timeout");
             setConnectionState("error");
             setConnectionError(message);
             terminal.current?.writeln(`\r\n${message}`);
@@ -523,7 +538,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
               remoteReadyRef.current = false;
               setRemoteReady(false);
               setConnectionState("error");
-              const localizedMessage = localizeRemoteError(message.message);
+              const localizedMessage = localizeRemoteError(message.message, t);
               setConnectionError(localizedMessage);
               terminal.current?.writeln(`\r\n${localizedMessage}`);
               sessionLease?.release();
@@ -539,7 +554,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
           clearAgentWaitTimeout();
           sessionLease?.release();
           setConnectionState("error");
-          setConnectionError("远程连接发生错误");
+          setConnectionError(t("terminal.session.connection_error"));
         };
         ws.onclose = () => {
           clearHeartbeat();
@@ -549,14 +564,14 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
             remoteReadyRef.current = false;
             setRemoteReady(false);
             setConnectionState((current) => current === "error" ? current : "disconnected");
-            terminal.current?.writeln("\r\n远程连接已断开");
+            terminal.current?.writeln(`\r\n${t("terminal.session.disconnected_notice")}`);
           }
         };
       } catch (error) {
         sessionLease?.release();
         if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) {
           setConnectionState("error");
-          setConnectionError(error instanceof Error ? error.message : "远程连接失败");
+          setConnectionError(error instanceof Error ? error.message : t("terminal.session.connection_failed"));
         }
       }
     };
@@ -571,7 +586,7 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
       sessionLease?.release();
       if (socket.current === ws) socket.current = null;
     };
-  }, [node.uuid, otpCode, reconnectKey, resizeTerminal, terminalReady]);
+  }, [grant, pageId, node.remote_control_enabled, node.remote_protocol, node.uuid, reconnectKey, resizeTerminal, t, terminalReady]);
 
   useEffect(() => {
     if (!active) return;
@@ -616,7 +631,6 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
   );
   const reconnect = () => {
     terminal.current?.reset();
-    setOtpCode(undefined);
     setReconnectKey((value) => value + 1);
   };
   const togglePanel = (panel: Exclude<SidePanel, null>) => {
@@ -629,23 +643,23 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
         <header className="remote-session-header">
           <div className="remote-node-heading">
             <strong>{node.name}</strong>
-            <span className={`remote-status is-${connectionState}`}><i />{stateLabel(connectionState)}</span>
+            <span className={`remote-status is-${connectionState}`}><i />{stateLabel(connectionState, t)}</span>
           </div>
           <div className="remote-metrics">
             <span><small>CPU</small>{(live?.cpu.usage || 0).toFixed(1)}%</span>
-            <span><small>内存</small>{percentage(live?.ram.used, node.mem_total)}</span>
-            <span><small>硬盘</small>{percentage(live?.disk.used, node.disk_total)}</span>
-            <span className="is-up"><small>实时上行</small>{formatBytes(live?.network.up || 0)}/s</span>
-            <span className="is-down"><small>实时下行</small>{formatBytes(live?.network.down || 0)}/s</span>
+            <span><small>{t("nodeCard.ram")}</small>{percentage(live?.ram.used, node.mem_total)}</span>
+            <span><small>{t("nodeCard.disk")}</small>{percentage(live?.disk.used, node.disk_total)}</span>
+            <span className="is-up"><small>{t("terminal.session.net_up")}</small>{formatBytes(live?.network.up || 0)}/s</span>
+            <span className="is-down"><small>{t("terminal.session.net_down")}</small>{formatBytes(live?.network.down || 0)}/s</span>
           </div>
           <div className="remote-session-actions">
-            <IconButton size="2" variant="ghost" title="复制选中内容" aria-label="复制选中内容" onClick={() => void copyTerminalSelection()}><ClipboardCopy size={16} /></IconButton>
-            <IconButton size="2" variant="ghost" title="粘贴" aria-label="粘贴" disabled={!remoteReady} onClick={() => void pasteTerminalClipboard()}><ClipboardPaste size={16} /></IconButton>
-            <IconButton size="2" variant="ghost" title="复制为独立标签" aria-label="复制为独立标签" onClick={onDuplicate}><Copy size={16} /></IconButton>
-            <IconButton size="2" variant="ghost" title="重新连接" onClick={reconnect}><RotateCw size={16} /></IconButton>
-            <Button size="1" variant={sidePanel === "files" ? "solid" : "soft"} onClick={() => togglePanel("files")}><Files size={15} />文件</Button>
-            <Button size="1" variant={sidePanel === "commands" ? "solid" : "soft"} onClick={() => togglePanel("commands")}><ClipboardList size={15} />命令</Button>
-            {sidePanel && <IconButton size="2" variant="ghost" title="关闭侧栏" onClick={() => setSidePanel(null)}><PanelRightClose size={16} /></IconButton>}
+            <IconButton size="2" variant="ghost" title={t("terminal.session.copy_selection")} aria-label={t("terminal.session.copy_selection")} onClick={() => void copyTerminalSelection()}><ClipboardCopy size={16} /></IconButton>
+            <IconButton size="2" variant="ghost" title={t("terminal.session.paste")} aria-label={t("terminal.session.paste")} disabled={!remoteReady} onClick={() => void pasteTerminalClipboard()}><ClipboardPaste size={16} /></IconButton>
+            <IconButton size="2" variant="ghost" title={t("terminal.session.copy_tab")} aria-label={t("terminal.session.copy_tab")} onClick={onDuplicate}><Copy size={16} /></IconButton>
+            <IconButton size="2" variant="ghost" title={t("terminal.session.reconnect")} onClick={reconnect}><RotateCw size={16} /></IconButton>
+            <Button size="1" variant={sidePanel === "files" ? "solid" : "soft"} onClick={() => togglePanel("files")}><Files size={15} />{t("terminal.session.files")}</Button>
+            <Button size="1" variant={sidePanel === "commands" ? "solid" : "soft"} onClick={() => togglePanel("commands")}><ClipboardList size={15} />{t("terminal.session.commands")}</Button>
+            {sidePanel && <IconButton size="2" variant="ghost" title={t("terminal.session.close_sidebar")} onClick={() => setSidePanel(null)}><PanelRightClose size={16} /></IconButton>}
           </div>
         </header>
 
@@ -670,8 +684,8 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
                 ref={mobileCommandInput}
                 type="text"
                 value={mobileCommand}
-                placeholder="输入命令"
-                aria-label="输入终端命令"
+                placeholder={t("terminal.session.input_command")}
+                aria-label={t("terminal.session.input_command_aria")}
                 inputMode="text"
                 enterKeyHint="send"
                 autoCapitalize="none"
@@ -690,14 +704,16 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
                   }
                 }}
               />
-              <IconButton type="submit" size="2" aria-label="发送命令" disabled={!remoteReady || !mobileCommand}>
+              <IconButton type="submit" size="2" aria-label={t("terminal.session.send_command")} disabled={!remoteReady || !mobileCommand}>
                 <CornerDownLeft size={16} />
               </IconButton>
             </form>
             {(connectionState === "error" || connectionState === "disconnected") && (
               <div className="remote-reconnect">
-                <span>{connectionError || "连接已断开"}</span>
-                <Button size="1" onClick={reconnect}><RotateCw size={14} />重新连接</Button>
+                <span>{connectionError || t("terminal.disconnect")}</span>
+                {!isPermanentRemoteError(connectionError, t) && (
+                  <Button size="1" onClick={reconnect}><RotateCw size={14} />{t("terminal.session.reconnect")}</Button>
+                )}
               </div>
             )}
           </div>
@@ -710,30 +726,19 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
           </aside>
         </main>
 
-        <Dialog.Root open={otpOpen} onOpenChange={(open) => { if (!open) setOtpOpen(false); }}>
-          <AppDialogContent maxWidth="400px">
-            <Dialog.Title>双重身份验证</Dialog.Title>
-            <Dialog.Description>请输入身份验证应用生成的动态口令。本次验证在 10 分钟内有效。</Dialog.Description>
-            <TextField.Root type="text" inputMode="numeric" autoFocus value={otpInput} onChange={(event) => setOtpInput(event.target.value.replace(/\D/g, ""))} onKeyDown={(event) => {
-              if (event.key === "Enter" && otpInput) { setOtpCode(otpInput); setOtpOpen(false); }
-            }} />
-            <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setOtpOpen(false)}>取消</Button><Button disabled={!otpInput} onClick={() => { setOtpCode(otpInput); setOtpOpen(false); }}>连接</Button></div>
-          </AppDialogContent>
-        </Dialog.Root>
-
         <Dialog.Root open={manualPasteOpen} onOpenChange={setManualPasteOpen}>
           <AppDialogContent maxWidth="440px">
-            <Dialog.Title>粘贴到终端</Dialog.Title>
+            <Dialog.Title>{t("terminal.session.paste_to_terminal")}</Dialog.Title>
             <TextArea autoFocus value={manualPasteText} onChange={(event) => setManualPasteText(event.target.value)} rows={7} />
             <div className="remote-dialog-actions">
-              <Button variant="soft" onClick={() => setManualPasteOpen(false)}>取消</Button>
+              <Button variant="soft" onClick={() => setManualPasteOpen(false)}>{t("common.cancel")}</Button>
               <Button disabled={!manualPasteText} onClick={() => {
                 if (sendTerminalText(manualPasteText)) {
                   setManualPasteOpen(false);
                   setManualPasteText("");
                   terminal.current?.focus();
                 }
-              }}>插入终端</Button>
+              }}>{t("terminal.session.insert")}</Button>
             </div>
           </AppDialogContent>
         </Dialog.Root>
@@ -748,19 +753,19 @@ export default function RemoteSession({ node, live, online, active, onDuplicate 
             <button type="button" role="menuitem" disabled={!terminal.current?.hasSelection()} onClick={() => {
               setContextMenu(null);
               void copyTerminalSelection();
-            }}><ClipboardCopy size={15} />复制</button>
+            }}><ClipboardCopy size={15} />{t("common.copy")}</button>
             <button type="button" role="menuitem" disabled={!remoteReady} onClick={() => {
               setContextMenu(null);
               void pasteTerminalClipboard();
-            }}><ClipboardPaste size={15} />粘贴</button>
+            }}><ClipboardPaste size={15} />{t("terminal.session.paste")}</button>
             <button type="button" role="menuitem" onClick={() => {
               terminal.current?.selectAll();
               setContextMenu(null);
-            }}><TextSelect size={15} />全选</button>
+            }}><TextSelect size={15} />{t("common.select_all")}</button>
           </div>
         )}
 
-        {!online && connectionState !== "connected" && <span className="sr-only">节点当前离线</span>}
+        {!online && connectionState !== "connected" && <span className="sr-only">{t("terminal.session.node_offline")}</span>}
       </div>
     </TerminalContext.Provider>
   );

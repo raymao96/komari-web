@@ -2,6 +2,7 @@ import React from "react";
 import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { RequireAllowRemoteManagement } from "@/components/admin/RemoteManagementGate";
 import { Button } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -22,6 +23,14 @@ import {
 } from "@/hooks/useXtermjsSettings";
 
 export default function XtermjsSettingsPage() {
+  return (
+    <RequireAllowRemoteManagement>
+      <XtermjsSettingsForm />
+    </RequireAllowRemoteManagement>
+  );
+}
+
+function XtermjsSettingsForm() {
   const { t } = useTranslation();
   const { settings, loading, error, saving, setSettings, resetSettings, refetch } =
     useXtermjsSettings();

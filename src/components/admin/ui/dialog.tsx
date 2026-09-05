@@ -43,6 +43,7 @@ type DialogRootProps = {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   zIndex?: number;
+  disableEnforceFocus?: boolean;
   children?: ReactNode;
 };
 
@@ -181,7 +182,14 @@ function DialogContent({
 }
 DialogContent.displayName = "DialogContent";
 
-function DialogRoot({ open, defaultOpen, onOpenChange, zIndex, children }: DialogRootProps) {
+function DialogRoot({
+  open,
+  defaultOpen,
+  onOpenChange,
+  zIndex,
+  disableEnforceFocus,
+  children,
+}: DialogRootProps) {
   const [uncontrolled, setUncontrolled] = useState(Boolean(defaultOpen));
   const isOpen = open ?? uncontrolled;
   const setOpen = (next: boolean) => {
@@ -214,6 +222,7 @@ function DialogRoot({ open, defaultOpen, onOpenChange, zIndex, children }: Dialo
         onClose={() => setOpen(false)}
         maxWidth={false}
         scroll="paper"
+        disableEnforceFocus={disableEnforceFocus}
         aria-describedby={undefined}
         sx={zIndex ? { zIndex } : undefined}
         slotProps={{

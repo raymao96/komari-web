@@ -22,6 +22,7 @@ const PREVIEW_WARMUP_MS = 800;
 
 let installedThemesSnapshot: InstalledThemeDetails[] | null = null;
 let installedThemesPending: Promise<InstalledThemeDetails[]> | null = null;
+let installedThemesGeneration = 0;
 
 export function getInstalledThemesSnapshot(): InstalledThemeDetails[] | null {
   return installedThemesSnapshot;
@@ -37,6 +38,12 @@ export function rememberInstalledThemes(
   }));
   installedThemesSnapshot = list;
   return list;
+}
+
+export function invalidateInstalledThemes() {
+  installedThemesSnapshot = null;
+  installedThemesPending = null;
+  installedThemesGeneration += 1;
 }
 
 function warmupThemePreview(theme: InstalledThemeDetails): Promise<void> {
@@ -69,6 +76,7 @@ async function warmupFirstScreenPreviews(themes: InstalledThemeDetails[]) {
 async function fetchInstalledThemes(
   currentTheme?: string,
 ): Promise<InstalledThemeDetails[]> {
+  const generation = installedThemesGeneration;
   const response = await fetch(
     "/api/admin/theme/list",
     sameOriginFetchInit(),
@@ -80,6 +88,9 @@ async function fetchInstalledThemes(
   } | null;
   if (!response.ok || !payload || payload.status === "error") {
     throw new Error(payload?.message || `HTTP ${response.status}`);
+  }
+  if (generation !== installedThemesGeneration) {
+    return installedThemesSnapshot ?? payload.data ?? [];
   }
   return rememberInstalledThemes(payload.data || [], currentTheme);
 }

@@ -1,19 +1,17 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
 import CircularProgress from "@mui/material/CircularProgress";
 import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
-import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import type { Theme } from "@mui/material/styles";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -22,76 +20,35 @@ import {
   useOptionalAccount,
 } from "@/contexts/AccountContext";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
-import { submitPasswordLogin } from "@/utils/adminAuth";
-import { getAppAssetUrl } from "@/utils/assetUrl";
+import { localizeLoginError, submitPasswordLogin } from "@/utils/adminAuth";
 import { sameOriginApiPath } from "@/utils/security";
-import { LITE_NAME } from "@/theme/brand";
-import LiteBrand from "@/components/LiteBrand";
-import { LanguageMenu, ThemeMenu } from "./ChromeActions";
+import AuthStandAlonePage, { authPrimaryButtonSx } from "./AuthStandAlonePage";
 
-const loginFieldSx = {
-  "& .MuiOutlinedInput-root": {
-    minHeight: 60,
-    bgcolor: "transparent",
-    "& input": {
-      px: 2,
-      py: 1.75,
+const loginFieldSx = (theme: Theme) => {
+  const fill = theme.palette.background.paper;
+  const text = theme.palette.text.primary;
+  return {
+    "& .MuiOutlinedInput-root": {
+      minHeight: 60,
+      bgcolor: fill,
+      "& input": {
+        px: 2,
+        py: 1.75,
+      },
+      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
+        {
+          WebkitTextFillColor: text,
+          caretColor: text,
+          borderRadius: "inherit",
+          WebkitBoxShadow: `0 0 0 100px ${fill} inset`,
+          transition: "background-color 99999s ease-out 0s",
+        },
     },
-  },
-  "& .MuiInputLabel-root": {
-    fontWeight: 600,
-  },
-} as const;
-
-function LoginToolbar() {
-  const compact = useMediaQuery("(max-width:599.95px)");
-
-  return (
-    <Stack
-      data-testid="admin-login-toolbar"
-      direction="row"
-      sx={{
-        position: "relative",
-        zIndex: 2,
-        width: "100%",
-        minHeight: { xs: 56, sm: 72 },
-        alignItems: "center",
-        justifyContent: "space-between",
-        pl: {
-          xs: "max(12px, var(--safe-area-left))",
-          sm: "max(24px, var(--safe-area-left))",
-        },
-        pr: {
-          xs: "max(8px, var(--safe-area-right))",
-          sm: "max(24px, var(--safe-area-right))",
-        },
-        pt: "var(--safe-area-top)",
-      }}
-    >
-      <Link
-        href="/"
-        underline="none"
-        color="inherit"
-        aria-label={LITE_NAME}
-        sx={{ display: "inline-flex", alignItems: "center", lineHeight: 0 }}
-      >
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <Box
-            component="img"
-            src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
-            alt=""
-            sx={{ width: compact ? 32 : 38, height: compact ? 32 : 38, objectFit: "contain" }}
-          />
-          <LiteBrand size={compact ? "sm" : "md"} />
-        </Stack>
-      </Link>
-      <Stack direction="row" spacing={0} sx={{ alignItems: "center" }}>
-        <ThemeMenu />
-        <LanguageMenu />
-      </Stack>
-    </Stack>
-  );
-}
+    "& .MuiInputLabel-root": {
+      fontWeight: 600,
+    },
+  };
+};
 
 function AdminLoginForm() {
   const { account, loading, error, refresh } = useAccount();
@@ -101,19 +58,45 @@ function AdminLoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [twoFac, setTwoFac] = useState("");
+  const [needTwoFactor, setNeedTwoFactor] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [require2FA, setRequire2FA] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const twoFactorFieldRef = useRef<HTMLInputElement>(null);
 
   const passwordLoginEnabled = !publicInfo?.disable_password_login;
   const oauthEnabled = Boolean(publicInfo?.oauth_enable);
   const isFormValid =
     passwordLoginEnabled && username.trim() !== "" && password.trim() !== "";
 
+  useEffect(() => {
+    if (!needTwoFactor) return;
+    twoFactorFieldRef.current?.focus();
+  }, [needTwoFactor]);
+
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    if (needTwoFactor) {
+      setNeedTwoFactor(false);
+      setTwoFac("");
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (needTwoFactor) {
+      setNeedTwoFactor(false);
+      setTwoFac("");
+    }
+  };
+
   const handleLogin = async () => {
     if (!isFormValid) {
       setErrorMsg(t("login.required"));
+      return;
+    }
+    if (needTwoFactor && twoFac.trim() === "") {
+      setErrorMsg(t("login.two_factor_prompt"));
       return;
     }
     setErrorMsg("");
@@ -123,16 +106,20 @@ function AdminLoginForm() {
         username,
         password,
         twoFactorCode: twoFac,
-        twoFactorEnabled: account?.["2fa_enabled"],
         refreshAccount: refresh,
       });
       if (result.ok) {
         setPassword("");
         setTwoFac("");
+        setNeedTwoFactor(false);
         return;
       }
-      if (result.requiresTwoFactor) setRequire2FA(true);
-      setErrorMsg(result.message);
+      if (result.requiresTwoFactor) {
+        setNeedTwoFactor(true);
+        setTwoFac("");
+        return;
+      }
+      setErrorMsg(localizeLoginError(result.message, t));
     } catch {
       setErrorMsg(t("login.network_error"));
     } finally {
@@ -184,7 +171,7 @@ function AdminLoginForm() {
                 fullWidth
                 label={t("login.username")}
                 value={username}
-                onChange={(event) => setUsername(event.target.value)}
+                onChange={(event) => handleUsernameChange(event.target.value)}
                 placeholder={t("login.username_placeholder")}
                 disabled={isLoading}
                 autoComplete="username"
@@ -198,7 +185,7 @@ function AdminLoginForm() {
                 label={t("login.password")}
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => handlePasswordChange(event.target.value)}
                 placeholder={t("login.password_placeholder")}
                 disabled={isLoading}
                 autoComplete="current-password"
@@ -221,13 +208,16 @@ function AdminLoginForm() {
                 }}
                 sx={loginFieldSx}
               />
-              {require2FA ? (
+              {needTwoFactor ? (
                 <TextField
                   id="admin-login-2fa"
+                  inputRef={twoFactorFieldRef}
                   fullWidth
                   label={t("login.two_factor")}
                   value={twoFac}
-                  onChange={(event) => setTwoFac(event.target.value)}
+                  onChange={(event) =>
+                    setTwoFac(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   placeholder="000000"
@@ -247,20 +237,7 @@ function AdminLoginForm() {
                 size="large"
                 fullWidth
                 disabled={isLoading}
-                sx={{
-                  mt: 0.25,
-                  minHeight: 56,
-                  bgcolor: "#1C252E",
-                  color: "#fff",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  "&:hover": { bgcolor: "#141B22" },
-                  "&.Mui-disabled": {
-                    bgcolor: "#1C252E",
-                    color: "#fff",
-                    opacity: 0.48,
-                  },
-                }}
+                sx={authPrimaryButtonSx}
               >
                 {isLoading ? t("login.logging_in") : t("login.title")}
               </Button>
@@ -298,83 +275,9 @@ function AdminLoginForm() {
   }
 
   return (
-    <Box
-      data-testid="admin-login-page"
-      sx={(theme) => ({
-        minHeight: "var(--app-viewport-height, 100dvh)",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-        overflowX: "hidden",
-        overflowY: "auto",
-        bgcolor: "background.paper",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          background:
-            theme.palette.mode === "dark"
-              ? "radial-gradient(ellipse 80% 55% at 12% 8%, rgba(7, 141, 238, 0.22), transparent 58%), radial-gradient(ellipse 70% 50% at 92% 6%, rgba(255, 171, 0, 0.1), transparent 52%), radial-gradient(ellipse 60% 45% at 78% 92%, rgba(0, 184, 217, 0.12), transparent 55%)"
-              : "radial-gradient(ellipse 80% 55% at 12% 8%, rgba(7, 141, 238, 0.18), transparent 58%), radial-gradient(ellipse 70% 50% at 92% 6%, rgba(255, 171, 0, 0.16), transparent 52%), radial-gradient(ellipse 60% 45% at 78% 92%, rgba(0, 184, 217, 0.14), transparent 55%)",
-        },
-      })}
-    >
-      <LoginToolbar />
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          alignItems: { xs: "flex-start", sm: "center" },
-          justifyContent: "center",
-          px: { xs: 2, sm: 3 },
-          pt: { xs: 2, sm: 4 },
-          pb: {
-            xs: "max(24px, var(--safe-area-bottom))",
-            sm: 6,
-          },
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <Card
-          data-testid="admin-login-card"
-          sx={{
-            width: "100%",
-            maxWidth: 484,
-            borderRadius: "8px",
-            border: 0,
-            boxShadow:
-              "0 2px 4px rgba(28, 37, 46, 0.04), 0 20px 48px rgba(28, 37, 46, 0.10)",
-          }}
-        >
-          <CardContent sx={{ p: { xs: 3, sm: 5.5 }, "&:last-child": { pb: { xs: 3, sm: 5.5 } } }}>
-            <Box sx={{ mb: { xs: 4, sm: 5 }, textAlign: "center" }}>
-              <Box
-                component="img"
-                src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
-                alt=""
-                sx={{
-                  display: "block",
-                  width: 60,
-                  height: 60,
-                  mx: "auto",
-                  mb: 2.5,
-                  objectFit: "contain",
-                }}
-              />
-              <Typography variant="h4" sx={{ fontSize: 23, lineHeight: "32px", fontWeight: 700 }}>
-                {t("login.heading")}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {t("login.desc")}
-              </Typography>
-            </Box>
-            {body}
-          </CardContent>
-        </Card>
-      </Box>
-    </Box>
+    <AuthStandAlonePage title={t("login.heading")} description={t("login.desc")}>
+      {body}
+    </AuthStandAlonePage>
   );
 }
 

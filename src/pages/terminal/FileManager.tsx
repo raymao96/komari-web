@@ -35,6 +35,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatBytes } from "@/utils/unitHelper";
+import { createRandomId } from "@/utils/randomId";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 export type FileEntry = {
   name: string;
@@ -137,20 +140,23 @@ function formatDate(value: string) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
-function nextCopyName(entry: FileEntry, reservedNames: Set<string>) {
+function nextCopyName(entry: FileEntry, reservedNames: Set<string>, t: TFunction) {
   const dot = entry.directory ? -1 : entry.name.lastIndexOf(".");
   const hasExtension = dot > 0;
   const stem = hasExtension ? entry.name.slice(0, dot) : entry.name;
   const extension = hasExtension ? entry.name.slice(dot) : "";
   for (let index = 1; index < 10_000; index += 1) {
-    const suffix = index === 1 ? " - 副本" : ` - 副本 (${index})`;
+    const suffix = index === 1
+      ? t("terminal.files.copy_suffix")
+      : t("terminal.files.copy_suffix_n", { index });
     const candidate = `${stem}${suffix}${extension}`;
     if (!reservedNames.has(candidate.toLocaleLowerCase())) return candidate;
   }
-  return `${stem} - 副本-${Date.now()}${extension}`;
+  return `${stem}${t("terminal.files.copy_suffix_fallback")}${Date.now()}${extension}`;
 }
 
 const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, ref) => {
+  const { t } = useTranslation();
   const pending = useRef(new Map<string, PendingRequest>());
   const downloads = useRef(new Map<string, DownloadState>());
   const [roots, setRoots] = useState<string[]>([]);
@@ -183,17 +189,17 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   const suppressClick = useRef(false);
 
   const request = (type: string, payload: Record<string, unknown> = {}) => {
-    const id = crypto.randomUUID();
+    const id = createRandomId();
     return new Promise<any>((resolve, reject) => {
       if (!send({ type, id, ...payload })) {
-        reject(new Error("远程连接尚未就绪"));
+        reject(new Error(t("terminal.files.not_ready")));
         return;
       }
       const timeout = window.setTimeout(() => {
         const waiting = pending.current.get(id);
         if (waiting) {
           pending.current.delete(id);
-          waiting.reject(new Error("文件操作超时"));
+          waiting.reject(new Error(t("terminal.files.timeout")));
         }
       }, requestTimeout);
       pending.current.set(id, { resolve, reject, timeout });
@@ -214,7 +220,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       selectionAnchor.current = null;
       setContextMenu(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "目录加载失败");
+      toast.error(error instanceof Error ? error.message : t("terminal.files.list_failed"));
     } finally {
       setLoading(false);
     }
@@ -228,7 +234,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         pending.current.delete(message.id);
         window.clearTimeout(waiting.timeout);
         if (message.ok) waiting.resolve(message.data);
-        else waiting.reject(new Error(message.error || "文件操作失败"));
+        else waiting.reject(new Error(message.error || t("terminal.files.operation_failed")));
         return;
       }
       if (message.type === "file.download.begin") {
@@ -238,7 +244,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
           received: 0,
           chunks: [],
         });
-        setTransferLabel(`正在下载 ${message.name || "文件"}`);
+        setTransferLabel(t("terminal.files.download_begin", { name: message.name || t("terminal.files.file") }));
         return;
       }
       if (message.type === "file.download.chunk") {
@@ -247,7 +253,10 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         const chunk = fromBase64((message as any).data);
         download.chunks.push(chunk);
         download.received += chunk.byteLength;
-        setTransferLabel(`正在下载 ${download.name} ${Math.round((download.received / Math.max(1, download.size)) * 100)}%`);
+        setTransferLabel(t("terminal.files.download_progress", {
+          name: download.name,
+          percent: Math.round((download.received / Math.max(1, download.size)) * 100),
+        }));
         return;
       }
       if (message.type === "file.download.end") {
@@ -262,13 +271,13 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
         setTransferLabel("");
-        toast.success(`${download.name} 下载完成`);
+        toast.success(t("terminal.files.download_done", { name: download.name }));
         return;
       }
       if (message.type === "file.download.error") {
         downloads.current.delete(message.id);
         setTransferLabel("");
-        toast.error((message as any).error || "下载失败");
+        toast.error((message as any).error || t("terminal.files.download_failed"));
       }
     },
     initialize(nextRoots, home, nextSeparator) {
@@ -284,7 +293,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   useEffect(() => () => {
     for (const waiting of pending.current.values()) {
       window.clearTimeout(waiting.timeout);
-      waiting.reject(new Error("远程连接已关闭"));
+      waiting.reject(new Error(t("terminal.files.closed")));
     }
     pending.current.clear();
     downloads.current.clear();
@@ -373,7 +382,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     if (!actionableEntries.length) return;
     setCopiedEntries(actionableEntries);
     setContextMenu(null);
-    toast.success(`已复制 ${actionableEntries.length} 个项目`);
+    toast.success(t("terminal.files.copy_done", { count: actionableEntries.length }));
   };
 
   const pasteCopied = async () => {
@@ -384,9 +393,9 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     try {
       for (const entry of copiedEntries) {
         let name = entry.name;
-        if (reservedNames.has(name.toLocaleLowerCase())) name = nextCopyName(entry, reservedNames);
+        if (reservedNames.has(name.toLocaleLowerCase())) name = nextCopyName(entry, reservedNames, t);
         reservedNames.add(name.toLocaleLowerCase());
-        setTransferLabel(`正在复制 ${entry.name}`);
+        setTransferLabel(t("terminal.files.copying", { name: entry.name }));
         await request("file.copy", {
           path: entry.path,
           destination: joinRemotePath(currentPath, name, separator),
@@ -394,10 +403,10 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         copied += 1;
       }
       await load();
-      toast.success(`已粘贴 ${copied} 个项目`);
+      toast.success(t("terminal.files.paste_done", { count: copied }));
     } catch (error) {
       if (copied > 0) await load();
-      toast.error(error instanceof Error ? error.message : "粘贴失败");
+      toast.error(error instanceof Error ? error.message : t("terminal.files.paste_failed"));
     } finally {
       setTransferLabel("");
     }
@@ -412,9 +421,9 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       setCreateKind(null);
       setCreateName("");
       await load();
-      toast.success(createKind === "folder" ? "文件夹已创建" : "文件已创建");
+      toast.success(createKind === "folder" ? t("terminal.files.created_folder") : t("terminal.files.created_file"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "创建失败");
+      toast.error(error instanceof Error ? error.message : t("terminal.files.create_failed"));
     }
   };
 
@@ -427,9 +436,9 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       });
       setRenameEntry(null);
       await load();
-      toast.success("重命名完成");
+      toast.success(t("terminal.files.rename_done"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "重命名失败");
+      toast.error(error instanceof Error ? error.message : t("terminal.files.rename_failed"));
     }
   };
 
@@ -440,18 +449,18 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       }
       setDeleteOpen(false);
       await load();
-      toast.success("删除完成");
+      toast.success(t("terminal.files.delete_done"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "删除失败");
+      toast.error(error instanceof Error ? error.message : t("terminal.files.delete_failed"));
     }
   };
 
   const downloadSelected = () => {
     setContextMenu(null);
     for (const entry of actionableEntries.filter((item) => !item.directory && !item.symlink)) {
-      const id = crypto.randomUUID();
+      const id = createRandomId();
       if (!send({ type: "file.download", id, path: entry.path })) {
-        toast.error("远程连接尚未就绪");
+        toast.error(t("terminal.files.not_ready"));
         return;
       }
     }
@@ -461,7 +470,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     if (!files.length) return;
     try {
       for (const file of files) {
-        setTransferLabel(`正在上传 ${file.name} 0%`);
+        setTransferLabel(t("terminal.files.upload_progress", { name: file.name, percent: 0 }));
         const start = await request("file.upload.start", {
           path: joinRemotePath(currentPath, file.name, separator),
           size: file.size,
@@ -476,14 +485,17 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             data: toBase64(buffer),
           });
           sent += buffer.byteLength;
-          setTransferLabel(`正在上传 ${file.name} ${Math.round((sent / Math.max(1, file.size)) * 100)}%`);
+          setTransferLabel(t("terminal.files.upload_progress", {
+            name: file.name,
+            percent: Math.round((sent / Math.max(1, file.size)) * 100),
+          }));
         }
         await request("file.upload.finish", { upload_id: uploadID });
-        toast.success(`${file.name} 上传完成`);
+        toast.success(t("terminal.files.upload_done", { name: file.name }));
       }
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "上传失败");
+      toast.error(error instanceof Error ? error.message : t("terminal.files.upload_failed"));
     } finally {
       setTransferLabel("");
       if (inputRef.current) inputRef.current.value = "";
@@ -526,7 +538,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     setDropActive(false);
     if (!connected) return;
     if (hasDraggedDirectory(event.dataTransfer.items)) {
-      toast.error("暂不支持拖拽上传文件夹");
+      toast.error(t("terminal.files.folder_unsupported"));
       return;
     }
     queueUpload(Array.from(event.dataTransfer.files));
@@ -621,7 +633,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   return (
     <section
       className={`remote-files${dropActive ? " is-drop-active" : ""}`}
-      aria-label="文件管理"
+      aria-label={t("terminal.files.title")}
       onDragEnter={handleDragEnter}
       onDragOver={(event) => {
         if (!event.dataTransfer.types.includes("Files")) return;
@@ -633,20 +645,20 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     >
       <div className="remote-files-title">
         <div>
-          <strong>文件管理</strong>
-          <span>{connected ? "已连接" : "未连接"}</span>
+          <strong>{t("terminal.files.title")}</strong>
+          <span>{connected ? t("terminal.files.connected") : t("terminal.files.not_connected")}</span>
         </div>
-        <IconButton size="1" variant="ghost" title="刷新" onClick={() => void load()} disabled={!connected || loading}>
+        <IconButton size="1" variant="ghost" title={t("terminal.files.refresh")} onClick={() => void load()} disabled={!connected || loading}>
           <RefreshCw size={15} className={loading ? "remote-spin" : ""} />
         </IconButton>
       </div>
 
       <div className="remote-file-path">
-        <IconButton size="1" variant="soft" title="上一级" disabled={!parentPath} onClick={() => void load(parentPath)}>
+        <IconButton size="1" variant="soft" title={t("terminal.files.parent")} disabled={!parentPath} onClick={() => void load(parentPath)}>
           <ArrowUp size={15} />
         </IconButton>
-        <select disabled={!connected} value={roots.includes(currentPath) ? currentPath : ""} onChange={(event) => event.target.value && void load(event.target.value)} title="磁盘或根目录">
-          <option value="">根目录</option>
+        <select disabled={!connected} value={roots.includes(currentPath) ? currentPath : ""} onChange={(event) => event.target.value && void load(event.target.value)} title={t("terminal.files.roots")}>
+          <option value="">{t("terminal.files.root")}</option>
           {roots.map((root) => <option key={root} value={root}>{root}</option>)}
         </select>
         <TextField.Root
@@ -661,21 +673,21 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       <div className="remote-file-toolbar">
         <input ref={inputRef} type="file" multiple hidden onChange={(event) => queueUpload(Array.from(event.target.files || []))} />
         <Button size="1" variant="soft" onClick={() => inputRef.current?.click()} disabled={!connected}>
-          <Upload size={14} /> 上传
+          <Upload size={14} /> {t("terminal.files.upload")}
         </Button>
-        <IconButton size="1" variant="soft" title="新建文件" disabled={!connected} onClick={() => setCreateKind("file")}><FilePlus2 size={14} /></IconButton>
-        <IconButton size="1" variant="soft" title="新建文件夹" disabled={!connected} onClick={() => setCreateKind("folder")}><FolderPlus size={14} /></IconButton>
-        <IconButton size="1" variant="soft" title="下载" disabled={!actionableEntries.some((entry) => !entry.directory && !entry.symlink)} onClick={downloadSelected}><Download size={14} /></IconButton>
-        <IconButton size="1" variant="soft" title="重命名" disabled={actionableEntries.length !== 1} onClick={() => {
+        <IconButton size="1" variant="soft" title={t("terminal.files.new_file")} disabled={!connected} onClick={() => setCreateKind("file")}><FilePlus2 size={14} /></IconButton>
+        <IconButton size="1" variant="soft" title={t("terminal.files.new_folder")} disabled={!connected} onClick={() => setCreateKind("folder")}><FolderPlus size={14} /></IconButton>
+        <IconButton size="1" variant="soft" title={t("terminal.files.download")} disabled={!actionableEntries.some((entry) => !entry.directory && !entry.symlink)} onClick={downloadSelected}><Download size={14} /></IconButton>
+        <IconButton size="1" variant="soft" title={t("terminal.files.rename")} disabled={actionableEntries.length !== 1} onClick={() => {
           const entry = actionableEntries[0];
           if (entry) { setRenameEntry(entry); setRenameName(entry.name); }
         }}><Pencil size={14} /></IconButton>
-        <IconButton size="1" color="red" variant="soft" title="删除" disabled={actionableEntries.length === 0} onClick={() => setDeleteOpen(true)}><Trash2 size={14} /></IconButton>
+        <IconButton size="1" color="red" variant="soft" title={t("common.delete")} disabled={actionableEntries.length === 0} onClick={() => setDeleteOpen(true)}><Trash2 size={14} /></IconButton>
       </div>
 
       <div className="remote-file-options">
-        <label><Checkbox checked={showHidden} onCheckedChange={(checked) => setShowHidden(checked === true)} /> 显示隐藏文件</label>
-        <label><Checkbox checked={overwrite} onCheckedChange={(checked) => setOverwrite(checked === true)} /> 覆盖同名文件</label>
+        <label><Checkbox checked={showHidden} onCheckedChange={(checked) => setShowHidden(checked === true)} /> {t("terminal.files.hidden")}</label>
+        <label><Checkbox checked={overwrite} onCheckedChange={(checked) => setOverwrite(checked === true)} /> {t("terminal.files.overwrite")}</label>
       </div>
 
       {transferLabel && <div className="remote-transfer-status">{transferLabel}</div>}
@@ -683,7 +695,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       {dropActive && connected && (
         <div className="remote-file-drop-overlay" aria-hidden="true">
           <Upload size={24} />
-          <strong>释放以上传到当前目录</strong>
+          <strong>{t("terminal.files.drop_to_upload")}</strong>
         </div>
       )}
 
@@ -702,10 +714,12 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         <Table container={false} className="remote-file-table">
           <TableHeader>
             <TableRow>
-              <TableHead aria-label="选择" />
-              <TableHead>名称</TableHead>
-              <TableHead>大小</TableHead>
-              <TableHead>修改时间</TableHead>
+              <TableHead aria-label={t("terminal.files.select")}>
+                <span className="remote-file-select" />
+              </TableHead>
+              <TableHead>{t("common.name")}</TableHead>
+              <TableHead>{t("terminal.files.size")}</TableHead>
+              <TableHead>{t("terminal.files.modified")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -726,16 +740,18 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
                 }}
               >
                 <TableCell>
-                  <Checkbox
+                  <span className="remote-file-select">
+                    <Checkbox
                     checked={selected.has(entry.path)}
                     disabled={entry.protected}
                     onClick={(event) => event.stopPropagation()}
                     onDoubleClick={(event) => event.stopPropagation()}
                     onCheckedChange={() => toggleSelected(entry)}
-                    aria-label={`选择 ${entry.name}`}
-                  />
+                    aria-label={t("terminal.files.select_name", { name: entry.name })}
+                    />
+                  </span>
                 </TableCell>
-                <TableCell title={entry.protected ? "SQLite 数据库已受保护" : undefined}>
+                <TableCell title={entry.protected ? t("terminal.files.protected_sqlite") : undefined}>
                   {entry.protected ? <LockKeyhole size={15} /> : entry.directory ? <Folder size={15} /> : <FileIcon size={15} />}
                   <span>{entry.name}</span>
                 </TableCell>
@@ -746,7 +762,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             {!loading && visibleEntries.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="remote-file-empty">
-                  <HardDrive size={18} /> 当前目录为空
+                  <HardDrive size={18} /> {t("terminal.files.empty")}
                 </TableCell>
               </TableRow>
             )}
@@ -765,18 +781,18 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             setContextMenu(null);
             setCreateName("");
             setCreateKind("file");
-          }}><FilePlus2 size={15} />新建文件</button>
+          }}><FilePlus2 size={15} />{t("terminal.files.new_file")}</button>
           <button type="button" role="menuitem" disabled={!connected} onClick={() => {
             setContextMenu(null);
             setCreateName("");
             setCreateKind("folder");
-          }}><FolderPlus size={15} />新建文件夹</button>
+          }}><FolderPlus size={15} />{t("terminal.files.new_folder")}</button>
           <div className="remote-file-context-separator" role="separator" />
           <button type="button" role="menuitem" disabled={actionableEntries.length === 0} onClick={copySelected}>
-            <Copy size={15} />复制
+            <Copy size={15} />{t("common.copy")}
           </button>
           <button type="button" role="menuitem" disabled={!connected || !currentPath || copiedEntries.length === 0} onClick={() => void pasteCopied()}>
-            <ClipboardPaste size={15} />粘贴
+            <ClipboardPaste size={15} />{t("terminal.session.paste")}
           </button>
           <button
             type="button"
@@ -784,7 +800,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             disabled={!actionableEntries.some((entry) => !entry.directory && !entry.symlink)}
             onClick={downloadSelected}
           >
-            <Download size={15} />下载所选文件
+            <Download size={15} />{t("terminal.files.download_selected")}
           </button>
           <button type="button" role="menuitem" disabled={actionableEntries.length !== 1} onClick={() => {
             const entry = actionableEntries[0];
@@ -792,50 +808,50 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             setContextMenu(null);
             setRenameEntry(entry);
             setRenameName(entry.name);
-          }}><Pencil size={15} />重命名</button>
+          }}><Pencil size={15} />{t("terminal.files.rename")}</button>
           <div className="remote-file-context-separator" role="separator" />
           <button type="button" className="is-danger" role="menuitem" disabled={actionableEntries.length === 0} onClick={() => {
             setContextMenu(null);
             setDeleteOpen(true);
-          }}><Trash2 size={15} />删除</button>
+          }}><Trash2 size={15} />{t("common.delete")}</button>
         </div>
       )}
 
       <Dialog.Root open={createKind !== null} onOpenChange={(open) => !open && setCreateKind(null)}>
         <AppDialogContent maxWidth="380px">
-          <Dialog.Title>{createKind === "folder" ? "新建文件夹" : "新建文件"}</Dialog.Title>
+          <Dialog.Title>{createKind === "folder" ? t("terminal.files.new_folder") : t("terminal.files.new_file")}</Dialog.Title>
           <TextField.Root autoFocus value={createName} onChange={(event) => setCreateName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void createEntry()} />
-          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setCreateKind(null)}>取消</Button><Button onClick={() => void createEntry()}>创建</Button></div>
+          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setCreateKind(null)}>{t("common.cancel")}</Button><Button onClick={() => void createEntry()}>{t("terminal.files.create")}</Button></div>
         </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={renameEntry !== null} onOpenChange={(open) => !open && setRenameEntry(null)}>
         <AppDialogContent maxWidth="380px">
-          <Dialog.Title>重命名</Dialog.Title>
+          <Dialog.Title>{t("terminal.files.rename")}</Dialog.Title>
           <TextField.Root autoFocus value={renameName} onChange={(event) => setRenameName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void rename()} />
-          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setRenameEntry(null)}>取消</Button><Button onClick={() => void rename()}>保存</Button></div>
+          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setRenameEntry(null)}>{t("common.cancel")}</Button><Button onClick={() => void rename()}>{t("common.save")}</Button></div>
         </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AppDialogContent maxWidth="420px">
-          <Dialog.Title>删除所选项目</Dialog.Title>
-          <Dialog.Description>将永久删除 {actionableEntries.length} 个项目，文件夹会连同内容一起删除。</Dialog.Description>
-          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setDeleteOpen(false)}>取消</Button><Button color="red" onClick={() => void removeSelected()}>删除</Button></div>
+          <Dialog.Title>{t("terminal.files.delete_confirm")}</Dialog.Title>
+          <Dialog.Description>{t("terminal.files.delete_count", { count: actionableEntries.length })}</Dialog.Description>
+          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</Button><Button color="red" onClick={() => void removeSelected()}>{t("common.delete")}</Button></div>
         </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={pendingOverwriteFiles !== null} onOpenChange={(open) => !open && setPendingOverwriteFiles(null)}>
         <AppDialogContent maxWidth="430px">
-          <Dialog.Title>覆盖同名文件</Dialog.Title>
-          <Dialog.Description>所选文件中存在与当前目录同名的文件。继续后将覆盖同名文件，其余文件正常上传。</Dialog.Description>
+          <Dialog.Title>{t("terminal.files.overwrite_title")}</Dialog.Title>
+          <Dialog.Description>{t("terminal.files.overwrite_confirm")}</Dialog.Description>
           <div className="remote-dialog-actions">
-            <Button variant="soft" onClick={() => setPendingOverwriteFiles(null)}>取消</Button>
+            <Button variant="soft" onClick={() => setPendingOverwriteFiles(null)}>{t("common.cancel")}</Button>
             <Button onClick={() => {
               const files = pendingOverwriteFiles || [];
               setPendingOverwriteFiles(null);
               void uploadFiles(files, true);
-            }}>覆盖并上传</Button>
+            }}>{t("terminal.files.overwrite_and_upload")}</Button>
           </div>
         </AppDialogContent>
       </Dialog.Root>

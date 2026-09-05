@@ -520,6 +520,20 @@ body, * {
   gap: 12px !important;
 }
 
+.km-node-deploy-dialog .km-admin-sheet-tabs {
+  background: transparent;
+  margin-bottom: 4px;
+}
+
+.km-node-deploy-dialog .km-node-dialog-pane {
+  padding: 8px 0 0;
+}
+
+html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
+  background: transparent;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
 .admin-install-platforms.MuiToggleButtonGroup-root {
   display: inline-flex;
   min-height: 40px;
@@ -581,14 +595,20 @@ body, * {
   gap: 4px;
 }
 
+.km-node-deploy-dialog .admin-deployment-delivery {
+  margin-top: 4px;
+}
+
+@media (max-width: 599.95px) {
+  .km-node-deploy-dialog .km-node-online-heading {
+    align-items: flex-start !important;
+  }
+}
+
 .km-node-deploy-dialog label {
   font-size: 14px !important;
   font-weight: 400 !important;
   line-height: 20px !important;
-}
-
-.km-node-deploy-dialog .admin-deployment-delivery {
-  margin-top: auto;
 }
 
 .km-node-edit-dialog .km-node-dialog-fields {

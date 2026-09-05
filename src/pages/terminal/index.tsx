@@ -1,5 +1,6 @@
 import AppDialogContent from "@/components/AppDialogContent";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Navigate } from "react-router-dom";
 import { Button, Dialog, IconButton, TextField, Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "@mui/material/styles";
 import { Plus, Server, X } from "@/components/admin/muiIcons";
@@ -24,10 +25,18 @@ import { CSS } from "@dnd-kit/utilities";
 import type { LiveDataResponse, Record as LiveRecord } from "@/types/LiveData";
 import RemoteSession, { type RemoteNode } from "./RemoteSession";
 import { getRemoteLaunchTarget } from "@/utils/remoteLaunch";
+import { createRandomId } from "@/utils/randomId";
+import { localizeRemoteError } from "@/utils/remoteSession";
+import { useAccount } from "@/contexts/AccountContext";
 import { useRPC2Call } from "@/contexts/RPC2Context";
+import { SettingsProvider } from "@/lib/api";
+import { RequireAllowRemoteManagement } from "@/components/admin/RemoteManagementGate";
+import Loading from "@/components/loading";
 import { mergeLatestStatus } from "@/utils/liveData";
+import { resolveAdminAuthView } from "@/utils/adminAuth";
 import RemoteNodePicker from "@/components/remote/RemoteNodePicker";
 import { createAppTheme } from "@/theme/createAppTheme";
+import { useTranslation } from "react-i18next";
 import "./Terminal.css";
 
 type RemoteTab = {
@@ -50,6 +59,7 @@ type SortableRemoteTabProps = {
 };
 
 function SortableRemoteTab({ tab, label, active, online, onActivate, onClose }: SortableRemoteTabProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
   return (
     <button
@@ -67,7 +77,7 @@ function SortableRemoteTab({ tab, label, active, online, onActivate, onClose }: 
         <span
           role="button"
           tabIndex={0}
-          title="关闭标签"
+          title={t("terminal.session.close_tab")}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => { event.stopPropagation(); onClose(); }}
           onKeyDown={(event) => {
@@ -82,7 +92,58 @@ function SortableRemoteTab({ tab, label, active, online, onActivate, onClose }: 
   );
 }
 
+function TerminalChrome({ children }: { children: ReactNode }) {
+  return (
+    <ThemeProvider theme={terminalMuiTheme}>
+      <Theme appearance="dark" accentColor="cyan" grayColor="slate" radius="small">
+        {children}
+      </Theme>
+    </ThemeProvider>
+  );
+}
+
 export default function TerminalWorkspace() {
+  const { t } = useTranslation();
+  const accountState = useAccount();
+  const view = resolveAdminAuthView(accountState);
+
+  if (view === "loading") {
+    return (
+      <TerminalChrome>
+        <Loading fullscreen />
+      </TerminalChrome>
+    );
+  }
+  if (view === "error") {
+    return (
+      <TerminalChrome>
+        <div className="remote-empty-workspace">
+          <strong>{t("login.account_status_failed")}</strong>
+          <Button onClick={() => void accountState.refresh()}>{t("common.retry")}</Button>
+        </div>
+      </TerminalChrome>
+    );
+  }
+  if (view === "login") {
+    return <Navigate to="/admin" replace />;
+  }
+  return (
+    <SettingsProvider>
+      <RequireAllowRemoteManagement loadingFallback={<Loading fullscreen />}>
+        <TerminalWorkspaceInner />
+      </RequireAllowRemoteManagement>
+    </SettingsProvider>
+  );
+}
+
+function TerminalWorkspaceInner() {
+  const { t } = useTranslation();
+  const { account } = useAccount();
+  useEffect(() => {
+    document.documentElement.classList.add("remote-terminal-open");
+    return () => document.documentElement.classList.remove("remote-terminal-open");
+  }, []);
+  const twoFaEnabled = Boolean(account?.["2fa_enabled"]);
   const initialUUID = useMemo(() => getRemoteLaunchTarget(), []);
   const [nodes, setNodes] = useState<RemoteNode[]>([]);
   const [tabs, setTabs] = useState<RemoteTab[]>([]);
@@ -94,9 +155,14 @@ export default function TerminalWorkspace() {
   const [nodesLoaded, setNodesLoaded] = useState(false);
   const [authorization, setAuthorization] = useState<AuthorizationState>("checking");
   const [otpInput, setOtpInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [otpError, setOtpError] = useState("");
+  const [grant, setGrant] = useState("");
   const initialized = useRef(false);
   const authorizationStarted = useRef(false);
+  const grantRef = useRef("");
+  const pageInstanceIdRef = useRef(createRandomId());
+  const grantExpiresAtRef = useRef(0);
   const liveDataRef = useRef<LiveDataResponse | null>(null);
   const { callViaHTTP } = useRPC2Call();
   const tabSensors = useSensors(
@@ -105,21 +171,16 @@ export default function TerminalWorkspace() {
     useSensor(KeyboardSensor, {}),
   );
 
-  useEffect(() => {
-    document.documentElement.classList.add("remote-terminal-open");
-    return () => document.documentElement.classList.remove("remote-terminal-open");
-  }, []);
-
   const addTab = useCallback((uuid: string) => {
     if (!uuid) return;
     if (tabs.length >= maxTabs) {
-      toast.error(`最多同时打开 ${maxTabs} 个远程标签`);
+      toast.error(t("terminal.session.max_tabs", { count: maxTabs }));
       return;
     }
-    const tab = { id: crypto.randomUUID(), uuid };
+    const tab = { id: createRandomId(), uuid };
     setTabs((current) => [...current, tab]);
     setActiveID(tab.id);
-  }, [tabs.length]);
+  }, [t, tabs.length]);
 
   useEffect(() => {
     fetch("/api/admin/client/list")
@@ -130,40 +191,107 @@ export default function TerminalWorkspace() {
         setNodes(list);
         setNodesLoaded(true);
       })
-      .catch(() => toast.error("无法加载服务器列表"));
-  }, []);
+      .catch(() => toast.error(t("terminal.session.load_nodes_failed")));
+  }, [t]);
 
-  const authorizeRemote = useCallback(async (code?: string) => {
+  const authorizeRemote = useCallback(async (credentials?: { password?: string; otp?: string }) => {
     setOtpError("");
+    const password = credentials?.password || passwordInput;
+    const otp = credentials?.otp || otpInput;
+    setPasswordInput("");
+    setOtpInput("");
     try {
       const response = await fetch("/api/admin/client/remote/authorize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(code ? { "2fa_code": code } : {}),
+        credentials: "same-origin",
+        body: JSON.stringify({
+          scope: "remote",
+          page_id: pageInstanceIdRef.current,
+          password: password || undefined,
+          otp: otp || undefined,
+        }),
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
       if (response.ok) {
+        const nextGrant = payload?.data?.grant;
+        if (typeof nextGrant !== "string" || !nextGrant) {
+          throw new Error(t("terminal.session.auth_failed"));
+        }
+        grantRef.current = nextGrant;
+        setGrant(nextGrant);
+        const expiresAt = Date.parse(String(payload?.data?.expires_at ?? ""));
+        grantExpiresAtRef.current = Number.isFinite(expiresAt) ? expiresAt : 0;
         setAuthorization("authorized");
-        setOtpInput("");
         return;
       }
-      if (response.status === 401) {
+      if (response.status === 429) {
         setAuthorization("required");
-        if (code) setOtpError(payload?.message === "Invalid 2FA code" ? "动态口令无效，请重新输入" : (payload?.message || "验证失败"));
+        setOtpError(
+          localizeRemoteError(payload?.message, t) || t("terminal.session.auth_rate_limited"),
+        );
         return;
       }
-      throw new Error(payload?.message || "无法验证远程管理权限");
+      if (response.status === 401 || response.status === 403) {
+        setAuthorization("required");
+        setOtpError(localizeRemoteError(payload?.message, t) || t("common.error"));
+        return;
+      }
+      throw new Error(localizeRemoteError(payload?.message, t) || t("terminal.session.auth_failed"));
     } catch (error) {
       setAuthorization("error");
-      setOtpError(error instanceof Error ? error.message : "无法验证远程管理权限");
+      setOtpError(
+        error instanceof Error
+          ? localizeRemoteError(error.message, t)
+          : t("terminal.session.auth_failed"),
+      );
+    } finally {
+      setPasswordInput("");
+      setOtpInput("");
     }
-  }, []);
+  }, [otpInput, passwordInput, t]);
 
   useEffect(() => {
     if (!nodesLoaded || authorizationStarted.current) return;
     authorizationStarted.current = true;
-    void authorizeRemote();
-  }, [authorizeRemote, initialUUID, nodes, nodesLoaded]);
+    setAuthorization("required");
+  }, [nodesLoaded]);
+
+  useEffect(() => {
+    const revoke = () => {
+      const currentGrant = grantRef.current;
+      if (!currentGrant) return;
+      grantRef.current = "";
+      grantExpiresAtRef.current = 0;
+      void fetch("/api/admin/client/remote/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grant: currentGrant }),
+        credentials: "same-origin",
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+    window.addEventListener("pagehide", revoke);
+    return () => {
+      window.removeEventListener("pagehide", revoke);
+      revoke();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authorization !== "authorized") return;
+    const expiresAt = grantExpiresAtRef.current;
+    if (!expiresAt) return;
+    const timer = window.setInterval(() => {
+      if (Date.now() < grantExpiresAtRef.current) return;
+      grantRef.current = "";
+      setGrant("");
+      grantExpiresAtRef.current = 0;
+      setAuthorization("required");
+      setOtpError("");
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [authorization]);
 
   useEffect(() => {
     if (!nodesLoaded || authorization !== "authorized" || initialized.current) return;
@@ -171,13 +299,15 @@ export default function TerminalWorkspace() {
     if (!initialUUID) return;
     const requested = nodes.find((node) => node.uuid === initialUUID);
     if (!requested) {
-      toast.error("指定的服务器不存在");
+      toast.error(t("terminal.session.node_not_found"));
       return;
     }
     addTab(requested.uuid);
-  }, [addTab, authorization, initialUUID, nodes, nodesLoaded]);
+  }, [addTab, authorization, initialUUID, nodes, nodesLoaded, t]);
 
   useEffect(() => {
+    if (authorization !== "authorized") return;
+
     let timer: number | undefined;
     let stopped = false;
     let running = false;
@@ -232,14 +362,14 @@ export default function TerminalWorkspace() {
       clearTimer();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [callViaHTTP]);
+  }, [authorization, callViaHTTP]);
 
   useEffect(() => {
     const active = tabs.find((tab) => tab.id === activeID);
     if (!active) return;
     const node = nodes.find((item) => item.uuid === active.uuid);
-    document.title = `${node?.name || "服务器"} - 远程终端`;
-  }, [activeID, nodes, tabs]);
+    document.title = `${node?.name || t("common.server")} - ${t("terminal.remote_title")}`;
+  }, [activeID, nodes, t, tabs]);
 
   const nodeMap = useMemo(() => new Map(nodes.map((node) => [node.uuid, node])), [nodes]);
   const labels = useMemo(() => {
@@ -275,11 +405,11 @@ export default function TerminalWorkspace() {
   const openNode = useCallback((uuid: string) => {
     const node = nodes.find((item) => item.uuid === uuid);
     if (!node) {
-      toast.error("指定的服务器不存在");
+      toast.error(t("terminal.session.node_not_found"));
       return;
     }
     addTab(uuid);
-  }, [addTab, nodes]);
+  }, [addTab, nodes, t]);
 
   const openPicker = () => {
     setPickerUUID(
@@ -291,12 +421,11 @@ export default function TerminalWorkspace() {
   };
 
   return (
-    <ThemeProvider theme={terminalMuiTheme}>
-    <Theme appearance="dark" accentColor="cyan" grayColor="slate" radius="small">
+    <TerminalChrome>
       <Toaster theme="dark" />
       <div className="remote-workspace">
-        <nav className="remote-tabbar" aria-label="远程服务器标签">
-          <div className="remote-brand"><Server size={17} /><span>Lite 远程管理</span></div>
+        <nav className="remote-tabbar" aria-label={t("terminal.session.tabbar")}>
+          <div className="remote-brand"><Server size={17} /><span>{t("terminal.session.brand")}</span></div>
           <DndContext sensors={tabSensors} collisionDetection={closestCenter} onDragEnd={reorderTabs}>
             <div className="remote-tabs">
               <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
@@ -312,7 +441,7 @@ export default function TerminalWorkspace() {
                   />
                 ))}
               </SortableContext>
-              <IconButton className="remote-add-tab" size="2" variant="ghost" title="打开服务器" aria-label="打开服务器" disabled={authorization !== "authorized"} onClick={openPicker}><Plus size={17} /></IconButton>
+              <IconButton className="remote-add-tab" size="2" variant="ghost" title={t("terminal.session.open_server")} aria-label={t("terminal.session.open_server")} disabled={authorization !== "authorized"} onClick={openPicker}><Plus size={17} /></IconButton>
             </div>
           </DndContext>
         </nav>
@@ -327,6 +456,8 @@ export default function TerminalWorkspace() {
                 live={live[tab.uuid]}
                 online={online.has(tab.uuid)}
                 active={activeID === tab.id}
+                grant={grant}
+                pageId={pageInstanceIdRef.current}
                 onDuplicate={() => openNode(tab.uuid)}
               />
             );
@@ -334,8 +465,8 @@ export default function TerminalWorkspace() {
           {tabs.length === 0 && (
             <div className="remote-empty-workspace">
               <Server size={28} />
-              <strong>尚未打开远程服务器</strong>
-              <Button disabled={authorization !== "authorized"} onClick={openPicker}><Plus size={15} />打开服务器</Button>
+              <strong>{t("terminal.session.workspace_empty")}</strong>
+              <Button disabled={authorization !== "authorized"} onClick={openPicker}><Plus size={15} />{t("terminal.session.open_server")}</Button>
             </div>
           )}
         </div>
@@ -343,8 +474,8 @@ export default function TerminalWorkspace() {
 
       <Dialog.Root open={pickerOpen} onOpenChange={setPickerOpen}>
         <AppDialogContent className="remote-server-picker-dialog" maxWidth="1040px">
-          <Dialog.Title>打开远程服务器</Dialog.Title>
-          <Dialog.Description>可重复选择同一台服务器，每个标签都会建立独立的终端与文件会话。</Dialog.Description>
+          <Dialog.Title>{t("terminal.session.open_server")}</Dialog.Title>
+          <Dialog.Description>{t("terminal.session.open_description")}</Dialog.Description>
           <RemoteNodePicker
             nodes={nodes}
             onlineSet={online}
@@ -355,48 +486,69 @@ export default function TerminalWorkspace() {
             onSelect={(node) => setPickerUUID(node.uuid)}
           />
           <div className="remote-dialog-actions">
-            <Button variant="soft" onClick={() => setPickerOpen(false)}>取消</Button>
-            <Button disabled={!pickerUUID || !online.has(pickerUUID)} onClick={() => { openNode(pickerUUID); setPickerOpen(false); }}>打开</Button>
+            <Button variant="soft" onClick={() => setPickerOpen(false)}>{t("common.cancel")}</Button>
+            <Button disabled={!pickerUUID || !online.has(pickerUUID)} onClick={() => { openNode(pickerUUID); setPickerOpen(false); }}>{t("terminal.session.open")}</Button>
           </div>
         </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={authorization === "required"}>
         <AppDialogContent maxWidth="400px">
-          <Dialog.Title>双重身份验证</Dialog.Title>
-          <Dialog.Description>请输入身份验证应用生成的动态口令。本次验证在 10 分钟内有效。</Dialog.Description>
-          <TextField.Root
-            type="text"
-            inputMode="numeric"
-            autoFocus
-            value={otpInput}
-            color={otpError ? "red" : undefined}
-            onChange={(event) => setOtpInput(event.target.value.replace(/\D/g, ""))}
-            onKeyDown={(event) => event.key === "Enter" && otpInput && void authorizeRemote(otpInput)}
-          />
+          <Dialog.Title>{twoFaEnabled ? t("login.two_factor") : t("terminal.session.reauth_title")}</Dialog.Title>
+          <Dialog.Description>
+            {twoFaEnabled
+              ? `${t("account.2fa_otp_input_prompt")} ${t("terminal.session.two_factor_valid_for")}`
+              : t("terminal.session.reauth_password_prompt")}
+          </Dialog.Description>
+          {twoFaEnabled ? (
+            <TextField.Root
+              type="text"
+              inputMode="numeric"
+              autoFocus
+              autoComplete="one-time-code"
+              value={otpInput}
+              color={otpError ? "red" : undefined}
+              onChange={(event) => setOtpInput(event.target.value.replace(/\D/g, ""))}
+              onKeyDown={(event) => event.key === "Enter" && otpInput && void authorizeRemote({ otp: otpInput })}
+            />
+          ) : (
+            <TextField.Root
+              type="password"
+              autoFocus
+              autoComplete="current-password"
+              value={passwordInput}
+              color={otpError ? "red" : undefined}
+              onChange={(event) => setPasswordInput(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && passwordInput && void authorizeRemote({ password: passwordInput })}
+            />
+          )}
           {otpError && <p className="remote-dialog-error">{otpError}</p>}
           <div className="remote-dialog-actions">
             <Button variant="soft" onClick={() => {
               window.close();
               window.setTimeout(() => { if (!window.closed) window.location.assign("/admin"); }, 100);
-            }}>取消</Button>
-            <Button disabled={!otpInput} onClick={() => void authorizeRemote(otpInput)}>验证并进入</Button>
+            }}>{t("common.cancel")}</Button>
+            <Button
+              disabled={twoFaEnabled ? !otpInput : !passwordInput}
+              onClick={() => void authorizeRemote(twoFaEnabled ? { otp: otpInput } : { password: passwordInput })}
+            >
+              {t("terminal.session.verify_and_enter")}
+            </Button>
           </div>
         </AppDialogContent>
       </Dialog.Root>
 
       <Dialog.Root open={authorization === "error"}>
         <AppDialogContent maxWidth="400px">
-          <Dialog.Title>无法进入远程管理</Dialog.Title>
-          <Dialog.Description>{otpError || "远程管理权限验证失败"}</Dialog.Description>
+          <Dialog.Title>{t("terminal.session.auth_failed_title")}</Dialog.Title>
+          <Dialog.Description>{otpError || t("terminal.session.auth_failed")}</Dialog.Description>
           <div className="remote-dialog-actions"><Button onClick={() => {
-            setAuthorization("checking");
-            void authorizeRemote();
-          }}>重试</Button></div>
+            setAuthorization("required");
+            setOtpError("");
+          }}>{t("common.retry")}</Button></div>
         </AppDialogContent>
       </Dialog.Root>
 
-    </Theme>
-    </ThemeProvider>
+    </TerminalChrome>
   );
 }

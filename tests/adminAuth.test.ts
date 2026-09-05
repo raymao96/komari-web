@@ -4,6 +4,10 @@ import test from "node:test";
 import {
   fetchAccount,
   isAdminNodeBootstrapLoading,
+  loginErrorI18nKey,
+  loginTwoFactorRequiredMessage,
+  localizeLoginError,
+  passwordLoginRequiresTwoFactor,
   planAdminSettingsFetch,
   resolveAdminAuthView,
   shouldOpenRpc2Socket,
@@ -126,4 +130,71 @@ test("登录成功后刷新外层账户信息", async () => {
 
   assert.deepEqual(result, { ok: true });
   assert.equal(refreshCount, 1);
+});
+
+test("密码正确且需要 2FA 时进入第二步，而不是当成登录失败", async () => {
+  const result = await submitPasswordLogin({
+    username: "admin",
+    password: "secret",
+    fetcher: async (_input, init) => {
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        username: "admin",
+        password: "secret",
+      });
+      return new Response(
+        JSON.stringify({ status: "error", message: loginTwoFactorRequiredMessage }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    },
+    refreshAccount: async () => {
+      throw new Error("must not refresh before 2FA succeeds");
+    },
+  });
+
+  assert.equal(passwordLoginRequiresTwoFactor(loginTwoFactorRequiredMessage), true);
+  assert.deepEqual(result, {
+    ok: false,
+    message: loginTwoFactorRequiredMessage,
+    requiresTwoFactor: true,
+  });
+});
+
+test("第二步会带上 2FA 验证码", async () => {
+  const result = await submitPasswordLogin({
+    username: "admin",
+    password: "secret",
+    twoFactorCode: "123456",
+    fetcher: async (_input, init) => {
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        username: "admin",
+        password: "secret",
+        "2fa_code": "123456",
+      });
+      return new Response("{}", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    refreshAccount: async () => {},
+  });
+
+  assert.deepEqual(result, { ok: true });
+});
+
+test("登录接口英文错误映射到文案键，不直接展示原文", () => {
+  assert.equal(loginErrorI18nKey("Invalid credentials"), "login.invalid_credentials");
+  assert.equal(loginErrorI18nKey("invalid credentials"), "login.invalid_credentials");
+  assert.equal(loginErrorI18nKey("Password login is disabled"), "login.password_login_disabled");
+  assert.equal(loginErrorI18nKey("Failed to verify login"), "login.failed");
+  assert.equal(loginErrorI18nKey("Failed to create session: boom"), "login.failed");
+  assert.equal(loginErrorI18nKey("Login failed (401)"), "login.failed");
+  assert.equal(loginErrorI18nKey("系统繁忙，请稍后重试"), "login.busy");
+  assert.equal(
+    loginErrorI18nKey("Invalid request body: Username and password are required"),
+    "login.required",
+  );
+  assert.equal(localizeLoginError("Invalid credentials", (key) => key), "login.invalid_credentials");
 });

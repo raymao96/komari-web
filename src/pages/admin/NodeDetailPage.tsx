@@ -62,9 +62,11 @@ import {
 } from "@/pages/admin/nodeDetailPreview";
 import { getRegionCode, getRegionDisplayName } from "@/utils/regionHelper";
 import { openRemoteTerminal } from "@/utils/remoteLaunch";
+import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate";
 import { nodeTrafficType, trafficUsed } from "@/utils/trafficAccounting";
 import { formatBytes, stringToBytes } from "@/utils/unitHelper";
 import { billingRequest } from "@/utils/billing";
+import { createRandomId } from "@/utils/randomId";
 import { LITE_BLUE, LITE_BLUE_SOFT_STRONG } from "@/theme/brand";
 import { getAdminMenuProps } from "@/components/admin/adminMenu";
 import {
@@ -513,6 +515,7 @@ export default function NodeDetailPage() {
 function NodeDetailPageBody() {
   const { uuid = "" } = useParams();
   const { t } = useTranslation();
+  const { ensureEnabled } = useRemoteManagementGate();
   const { nodeDetail, isLoading, refresh } = useNodeDetails();
   const { liveData, available } = useAdminNodeLiveData();
   const [tab, setTab] = useAdminTabParam(DETAIL_TABS, "overview");
@@ -570,6 +573,7 @@ function NodeDetailPageBody() {
     : t("nodeCard.offline", "离线");
   const statusPending = online === null;
   const openTerminal = () => {
+    if (!ensureEnabled()) return;
     if (!openRemoteTerminal(node.uuid)) {
       toast.error("浏览器阻止了远程管理窗口");
     }
@@ -1121,14 +1125,14 @@ function TrafficResetCostDialog({
   const [amount, setAmount] = useState("");
   const [allowance, setAllowance] = useState("");
   const [saving, setSaving] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => createRandomId());
   const currencyPrefix = currencyForDisplay(node.currency || "");
 
   useEffect(() => {
     if (!open) return;
     setAmount("");
     setAllowance(formatBytes(node.traffic_reset_allowance ?? 0));
-    setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(createRandomId());
   }, [open, node.traffic_reset_allowance]);
 
   const submit = async () => {
@@ -1230,13 +1234,13 @@ function IPChangeCostDialog({
   const { t } = useTranslation();
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => createRandomId());
   const currencyPrefix = currencyForDisplay(node.currency || "");
 
   useEffect(() => {
     if (!open) return;
     setAmount("");
-    setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(createRandomId());
   }, [open]);
 
   const submit = async () => {
@@ -1319,7 +1323,7 @@ function OneTimeFeeDialog({
   const [note, setNote] = useState("");
   const [currency, setCurrency] = useState(() => currencyForDisplay(node.currency || "$") || "$");
   const [saving, setSaving] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => createRandomId());
   const currencyOptions = BILLING_CURRENCY_OPTIONS.includes(currency)
     ? BILLING_CURRENCY_OPTIONS
     : [currency, ...BILLING_CURRENCY_OPTIONS];
@@ -1329,7 +1333,7 @@ function OneTimeFeeDialog({
     setAmount("");
     setNote("");
     setCurrency(currencyForDisplay(node.currency || "$") || "$");
-    setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(createRandomId());
   }, [open, node.currency]);
 
   const submit = async () => {

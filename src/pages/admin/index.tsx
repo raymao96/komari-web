@@ -16,6 +16,7 @@ import {
   useNodeDetails,
   type NodeDetail,
 } from "@/contexts/NodeDetailsContext";
+import { createInstallTokenSession, installCommandCopyAllowed } from "@/lib/installTokenSession";
 import { AdminMobileCardStack, AdminMobileListCard } from "@/components/admin/AdminMobileListCard";
 import Alert from "@mui/material/Alert";
 import MuiButton from "@mui/material/Button";
@@ -35,6 +36,7 @@ import {
   Callout,
   Badge,
   Select,
+  Tabs,
 } from "@/components/admin/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -103,8 +105,10 @@ import {
 } from "@/lib/dateInput";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
 import { openRemoteTerminal } from "@/utils/remoteLaunch";
+import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
 import AdminNodeListFilters, {
   type AdminNodeStatusValue,
 } from "@/components/admin/AdminNodeListFilters";
@@ -370,7 +374,7 @@ const EmptyNodesGuide = () => {
 };
 
 type AutoDiscoveryInstallOptions = {
-  disableWebSsh: boolean;
+  enableRemoteControl: boolean;
   disableAutoUpdate: boolean;
   ignoreUnsafeCert: boolean;
   memoryIncludeCache: boolean;
@@ -402,7 +406,7 @@ const AutoDiscoverySection = ({
   const [showOptions, setShowOptions] = React.useState(false);
   const [installOptions, setInstallOptions] =
     React.useState<AutoDiscoveryInstallOptions>({
-      disableWebSsh: false,
+      enableRemoteControl: false,
       disableAutoUpdate: false,
       ignoreUnsafeCert: false,
       memoryIncludeCache: false,
@@ -437,8 +441,10 @@ const AutoDiscoverySection = ({
       return normalizeOptionalServiceUrl(settings.script_domain);
     })();
     const args: string[] = ["-e", host, "--auto-discovery", adKey];
-    if (installOptions.disableWebSsh) {
-      args.push("--disable-web-ssh");
+    if (installOptions.enableRemoteControl) {
+      args.push("--enable-remote-control");
+    } else {
+      args.push("--enable-remote-control=false");
     }
     if (installOptions.disableAutoUpdate) {
       args.push("--disable-auto-update");
@@ -655,24 +661,25 @@ const AutoDiscoverySection = ({
           <div className="admin-install-options-grid grid grid-cols-2 gap-2">
             <Flex gap="2" align="center">
               <Checkbox
-                checked={installOptions.disableWebSsh}
+                checked={installOptions.enableRemoteControl}
                 onCheckedChange={(checked) =>
                   setInstallOptions((prev) => ({
                     ...prev,
-                    disableWebSsh: Boolean(checked),
+                    enableRemoteControl: Boolean(checked),
                   }))
                 }
               />
               <label
                 className="text-sm font-normal cursor-pointer"
+                title={t("admin.nodeTable.enableRemoteControlHint")}
                 onClick={() =>
                   setInstallOptions((prev) => ({
                     ...prev,
-                    disableWebSsh: !prev.disableWebSsh,
+                    enableRemoteControl: !prev.enableRemoteControl,
                   }))
                 }
               >
-                {t("admin.nodeTable.disableWebSsh")}
+                {t("admin.nodeTable.enableRemoteControl")}
               </label>
             </Flex>
             <Flex gap="2" align="center">
@@ -1901,6 +1908,7 @@ function formatTrafficCycleRange(snapshot: TrafficCalibrationSnapshot, language:
 
 const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) => {
   const { t } = useTranslation();
+  const { ensureEnabled } = useRemoteManagementGate();
   return (
     <div className="flex h-10 items-center justify-start gap-1 admin-node-actions max-md:w-full">
       <GenerateCommandButton node={node} settings={settings} />
@@ -1908,6 +1916,7 @@ const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) 
         title={t("terminal.title")}
         variant="ghost"
         onClick={() => {
+          if (!ensureEnabled()) return;
           if (!openRemoteTerminal(node.uuid)) toast.error("浏览器阻止了远程管理窗口");
         }}
       >
@@ -2207,7 +2216,7 @@ function DeleteButton({ node }: { node: NodeDetail }) {
   );
 }
 type InstallOptions = {
-  disableWebSsh: boolean;
+  enableRemoteControl: boolean;
   disableAutoUpdate: boolean;
   ignoreUnsafeCert: boolean;
   memoryIncludeCache: boolean;
@@ -2225,7 +2234,7 @@ type InstallOptions = {
 
 type DeploymentProfilePayload = {
   platform: Platform;
-  disable_web_ssh: boolean;
+  enable_remote_control: boolean;
   disable_auto_update: boolean;
   ignore_unsafe_cert: boolean;
   get_ip_addr_from_nic: boolean;
@@ -2281,7 +2290,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   const [selectedPlatform, setSelectedPlatform] =
     React.useState<Platform>("linux");
   const [installOptions, setInstallOptions] = React.useState<InstallOptions>({
-    disableWebSsh: false,
+    enableRemoteControl: false,
     disableAutoUpdate: false,
     ignoreUnsafeCert: false,
     memoryIncludeCache: false,
@@ -2310,6 +2319,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     initialResetDay !== "",
   );
   const [open, setOpen] = React.useState(false);
+  const [dialogTab, setDialogTab] = React.useState<"online" | "install">("online");
   const [loadingProfile, setLoadingProfile] = React.useState(false);
   const [profileAction, setProfileAction] = React.useState<"dispatch" | "copy" | null>(null);
   const [deliveryState, setDeliveryState] = React.useState<DeploymentDeliveryState>();
@@ -2317,8 +2327,73 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     kind: "success" | "warning" | "error";
     message: string;
   }>();
+  const tokenSessionRef = React.useRef<ReturnType<typeof createInstallTokenSession> | null>(null);
+  if (!tokenSessionRef.current) {
+    tokenSessionRef.current = createInstallTokenSession();
+  }
+  const tokenAbortControllerRef = tokenSessionRef.current.tokenAbortControllerRef;
+  const [tokenState, setTokenState] = React.useState(tokenSessionRef.current.getSnapshot());
+  const [otpInput, setOtpInput] = React.useState("");
   const commandTextAreaRef = React.useRef<HTMLTextAreaElement>(null);
+  const otpFieldRef = React.useRef<HTMLInputElement>(null);
   const deliveryStatus = deliveryState?.status;
+  const installToken = tokenState.token;
+  const tokenLoading = tokenState.loading;
+  const tokenError = tokenState.error
+    ? t("admin.nodeTable.tokenLoadFailed", "读取节点 Token 失败")
+    : null;
+  const needTwoFactor = tokenState.twoFactorOpen;
+  const otpSubmitting = tokenState.submitting;
+  const copyBlocked = !installCommandCopyAllowed(tokenState);
+
+  React.useEffect(() => tokenSessionRef.current?.subscribe(setTokenState), []);
+
+  const cancelDeployTwoFactor = () => {
+    tokenAbortControllerRef.current?.abort();
+    tokenAbortControllerRef.current = null;
+    tokenSessionRef.current?.cancelTwoFactor();
+    setOtpInput("");
+    setDialogTab("online");
+  };
+
+  React.useEffect(() => {
+    const session = tokenSessionRef.current;
+    if (!session) return;
+    if (!open) {
+      session.closeDialog();
+      setOtpInput("");
+      setDialogTab("online");
+      return;
+    }
+    return () => {
+      session.dispose();
+      setOtpInput("");
+    };
+  }, [node.uuid, open]);
+
+  React.useEffect(() => {
+    if (!open || dialogTab !== "install") return;
+    const session = tokenSessionRef.current;
+    if (!session) return;
+    const snapshot = session.getSnapshot();
+    if (snapshot.token || snapshot.loading || snapshot.submitting || snapshot.twoFactorOpen) {
+      return;
+    }
+    void session.beginDeployTokenFetch(node.uuid);
+  }, [dialogTab, node.uuid, open]);
+
+  React.useEffect(() => {
+    if (!needTwoFactor || otpSubmitting) return;
+    const timer = window.setTimeout(() => {
+      otpFieldRef.current?.focus();
+      if (tokenState.twoFactorInvalid) otpFieldRef.current?.select();
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [needTwoFactor, otpSubmitting, tokenState.twoFactorInvalid]);
+
+  React.useEffect(() => {
+    if (installToken) setOtpInput("");
+  }, [installToken]);
 
   React.useEffect(() => {
     setEnableMonthRotate(initialResetDay !== "");
@@ -2345,7 +2420,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       .then(({ profile, saved, delivery_state }) => {
         setSelectedPlatform(profile.platform || "linux");
         setInstallOptions({
-          disableWebSsh: profile.disable_web_ssh,
+          enableRemoteControl: profile.enable_remote_control,
           disableAutoUpdate: profile.disable_auto_update,
           ignoreUnsafeCert: profile.ignore_unsafe_cert,
           memoryIncludeCache: profile.memory_include_cache,
@@ -2432,7 +2507,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
 
   const deploymentProfile = (): DeploymentProfilePayload => ({
     platform: selectedPlatform,
-    disable_web_ssh: installOptions.disableWebSsh,
+    enable_remote_control: installOptions.enableRemoteControl,
     disable_auto_update: installOptions.disableAutoUpdate,
     ignore_unsafe_cert: installOptions.ignoreUnsafeCert,
     get_ip_addr_from_nic: installOptions.getIpAddrFromNic,
@@ -2463,11 +2538,13 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       }
       return normalizeOptionalServiceUrl(settings.script_domain);
     }();
-    const token = node.token || "";
+    const token = installToken || "";
     let args = ["-e", host, "-t", token];
     // 根据安装选项生成参数
-    if (installOptions.disableWebSsh) {
-      args.push("--disable-web-ssh");
+    if (installOptions.enableRemoteControl) {
+      args.push("--enable-remote-control");
+    } else {
+      args.push("--enable-remote-control=false");
     }
     if (installOptions.disableAutoUpdate) {
       args.push("--disable-auto-update");
@@ -2604,6 +2681,16 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       return;
     }
 
+    if (copyCommand && copyBlocked) {
+      toast.error(
+        t(
+          "admin.nodeTable.tokenMissingCopyBlocked",
+          "Token 尚未就绪，无法复制安装命令",
+        ),
+      );
+      return;
+    }
+
     const action = copyCommand ? "copy" : "dispatch";
     setProfileAction(action);
     const copyAttempt = copyCommand
@@ -2733,35 +2820,70 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     }
   })();
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      disableEnforceFocus={needTwoFactor}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          setDialogTab("online");
+          return;
+        }
+        tokenAbortControllerRef.current?.abort();
+        tokenAbortControllerRef.current = null;
+        tokenSessionRef.current?.closeDialog();
+        setOtpInput("");
+        setDialogTab("online");
+      }}
+    >
       <Dialog.Trigger>
         <IconButton variant="ghost" title={t("admin.nodeTable.installCommand")}>
           <Download size="18" />
         </IconButton>
       </Dialog.Trigger>
       <AppDialogContent
-        maxWidth={960}
+        maxWidth="720px"
         className="km-node-dialog km-node-deploy-dialog"
       >
         <Dialog.Title>
-          {t("admin.nodeTable.installCommand", "一键部署指令")}
+          {t("admin.nodeTable.nodeConfig", "节点配置")}
         </Dialog.Title>
+        <Tabs.Root
+          value={dialogTab}
+          onValueChange={(value) => {
+            if (value === "online" || value === "install") setDialogTab(value);
+          }}
+        >
+          <AdminSheetTabs>
+            <Tabs.List>
+              <Tabs.Trigger value="online">
+                <AdminTabLabel>
+                  {t("admin.nodeTable.onlineConfigTab", "在线配置")}
+                </AdminTabLabel>
+              </Tabs.Trigger>
+              <Tabs.Trigger value="install">
+                <AdminTabLabel>
+                  {t("admin.nodeTable.deployCommandTab", "部署指令")}
+                </AdminTabLabel>
+              </Tabs.Trigger>
+            </Tabs.List>
+          </AdminSheetTabs>
         <div
           className="km-node-dialog-body flex flex-col gap-4"
-          aria-busy={loadingProfile}
+          aria-busy={loadingProfile || (dialogTab === "install" && tokenLoading)}
           style={{
             opacity: loadingProfile ? 0.55 : 1,
             pointerEvents: loadingProfile ? "none" : undefined,
           }}
         >
+          <Tabs.Content value="install" className="flex flex-col gap-4">
           <InstallPlatformToggle
             className="admin-install-platforms"
             value={selectedPlatform}
             onChange={setSelectedPlatform}
           />
 
-          <Flex direction="column" gap="2" className="km-node-dialog-grid km-deploy-dialog-grid">
-            <section className="km-node-dialog-pane">
+          <section className="km-node-dialog-pane">
             <Flex justify="between" align="center">
               <Text size="3" weight="bold">
                 {t("admin.nodeTable.installationSettings", "安装配置")}
@@ -2773,24 +2895,25 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
             <div className="admin-install-options-grid grid grid-cols-2 gap-2">
               <Flex gap="2" align="center">
                 <Checkbox
-                  checked={installOptions.disableWebSsh}
+                  checked={installOptions.enableRemoteControl}
                   onCheckedChange={(checked) => {
                     setInstallOptions((prev) => ({
                       ...prev,
-                      disableWebSsh: Boolean(checked),
+                      enableRemoteControl: Boolean(checked),
                     }));
                   }}
                 />
                 <label
                   className="text-sm font-normal"
+                  title={t("admin.nodeTable.enableRemoteControlHint")}
                   onClick={() => {
                     setInstallOptions((prev) => ({
                       ...prev,
-                      disableWebSsh: !prev.disableWebSsh,
+                      enableRemoteControl: !prev.enableRemoteControl,
                     }));
                   }}
                 >
-                  {t("admin.nodeTable.disableWebSsh")}
+                  {t("admin.nodeTable.enableRemoteControl")}
                 </label>
               </Flex>
               <Flex gap="2" align="center">
@@ -2995,13 +3118,24 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               )}
             </Flex>
             </section>
+          </Tabs.Content>
+          <Tabs.Content value="online">
             <section className="km-node-dialog-pane">
-              <Flex justify="between" align="center">
+              <Flex
+                justify="between"
+                align="center"
+                wrap="wrap"
+                gap="2"
+                className="km-node-online-heading"
+              >
                 <Text size="3" weight="bold">
                   {t("admin.nodeTable.onlineCollectionSettings", "在线采集配置")}
                 </Text>
                 <Text size="1" color="green">
-                  {t("admin.nodeTable.onlineApplicable", "保存后可直接下发")}
+                  {t(
+                    "admin.nodeTable.onlineApplicable",
+                    "部署完成后，保存后可直接下发",
+                  )}
                 </Text>
               </Flex>
             <Flex direction="column" gap="2" className="km-node-dialog-fields [&_label]:font-normal">
@@ -3225,9 +3359,6 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               {enableInterval && (
                 <TextField.Root
                   placeholder="1"
-                  type="number"
-                  min="1"
-                  step="0.1"
                   value={installOptions.interval}
                   onChange={(e) =>
                     setInstallOptions((prev) => ({
@@ -3341,18 +3472,30 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               </Button>
             </Flex>
             </section>
-          </Flex>
+          </Tabs.Content>
+          <Tabs.Content value="install" className="flex flex-col gap-4">
           <Flex direction="column" gap="2">
             <label className="text-base font-bold">
               {t("admin.nodeTable.generatedCommand", "生成的指令")}
             </label>
+            {tokenError ? (
+              <Callout.Root color="red" size="1">
+                <Callout.Text>{tokenError}</Callout.Text>
+              </Callout.Root>
+            ) : null}
             <div className="relative">
               <TextArea
                 ref={commandTextAreaRef}
                 readOnly
                 className="w-full"
                 style={{ minHeight: "80px" }}
-                value={generateCommand()}
+                value={
+                  tokenLoading
+                    ? t("admin.nodeTable.installTokenLoading", "正在读取节点 Token…")
+                    : installToken
+                      ? generateCommand()
+                      : ""
+                }
                 onFocus={(event) => event.currentTarget.select()}
               />
             </div>
@@ -3360,8 +3503,9 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           <Flex direction="column" gap="2">
             <Button
               style={{ width: "100%" }}
-              aria-busy={profileAction === "copy"}
+              aria-busy={tokenLoading || profileAction === "copy"}
               disabled={
+                copyBlocked ||
                 selectedTrafficResetDay() === null ||
                 selectedInterval() === null
               }
@@ -3390,8 +3534,80 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               </Text>
             )}
           </Flex>
+          </Tabs.Content>
         </div>
+        </Tabs.Root>
       </AppDialogContent>
+      {needTwoFactor ? (
+      <Dialog.Root
+        open
+        zIndex={1400}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) return;
+          if (tokenSessionRef.current?.getSnapshot().twoFactorOpen) {
+            cancelDeployTwoFactor();
+          }
+        }}
+      >
+        <AppDialogContent className="admin-install-dialog">
+          <Dialog.Title>
+            {t("admin.nodeTable.identityAuthTitle", "身份验证")}
+          </Dialog.Title>
+          <Dialog.Description>
+            {t("admin.nodeTable.identityAuthDescription", "请输入身份验证器中的 6 位动态口令")}
+          </Dialog.Description>
+          <form
+            autoComplete="on"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (otpInput.length === 6 && !otpSubmitting) {
+                void tokenSessionRef.current?.submitTwoFactor(node.uuid, otpInput);
+              }
+            }}
+          >
+            <TextField.Root
+              ref={otpFieldRef}
+              id="admin-node-deploy-otp"
+              name="one-time-code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={6}
+              color={tokenState.twoFactorInvalid ? "red" : undefined}
+              disabled={otpSubmitting}
+              value={otpInput}
+              onChange={(event) =>
+                setOtpInput(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
+              aria-label={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
+            />
+            {tokenState.twoFactorInvalid ? (
+              <Text size="2" color="red" className="mt-2" role="alert">
+                {t("admin.nodeTable.twoFactorInvalid", "验证码错误")}
+              </Text>
+            ) : null}
+            <Flex justify="end" gap="2" mt="4">
+              <Button
+                type="button"
+                variant="soft"
+                disabled={otpSubmitting}
+                onClick={cancelDeployTwoFactor}
+              >
+                {t("admin.nodeTable.cancel")}
+              </Button>
+              <Button
+                type="submit"
+                disabled={otpInput.length !== 6 || otpSubmitting}
+              >
+                {t("common.confirm", "确认")}
+              </Button>
+            </Flex>
+          </form>
+        </AppDialogContent>
+      </Dialog.Root>
+      ) : null}
     </Dialog.Root>
   );
 }

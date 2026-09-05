@@ -296,7 +296,12 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
                         <Typography
                           noWrap
                           title={value || undefined}
-                          sx={{ fontSize: 13.5, fontWeight: 400, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}
+                          sx={{
+                            fontSize: 13.5,
+                            fontWeight: 400,
+                            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                            color: value ? undefined : "text.secondary",
+                          }}
                         >
                           {value || t("terminal.address_unreported")}
                         </Typography>

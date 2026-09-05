@@ -1,10 +1,8 @@
-const remoteLaunchKey = "lite.remote.launch";
-const legacyRemoteLaunchKey = "komari.remote.launch";
+const remoteNodeIdPattern = /^[0-9A-Za-z][0-9A-Za-z._:-]{0,127}$/;
 
-type RemoteLaunchTarget = {
-  uuid: string;
-  expiresAt: number;
-};
+export function isSafeRemoteNodeId(uuid: string | null | undefined): uuid is string {
+  return typeof uuid === "string" && remoteNodeIdPattern.test(uuid);
+}
 
 export function remoteTerminalPath(uuid: string): string {
   const params = new URLSearchParams({ node: uuid });
@@ -13,27 +11,18 @@ export function remoteTerminalPath(uuid: string): string {
 
 export function parseRemoteLaunchHash(hash: string): string | null {
   const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
-  const uuid = params.get("node")?.trim();
-  return uuid || null;
-}
-
-export function parseLegacyRemoteLaunchTarget(
-  raw: string | null,
-  now = Date.now(),
-): string | null {
-  if (!raw) return null;
-  try {
-    const launch = JSON.parse(raw) as RemoteLaunchTarget;
-    if (typeof launch.uuid !== "string" || !launch.uuid || launch.expiresAt < now) return null;
-    return launch.uuid;
-  } catch {
-    return null;
-  }
+  const uuid = params.get("node")?.trim() ?? "";
+  return isSafeRemoteNodeId(uuid) ? uuid : null;
 }
 
 export function openRemoteTerminal(uuid: string): boolean {
-  if (!uuid) return false;
-  const target = window.open(remoteTerminalPath(uuid), "_blank");
+  if (!isSafeRemoteNodeId(uuid)) return false;
+  const path = remoteTerminalPath(uuid);
+  if (window.matchMedia("(max-width:599.95px)").matches) {
+    window.location.assign(path);
+    return true;
+  }
+  const target = window.open(path, "_blank");
   if (!target) return false;
   try {
     target.opener = null;
@@ -45,15 +34,5 @@ export function openRemoteTerminal(uuid: string): boolean {
 }
 
 export function getRemoteLaunchTarget(): string | null {
-  const hashTarget = parseRemoteLaunchHash(window.location.hash);
-  if (hashTarget) return hashTarget;
-
-  // Compatibility for an already-open admin page that still launches the
-  // terminal with the pre-hash handoff used by older frontend bundles.
-  const raw =
-    window.sessionStorage.getItem(remoteLaunchKey) ??
-    window.sessionStorage.getItem(legacyRemoteLaunchKey);
-  window.sessionStorage.removeItem(remoteLaunchKey);
-  window.sessionStorage.removeItem(legacyRemoteLaunchKey);
-  return parseLegacyRemoteLaunchTarget(raw);
+  return parseRemoteLaunchHash(window.location.hash);
 }

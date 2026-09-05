@@ -194,6 +194,14 @@ export function createAppTheme(mode: "light" | "dark") {
               color: GREY[500],
               opacity: 1,
             },
+            "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active":
+              {
+                WebkitTextFillColor: isLight ? GREY[800] : "#FFFFFF",
+                caretColor: isLight ? GREY[800] : "#FFFFFF",
+                borderRadius: "inherit",
+                WebkitBoxShadow: `0 0 0 100px ${isLight ? INPUT_FILL : INPUT_FILL_DARK} inset`,
+                transition: "background-color 99999s ease-out 0s",
+              },
           },
           sizeSmall: {
             "& .MuiInputBase-input": {

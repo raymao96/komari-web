@@ -9,6 +9,7 @@ import Stack from "@mui/material/Stack";
 import { useOutlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RemoteManagementGateProvider } from "@/components/admin/RemoteManagementGate";
 import AdminShell from "@/components/admin/shell/AdminShell";
 import AdminLoginPage from "@/components/admin/shell/AdminLoginPage";
 import AdminRouteViewport from "@/components/admin/AdminRouteViewport";
@@ -133,15 +134,17 @@ const AdminAuthenticatedContent = () => {
         aria-hidden={firstRouteReady ? undefined : true}
         sx={{ visibility: firstRouteReady ? "visible" : "hidden" }}
       >
-        <AdminShell
-          content={
-            <AdminRouteViewport
-              fallback={<AdminRouteLoading />}
-              outlet={outlet}
-              onFirstReady={() => setFirstRouteReady(true)}
-            />
-          }
-        />
+        <RemoteManagementGateProvider>
+          <AdminShell
+            content={
+              <AdminRouteViewport
+                fallback={<AdminRouteLoading />}
+                outlet={outlet}
+                onFirstReady={() => setFirstRouteReady(true)}
+              />
+            }
+          />
+        </RemoteManagementGateProvider>
       </Box>
     </>
   );

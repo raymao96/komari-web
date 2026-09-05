@@ -1,10 +1,10 @@
 import React from "react";
 import { useAccount } from "@/contexts/AccountContext";
 import { isAdminNodeBootstrapLoading } from "@/utils/adminAuth";
+import { omitClientTokenFromNode } from "@/lib/clientToken";
 
 export type NodeDetail = {
   uuid: string;
-  token: string;
   name: string;
   cpu_name: string;
   virtualization: string;
@@ -25,7 +25,8 @@ export type NodeDetail = {
   price: number;
   remark: string | undefined;
   public_remark: string;
-  remote_control_protected: boolean;
+  remote_protocol?: number;
+  remote_control_enabled?: boolean;
   traffic_reset_day?: number | null;
   traffic_reset_allowance: number;
   effective_traffic_limit: number;
@@ -115,7 +116,9 @@ const NodeDetailsProviderValue: React.FC<{ children: React.ReactNode }> = ({
         if (!Array.isArray(data)) {
           throw new Error("Invalid node details response");
         }
-        const nodes = await hydrateLegacyDeploymentStatuses(data);
+        const nodes = (await hydrateLegacyDeploymentStatuses(data)).map(
+          omitClientTokenFromNode,
+        );
         if (sequence !== requestSequence.current) return;
         setNodeDetail(nodes);
         setLoadedAccount(targetAccount);

@@ -1,6 +1,10 @@
 import { sameOriginFetchInit } from "@/utils/security";
 import { themePreviewSrc } from "@/utils/themePreviewImage";
 import type { I18nText } from "@/utils/i18nText";
+import {
+  rememberInstalledThemes,
+  type InstalledThemeDetails,
+} from "@/lib/themeList";
 
 export interface MarketSource {
   id: string;
@@ -30,11 +34,6 @@ export interface MarketTheme {
   installable: boolean;
   source_id: string;
   source_name: string;
-}
-
-export interface InstalledTheme {
-  short: string;
-  version: string;
 }
 
 export interface ThemeMarketSnapshot {
@@ -103,17 +102,16 @@ async function fetchThemeMarket(): Promise<ThemeMarketSnapshot> {
     request<{ themes: MarketTheme[]; sources: MarketSourceStatus[] }>(
       "/api/admin/theme/market/catalog",
     ),
-    request<InstalledTheme[]>("/api/admin/theme/list"),
+    request<InstalledThemeDetails[]>("/api/admin/theme/list"),
     request<MarketSource[]>("/api/admin/theme/market/sources"),
   ]);
+  const installedThemes = installedPayload.data || [];
+  rememberInstalledThemes(installedThemes);
   return rememberThemeMarket({
     themes: catalogPayload.data?.themes || [],
     sourceStatuses: catalogPayload.data?.sources || [],
     sources: sourcesPayload.data || [],
-    installed: (installedPayload.data || []).map((theme) => [
-      theme.short,
-      theme.version,
-    ]),
+    installed: installedThemes.map((theme) => [theme.short, theme.version]),
   });
 }
 
@@ -140,17 +138,16 @@ export async function refreshThemeMarketCatalog(
     request<{ themes: MarketTheme[]; sources: MarketSourceStatus[] }>(
       `/api/admin/theme/market/catalog${suffix}`,
     ),
-    request<InstalledTheme[]>("/api/admin/theme/list"),
+    request<InstalledThemeDetails[]>("/api/admin/theme/list"),
   ]);
   const sources = themeMarketSnapshot?.sources ?? [];
+  const installedThemes = installedPayload.data || [];
+  rememberInstalledThemes(installedThemes);
   return rememberThemeMarket({
     themes: catalogPayload.data?.themes || [],
     sourceStatuses: catalogPayload.data?.sources || [],
     sources,
-    installed: (installedPayload.data || []).map((theme) => [
-      theme.short,
-      theme.version,
-    ]),
+    installed: installedThemes.map((theme) => [theme.short, theme.version]),
   });
 }
 

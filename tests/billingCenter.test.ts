@@ -7,6 +7,7 @@ import {
   billingQuery,
   formatBillingMoney,
   isLongTermExpiry,
+  remainingExpiryDays,
 } from "../src/utils/billing.ts";
 
 const pageSource = readFileSync("src/pages/admin/billing.tsx", "utf8");
@@ -28,6 +29,15 @@ test("treats stored long-term expiry as long term in the server list", () => {
   assert.equal(formatBillingMoney(null, "CNY"), "--");
   assert.match(pageSource, /isLongTermExpiry\(expiredAt\)/);
   assert.match(pageSource, /common\.long_term/);
+});
+
+test("remaining expiry days match the theme nearest-day rounding", () => {
+  const day = 24 * 60 * 60 * 1000;
+  const expire = Date.parse("2027-05-14T00:00:00.000Z");
+  assert.equal(remainingExpiryDays(new Date(expire).toISOString(), expire - 251.4 * day), 251);
+  assert.equal(remainingExpiryDays(new Date(expire).toISOString(), expire - 251.6 * day), 252);
+  assert.equal(remainingExpiryDays("2226-05-14T00:00:00.000Z", expire), null);
+  assert.equal(remainingExpiryDays(null, expire), null);
 });
 
 test("registers and preloads the billing center after the server menu", () => {

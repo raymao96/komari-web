@@ -18,7 +18,7 @@ test("traffic calibration action sits between billing and delete", () => {
 test("calibration dialog keeps form state independent from node polling", () => {
   const calibrationSource = source.slice(
     source.indexOf("function TrafficCalibrationButton"),
-    source.indexOf("function RotateTokenButton"),
+    source.indexOf("function DeleteButton"),
   );
   assert.doesNotMatch(calibrationSource, /\[open, node\.uuid\]/);
   assert.match(calibrationSource, /const prepareCalibration = async \(\) =>/);

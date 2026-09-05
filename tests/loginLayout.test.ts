@@ -6,6 +6,10 @@ const loginSource = readFileSync(
   new URL("../src/components/admin/shell/AdminLoginPage.tsx", import.meta.url),
   "utf8",
 );
+const authPageSource = readFileSync(
+  new URL("../src/components/admin/shell/AuthStandAlonePage.tsx", import.meta.url),
+  "utf8",
+);
 const loginIdentitySource = readFileSync(
   new URL("../src/components/LoginIdentityHeader.tsx", import.meta.url),
   "utf8",
@@ -28,11 +32,12 @@ const rpc2ContextSource = readFileSync(
 );
 
 test("admin login is a standalone MUI page, not a dialog overlay", () => {
-  assert.match(loginSource, /data-testid="admin-login-page"/);
-  assert.match(loginSource, /data-testid="admin-login-toolbar"/);
-  assert.match(loginSource, /data-testid="admin-login-card"/);
+  assert.match(authPageSource, /testId = "admin-login-page"/);
+  assert.match(authPageSource, /data-testid="admin-login-toolbar"/);
+  assert.match(authPageSource, /cardTestId = "admin-login-card"/);
   assert.match(loginSource, /login\.heading/);
-  assert.match(loginSource, /from "@mui\/material\/Card"/);
+  assert.match(loginSource, /AuthStandAlonePage/);
+  assert.match(authPageSource, /from "@mui\/material\/Card"/);
   assert.doesNotMatch(loginSource, /Dialog\.Root/);
   assert.doesNotMatch(loginSource, /<AppDialogContent/);
   assert.doesNotMatch(loginSource, /@radix-ui\/themes/);
@@ -40,6 +45,11 @@ test("admin login is a standalone MUI page, not a dialog overlay", () => {
 
 test("login card does not use the framed favicon as a hero icon", () => {
   assert.doesNotMatch(loginSource, /width: 64, height: 64/);
+  assert.doesNotMatch(authPageSource, /width: 64, height: 64/);
+  assert.match(
+    authPageSource,
+    /getAppAssetUrl\("assets\/logo\.png\?v=lite-icon-0e86dd"\)/,
+  );
   assert.match(
     loginIdentitySource,
     /getAppAssetUrl\("assets\/logo\.png\?v=lite-icon-0e86dd"\)/,
@@ -49,6 +59,21 @@ test("login card does not use the framed favicon as a hero icon", () => {
 test("login fields use localized placeholders", () => {
   assert.match(loginSource, /placeholder=\{t\("login\.username_placeholder"\)\}/);
   assert.match(loginSource, /placeholder=\{t\("login\.password_placeholder"\)\}/);
+  assert.match(loginSource, /localizeLoginError\(result\.message, t\)/);
+  assert.doesNotMatch(loginSource, /setErrorMsg\(result\.message\)/);
+});
+
+test("login shows two-factor only after the server asks for it", () => {
+  assert.match(loginSource, /const \[needTwoFactor, setNeedTwoFactor\]/);
+  assert.match(loginSource, /if \(result\.requiresTwoFactor\)/);
+  assert.match(loginSource, /needTwoFactor \? \(/);
+  assert.match(loginSource, /id="admin-login-2fa"/);
+  assert.match(loginSource, /autoComplete="username"/);
+  assert.match(loginSource, /autoComplete="current-password"/);
+  assert.match(loginSource, /autoComplete="one-time-code"/);
+  assert.match(adminAuthSource, /loginTwoFactorRequiredMessage = "2FA code is required"/);
+  assert.match(loginSource, /WebkitBoxShadow: `0 0 0 100px \$\{fill\} inset`/);
+  assert.doesNotMatch(loginSource, /autoComplete="off"/);
 });
 
 test("login and RPC stay on the current origin and keep session cookies", () => {
@@ -85,8 +110,8 @@ test("login chrome uses shared circular icon buttons and menus", () => {
     new URL("../src/components/admin/shell/ChromeActions.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(loginSource, /<LanguageMenu \/>/);
-  assert.match(loginSource, /<ThemeMenu \/>/);
+  assert.match(authPageSource, /<LanguageMenu \/>/);
+  assert.match(authPageSource, /<ThemeMenu \/>/);
   assert.match(chromeSource, /borderRadius: "50%"/);
   assert.match(chromeSource, /width: 40,\s+height: 40,\s+minWidth: 40/);
   assert.match(chromeSource, /AutoThemeIcon/);
@@ -106,9 +131,13 @@ test("login and admin chrome adapt to compact viewports", () => {
   );
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   const globalStyles = readFileSync(new URL("../src/global.css", import.meta.url), "utf8");
-  assert.match(loginSource, /max-width:599\.95px/);
-  assert.match(loginSource, /100dvh/);
-  assert.match(loginSource, /var\(--safe-area-top\)/);
+  assert.match(authPageSource, /alignItems: "center"/);
+  assert.doesNotMatch(authPageSource, /alignItems: \{ xs: "flex-start"/);
+  assert.match(authPageSource, /max-width:599\.95px/);
+  assert.match(authPageSource, /100dvh/);
+  assert.match(authPageSource, /var\(--safe-area-top\)/);
+  assert.match(authPageSource, /overflowWrap: "anywhere"/);
+  assert.match(authPageSource, /WebkitOverflowScrolling: "touch"/);
   assert.match(shellSource, /var\(--safe-area-top\)/);
   assert.match(shellSource, /var\(--safe-area-bottom\)/);
   assert.match(

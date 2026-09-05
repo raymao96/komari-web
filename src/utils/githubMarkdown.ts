@@ -1,4 +1,4 @@
-const GITHUB_ALERTS = ["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"] as const;
+export const GITHUB_ALERTS = ["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"] as const;
 
 export type GithubAlertType = (typeof GITHUB_ALERTS)[number];
 

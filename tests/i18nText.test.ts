@@ -59,6 +59,85 @@ test("source locale keys are sorted", () => {
   assertKeysSorted(contents, filename);
 });
 
+test("login API errors are translated in every locale", () => {
+  const keys = [
+    "busy",
+    "failed",
+    "invalid_credentials",
+    "password_login_disabled",
+  ];
+  for (const filename of ["zh_CN.json", "en.json", "ja_JP.json", "zh_TW.json"]) {
+    const contents = JSON.parse(
+      readFileSync(
+        path.join(repositoryRoot, "src", "i18n", "locales", filename),
+        "utf8",
+      ),
+    ) as { login?: Record<string, string> };
+    for (const key of keys) {
+      const value = contents.login?.[key]?.trim() ?? "";
+      assert.notEqual(value, "", `${filename} login.${key} is missing`);
+      assert.notEqual(value, "Invalid credentials", `${filename} login.${key} still uses API English`);
+    }
+    assert.notEqual(
+      contents.login?.invalid_credentials,
+      "Invalid credentials",
+    );
+  }
+});
+
+test("exec canned results are translated in every locale", () => {
+  const keys = [
+    "client_offline",
+    "delivery_failed",
+    "delivery_timeout",
+    "execution_unknown",
+    "remote_closed",
+    "remote_unavailable",
+    "timeout",
+  ];
+  for (const filename of ["zh_CN.json", "en.json", "ja_JP.json", "zh_TW.json"]) {
+    const contents = JSON.parse(
+      readFileSync(
+        path.join(repositoryRoot, "src", "i18n", "locales", filename),
+        "utf8",
+      ),
+    ) as { exec?: { output?: Record<string, string>; errors?: Record<string, string> } };
+    for (const key of keys) {
+      const value = contents.exec?.output?.[key]?.trim() ?? "";
+      assert.notEqual(value, "", `${filename} exec.output.${key} is missing`);
+    }
+    assert.notEqual(
+      contents.exec?.output?.remote_unavailable,
+      "remote control unavailable",
+    );
+    assert.notEqual(
+      contents.exec?.errors?.noClientsConnected?.trim() ?? "",
+      "",
+      `${filename} exec.errors.noClientsConnected is missing`,
+    );
+    assert.notEqual(
+      contents.exec?.errors?.noClientsConnected,
+      "No clients connected",
+    );
+  }
+});
+
+test("empty remote addresses use the same placeholder in every locale", () => {
+  for (const filename of ["zh_CN.json", "en.json", "ja_JP.json", "zh_TW.json"]) {
+    const contents = JSON.parse(
+      readFileSync(
+        path.join(repositoryRoot, "src", "i18n", "locales", filename),
+        "utf8",
+      ),
+    ) as { terminal?: { address_unreported?: string } };
+    assert.equal(
+      contents.terminal?.address_unreported,
+      "--",
+      `${filename} terminal.address_unreported should match empty tags`,
+    );
+  }
+});
+
 test("i18n sync workflow has no candidate branch job", () => {
   const workflow = readFileSync(
     path.join(repositoryRoot, ".github", "workflows", "i18n-sync.yml"),

@@ -66,6 +66,13 @@ test("theme pages share preview-image loading treatment", () => {
     readFileSync("src/routes.ts", "utf8"),
     /prefetchInstalledThemes/,
   );
+  assert.match(
+    readFileSync("src/lib/themeList.ts", "utf8"),
+    /export function invalidateInstalledThemes/,
+  );
+  assert.match(marketSource, /invalidateInstalledThemes\(\)/);
+  assert.match(themeSettingsSource, /refreshInstalledThemes\(\)/);
+  assert.doesNotMatch(themeSettingsSource, /prefetchInstalledThemes/);
   assert.match(globalStyles, /km-theme-preview-skeleton/);
   assert.match(globalStyles, /km-theme-preview-image\[data-loaded="true"\]/);
   assert.match(marketSource, /direction="column" gap="5"/);

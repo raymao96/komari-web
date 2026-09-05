@@ -15,6 +15,7 @@ export interface SettingsResponse {
   reduce_motion: boolean;
   cors_origin_check_enabled: boolean;
   auto_order_new_clients_by_region: boolean;
+  allow_remote_management: boolean;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
   o_auth_provider: string;
@@ -32,6 +33,7 @@ const createDefaultSettings = (): SettingsResponse => ({
   reduce_motion: false,
   cors_origin_check_enabled: true,
   auto_order_new_clients_by_region: false,
+  allow_remote_management: false,
   geo_ip_enabled: false,
   geo_ip_provider: "",
   o_auth_provider: "",

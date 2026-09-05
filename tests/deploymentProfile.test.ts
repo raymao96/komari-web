@@ -29,7 +29,7 @@ test("deployment UI separates live dispatch from reinstall-only settings", () =>
   assert.match(source, /reinstallRequired/);
   assert.match(source, /onlineCollectionSettings/);
   for (const persistedOnly of [
-    "disable_web_ssh",
+    "enable_remote_control",
     "disable_auto_update",
     "ignore_unsafe_cert",
     "get_ip_addr_from_nic",
@@ -119,11 +119,20 @@ test("mobile Agent version and delivery state align left without changing deskto
 test("deployment actions keep stable button content while a request is pending", () => {
   assert.match(source, /profileAction, setProfileAction/);
   assert.match(source, /aria-busy=\{profileAction === "dispatch"\}/);
-  assert.match(source, /aria-busy=\{profileAction === "copy"\}/);
+  assert.match(source, /aria-busy=\{tokenLoading \|\| profileAction === "copy"\}/);
   assert.doesNotMatch(source, /loading=\{profileAction === "(?:dispatch|copy)"\}/);
   assert.doesNotMatch(source, /profileAction === "(?:dispatch|copy)" \|\|/);
   assert.doesNotMatch(source, /aria-disabled=\{Boolean\(profileAction\)\}/);
   assert.doesNotMatch(source, /savingProfile/);
+});
+
+test("install commands always emit an explicit remote-control flag", () => {
+  assert.match(source, /args\.push\("--enable-remote-control"\)/);
+  assert.match(source, /args\.push\("--enable-remote-control=false"\)/);
+  const falseFlagCount = source.split('args.push("--enable-remote-control=false")').length - 1;
+  const trueFlagCount = source.split('args.push("--enable-remote-control")').length - 1;
+  assert.equal(falseFlagCount, 2);
+  assert.equal(trueFlagCount, 2);
 });
 
 test("one-click Agent install uses Lite-agent latest paths", () => {

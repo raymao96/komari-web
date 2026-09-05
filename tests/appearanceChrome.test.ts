@@ -41,4 +41,6 @@ test("admin appearance chrome matches the header, not the brand accent", () => {
     theme,
     /MuiOutlinedInput:[\s\S]*transition:\s*"border-color 180ms ease, box-shadow 180ms ease"/,
   );
+  assert.match(theme, /&:-webkit-autofill, &:-webkit-autofill:hover/);
+  assert.match(theme, /WebkitBoxShadow: `0 0 0 100px \$\{isLight \? INPUT_FILL : INPUT_FILL_DARK\} inset`/);
 });

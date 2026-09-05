@@ -32,6 +32,7 @@ import { prefetchAdminDashboard } from "./utils/dashboardPrefetch";
 import MuiAppProvider from "./theme/MuiAppProvider";
 import { applyAppearanceChrome } from "./theme/appearanceChrome";
 import { clientCookieSuffix, isSafeTempKey } from "./utils/security";
+import { preparePrivateApplication } from "./utils/preparePrivateApplication";
 
 const RadixThemeRoot = lazy(() => import("./theme/RadixThemeRoot"));
 
@@ -90,6 +91,14 @@ const AdminRoutePreloader = () => {
   }, [account?.logged_in]);
 
   return null;
+};
+
+const AccountScopedRPC2 = ({ children }: { children: React.ReactNode }) => {
+  const { account } = useAccount();
+  if (!account?.logged_in) {
+    return children;
+  }
+  return <RPC2Provider>{children}</RPC2Provider>;
 };
 
 const App = () => {
@@ -173,7 +182,7 @@ const App = () => {
     <AccountProvider>
       <AccountPreferenceSync />
       <AdminRoutePreloader />
-      <RPC2Provider>
+      <AccountScopedRPC2>
         <PublicInfoProvider>
           <DocumentTitle />
           <Toaster />
@@ -184,7 +193,7 @@ const App = () => {
             {routing}
           </Suspense>
         </PublicInfoProvider>
-      </RPC2Provider>
+      </AccountScopedRPC2>
     </AccountProvider>
   );
   return (
@@ -214,7 +223,8 @@ const App = () => {
   );
 };
 
-void i18nReady.then(() => {
+void i18nReady.then(async () => {
+  await preparePrivateApplication();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <BrowserRouter>

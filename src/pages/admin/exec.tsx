@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type KeyboardEvent } from "react";
 import Loading from "@/components/loading";
 import { NodeDetailsProvider, useNodeDetails } from "@/contexts/NodeDetailsContext";
+import { AdminNodeLiveDataProvider } from "@/hooks/use-admin-node-live-data";
 import { useTranslation } from "react-i18next";
 import {
     Button,
@@ -17,6 +18,10 @@ import { AlertCircle, CheckCircle2, Copy, Clock } from "@/components/admin/muiIc
 import { toast } from "sonner";
 import RemoteExecNodeSelector from "@/components/remote/RemoteExecNodeSelector";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { RequireAllowRemoteManagement } from "@/components/admin/RemoteManagementGate";
+import { localizeRemoteError } from "@/utils/remoteSession";
+import { createRandomId } from "@/utils/randomId";
+import { localizeExecResult, isExecTimeoutResult } from "@/utils/execResult";
 import { useAccount } from "@/contexts/AccountContext";
 import {
     AdminPagination,
@@ -46,6 +51,8 @@ interface ExecResponse {
     status?: string;
     data?: {
         task_id: string;
+        next_grant?: string;
+        expires_at?: string;
     };
 }
 
@@ -90,9 +97,13 @@ const getCommandEditorCollapsedHeight = (textarea: HTMLTextAreaElement, editor: 
 
 const ExecPage = () => {
     return (
-        <NodeDetailsProvider>
-            <ExecContent />
-        </NodeDetailsProvider>
+        <RequireAllowRemoteManagement>
+            <NodeDetailsProvider>
+                <AdminNodeLiveDataProvider>
+                    <ExecContent />
+                </AdminNodeLiveDataProvider>
+            </NodeDetailsProvider>
+        </RequireAllowRemoteManagement>
     );
 };
 
@@ -108,8 +119,12 @@ const ExecContent = () => {
     const [polling, setPolling] = useState(false);
     const [commandFocused, setCommandFocused] = useState(false);
     const [commandEditorHeight, setCommandEditorHeight] = useState(COMMAND_EDITOR_COLLAPSED_HEIGHT);
+    const [passwordInput, setPasswordInput] = useState("");
     const [twoFaCode, setTwoFaCode] = useState("");
     const twoFaEnabled = Boolean(account?.["2fa_enabled"]);
+    const grantRef = useRef("");
+    const pageInstanceIdRef = useRef(createRandomId());
+    const grantExpiresAtRef = useRef(0);
     const {
         page: resultPage,
         setPage: setResultPage,
@@ -124,6 +139,26 @@ const ExecContent = () => {
     const commandTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const commandEditorRef = useRef<HTMLDivElement | null>(null);
     const commandLineGutterRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const revoke = () => {
+            const currentGrant = grantRef.current;
+            if (!currentGrant) return;
+            grantRef.current = "";
+            void fetch("/api/admin/client/remote/revoke", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ grant: currentGrant }),
+                credentials: "same-origin",
+                keepalive: true,
+            }).catch(() => undefined);
+        };
+        window.addEventListener("pagehide", revoke);
+        return () => {
+            window.removeEventListener("pagehide", revoke);
+            revoke();
+        };
+    }, []);
 
     const commandLineCount = useMemo(() => {
         return command === "" ? 1 : command.split("\n").length;
@@ -287,8 +322,12 @@ const ExecContent = () => {
             return;
         }
 
-        if (twoFaEnabled && !twoFaCode.trim()) {
+        if (twoFaEnabled && !grantRef.current && !twoFaCode.trim()) {
             toast.error(t("account.otp_empty_error"));
+            return;
+        }
+        if (!twoFaEnabled && !grantRef.current && !passwordInput.trim()) {
+            toast.error(t("terminal.session.reauth_password_prompt"));
             return;
         }
 
@@ -299,44 +338,96 @@ const ExecContent = () => {
         setResults([]);
         setTaskId(null);
 
+        const password = passwordInput;
+        const otp = twoFaCode;
+        setPasswordInput("");
+        setTwoFaCode("");
+
         try {
+            if (!grantRef.current || (grantExpiresAtRef.current && Date.now() >= grantExpiresAtRef.current)) {
+                grantRef.current = "";
+                const authorizeResponse = await fetch("/api/admin/client/remote/authorize", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                        scope: "exec",
+                        page_id: pageInstanceIdRef.current,
+                        password: twoFaEnabled ? undefined : password,
+                        otp: twoFaEnabled ? otp : undefined,
+                    }),
+                });
+                const authorizePayload = await authorizeResponse.json().catch(() => ({}));
+                if (!authorizeResponse.ok) {
+                    throw new Error(
+                        localizeRemoteError(
+                            authorizePayload?.message || `HTTP error! status: ${authorizeResponse.status}`,
+                            t,
+                        ),
+                    );
+                }
+                const nextGrant = authorizePayload?.data?.grant;
+                if (typeof nextGrant !== "string" || !nextGrant) {
+                    throw new Error(t("terminal.session.auth_failed"));
+                }
+                grantRef.current = nextGrant;
+                const expiresAt = Date.parse(String(authorizePayload?.data?.expires_at ?? ""));
+                grantExpiresAtRef.current = Number.isFinite(expiresAt) ? expiresAt : 0;
+            }
+            const usedGrant = grantRef.current;
+            grantRef.current = "";
             const response = await fetch("/api/admin/task/exec", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    // Remote exec treats whitespace as script content, so preserve the user's exact input.
                     command,
                     clients: selectedNodes,
-                    "2fa_code": twoFaCode,
+                    grant: usedGrant,
+                    page_id: pageInstanceIdRef.current,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                throw new Error(
+                    localizeRemoteError(
+                        errorData.message || `HTTP error! status: ${response.status}`,
+                        t,
+                    ),
+                );
             }
 
             const data: ExecResponse = await response.json();
+            const payload = data.data ?? data;
+            const rotatedGrant = data.data?.next_grant;
+            if (typeof rotatedGrant === "string" && rotatedGrant) {
+                grantRef.current = rotatedGrant;
+                const expiresAt = Date.parse(String(data.data?.expires_at ?? ""));
+                if (Number.isFinite(expiresAt)) {
+                    grantExpiresAtRef.current = expiresAt;
+                }
+            }
 
             if (data.success && data.task_id) {
                 setTaskId(data.task_id);
-                setTwoFaCode("");
                 toast.success(t("exec.taskStarted"));
                 startPolling(data.task_id);
-            } else if (data.status === "success" && data.data?.task_id) {
-                setTaskId(data.data.task_id);
-                setTwoFaCode("");
+            } else if (data.status === "success" && payload?.task_id) {
+                setTaskId(payload.task_id);
                 toast.success(t("exec.taskStarted"));
-                startPolling(data.data.task_id);
+                startPolling(payload.task_id);
             } else {
                 throw new Error(data.message);
             }
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : "未知错误";
-            toast.error(errorMessage);
+            grantRef.current = "";
+            const errorMessage = err instanceof Error ? err.message : t("common.error");
+            toast.error(localizeRemoteError(errorMessage, t));
         } finally {
+            setPasswordInput("");
+            setTwoFaCode("");
             setExecuting(false);
         }
     };
@@ -368,8 +459,8 @@ const ExecContent = () => {
         if (result.finished_at === null) {
             return { status: "running", color: "blue" as const, text: t("exec.status.running") };
         }
-        if (result.result === "执行超时") {
-            return { status: "timeout", color: "orange" as const, text: t("exec.status.timeout", "超时") };
+        if (isExecTimeoutResult(result.result)) {
+            return { status: "timeout", color: "orange" as const, text: t("exec.status.timeout") };
         }
         if (result.exit_code === 0) {
             return { status: "success", color: "green" as const, text: t("common.success") };
@@ -489,14 +580,18 @@ const ExecContent = () => {
                         <MuiTextField
                             size="small"
                             className="w-full sm:w-64"
-                            type="text"
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            aria-label={t("admin.nodeTable.twoFactorCode")}
-                            placeholder={t("admin.nodeTable.twoFactorCode")}
-                            value={twoFaCode}
-                            onChange={(e) => setTwoFaCode((e.target as HTMLInputElement).value.replace(/\D/g, "").slice(0, 6))}
-                            slotProps={{ htmlInput: { maxLength: 6 } }}
+                            type={twoFaEnabled ? "text" : "password"}
+                            inputMode={twoFaEnabled ? "numeric" : undefined}
+                            autoComplete={twoFaEnabled ? "one-time-code" : "current-password"}
+                            aria-label={twoFaEnabled ? t("admin.nodeTable.twoFactorCode") : t("terminal.session.reauth_password_prompt")}
+                            placeholder={twoFaEnabled ? t("admin.nodeTable.twoFactorCode") : t("login.password")}
+                            value={twoFaEnabled ? twoFaCode : passwordInput}
+                            onChange={(e) => {
+                                const value = (e.target as HTMLInputElement).value;
+                                if (twoFaEnabled) setTwoFaCode(value.replace(/\D/g, "").slice(0, 6));
+                                else setPasswordInput(value);
+                            }}
+                            slotProps={{ htmlInput: twoFaEnabled ? { maxLength: 6 } : undefined }}
                             sx={{
                                 "& .MuiOutlinedInput-root": {
                                     height: 40,
@@ -510,7 +605,7 @@ const ExecContent = () => {
                             disableElevation
                             className="w-full sm:w-auto"
                             onClick={executeCommand}
-                            disabled={executing || !command.trim() || selectedNodes.length === 0 || (twoFaEnabled && !twoFaCode.trim())}
+                            disabled={executing || !command.trim() || selectedNodes.length === 0 || (!grantRef.current && (twoFaEnabled ? !twoFaCode.trim() : !passwordInput.trim()))}
                             sx={{ minWidth: 120, height: 40, borderRadius: "8px", textTransform: "none", fontWeight: 600 }}
                         >
                             {executing ? (
@@ -536,7 +631,7 @@ const ExecContent = () => {
                             </h2>
                             {taskId && (
                                 <Text size="2" color="gray">
-                                    Task ID: {taskId}
+                                    {t("exec.task_id", { id: taskId })}
                                 </Text>
                             )}
                         </Flex>
@@ -582,7 +677,7 @@ const ExecContent = () => {
                                                     </Badge>
                                                     {result.exit_code !== null && (
                                                         <Text size="1" color="gray">
-                                                            Exit Code: {result.exit_code}
+                                                            {t("exec.exit_code", { code: result.exit_code })}
                                                         </Text>
                                                     )}
                                                 </Flex>
@@ -592,7 +687,7 @@ const ExecContent = () => {
                                                         variant="ghost"
                                                         size="1"
                                                         title={t("common.copy")}
-                                                        onClick={() => copyOutput(result.result)}
+                                                        onClick={() => copyOutput(localizeExecResult(result.result, t))}
                                                     >
                                                         <Copy size={14} />
                                                     </IconButton>
@@ -614,7 +709,7 @@ const ExecContent = () => {
                                             {/* 输出内容 */}
                                             {result.result && (
                                                 <div className="bg-[var(--gray-2)] rounded-md p-3 font-mono text-sm overflow-x-auto">
-                                                    <pre className="whitespace-pre-wrap">{result.result}</pre>
+                                                    <pre className="whitespace-pre-wrap">{localizeExecResult(result.result, t)}</pre>
                                                 </div>
                                             )}
                                         </Flex>
@@ -637,7 +732,7 @@ const ExecContent = () => {
                                 <Flex align="center" gap="2">
                                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
                                     <Text size="2" color="gray">
-                                        正在获取最新执行状态...
+                                        {t("exec.polling")}
                                     </Text>
                                 </Flex>
                                 <Button
@@ -645,7 +740,7 @@ const ExecContent = () => {
                                     size="1"
                                     onClick={clearPolling}
                                 >
-                                    停止轮询
+                                    {t("exec.stop_polling")}
                                 </Button>
                             </Flex>
                         )}

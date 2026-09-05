@@ -65,7 +65,7 @@ test("matches the server management order before filtering and pagination", () =
   );
 });
 
-test("normalizes missing addresses before rendering their unreported state", () => {
+test("normalizes missing addresses before rendering their empty state", () => {
   assert.equal(displayRemoteAddress(" 2001:db8::1 "), "2001:db8::1");
   assert.equal(displayRemoteAddress(""), "");
   assert.equal(displayRemoteAddress(undefined), "");
@@ -98,6 +98,7 @@ test("keeps the terminal portal aligned with the dashboard visual language", () 
   assert.match(pickerSource, /from "@mui\/material\/TextField"/);
   assert.equal(pickerSource.includes('t("terminal.ip_address")'), true);
   assert.equal(pickerSource.includes('t("terminal.address_unreported")'), true);
+  assert.match(pickerSource, /color: value \? undefined : "text.secondary"/);
   assert.match(pickerSource, /\["IPv4", ipv4\][\s\S]*\["IPv6", ipv6\]/);
   assert.equal(pickerSource.includes('t("terminal.copy_address"'), false);
   assert.equal(pickerSource.includes('role="button"'), true);

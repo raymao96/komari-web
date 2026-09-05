@@ -48,7 +48,6 @@ import { resolveI18nText, type I18nText } from "@/utils/i18nText";
 import { clearThemeNavigationCache } from "@/utils/themeCache";
 import {
   getInstalledThemesSnapshot,
-  prefetchInstalledThemes,
   refreshInstalledThemes,
 } from "@/lib/themeList";
 import {
@@ -436,7 +435,7 @@ const ThemePage = () => {
 
   // 同步活跃状态
   useEffect(() => {
-    prefetchInstalledThemes()
+    refreshInstalledThemes()
       .then((list) => setThemes(list as Theme[]))
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to fetch themes");
