@@ -197,7 +197,7 @@ export function isRemoteGrantLive(
 export function loadStoredRemoteGrant(scope: string): StoredRemoteGrant | null {
   purgeGrantFromWebStorage();
   const stored = memoryGrants[scope];
-  if (!isRemoteGrantLive(stored?.grant, stored?.expiresAt)) {
+  if (!stored || !isRemoteGrantLive(stored.grant, stored.expiresAt)) {
     if (stored) delete memoryGrants[scope];
     return null;
   }
