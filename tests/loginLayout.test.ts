@@ -174,3 +174,13 @@ test("admin shell can preview the self-update dialog from the URL", () => {
   assert.match(shellSource, /setUpdateDialogOpen\(true\)/);
   assert.match(shellSource, /setUpdateAvailable\(true\)/);
 });
+
+test("logout clears stored remote grants", () => {
+  const shellSource = readFileSync(
+    new URL("../src/components/admin/shell/useAdminShell.ts", import.meta.url),
+    "utf8",
+  );
+  const clear = shellSource.indexOf("clearStoredRemoteGrant()");
+  const logoutNav = shellSource.indexOf('window.open("/api/logout", "_self")');
+  assert.ok(clear >= 0 && logoutNav > clear);
+});

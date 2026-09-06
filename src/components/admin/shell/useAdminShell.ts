@@ -11,6 +11,7 @@ import type { MenuItem } from "@/types/menu";
 import { buildAdminMenuItems } from "@/utils/adminMenu";
 import { isSelfUpdatePreview } from "@/utils/guidePreview";
 import { fetchThemeManifest } from "@/utils/themeManifest";
+import { clearStoredRemoteGrant } from "@/utils/remoteSession";
 import {
   getThemeConfigurationType,
   normalizeThemeRedirectTarget,
@@ -454,5 +455,6 @@ export function useAdminShell() {
 }
 
 export function logout() {
+  clearStoredRemoteGrant();
   window.open("/api/logout", "_self");
 }

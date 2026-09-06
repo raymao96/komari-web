@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type KeyboardEvent } from "react";
 import Loading from "@/components/loading";
 import { NodeDetailsProvider, useNodeDetails } from "@/contexts/NodeDetailsContext";
 import { AdminNodeLiveDataProvider } from "@/hooks/use-admin-node-live-data";
@@ -19,8 +19,13 @@ import { toast } from "sonner";
 import RemoteExecNodeSelector from "@/components/remote/RemoteExecNodeSelector";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { RequireAllowRemoteManagement } from "@/components/admin/RemoteManagementGate";
-import { localizeRemoteError } from "@/utils/remoteSession";
-import { createRandomId } from "@/utils/randomId";
+import {
+    localizeRemoteError,
+    loadStoredRemoteGrant,
+    saveStoredRemoteGrant,
+    clearStoredRemoteGrant,
+    isRemoteGrantLive,
+} from "@/utils/remoteSession";
 import { localizeExecResult, isExecTimeoutResult } from "@/utils/execResult";
 import { useAccount } from "@/contexts/AccountContext";
 import {
@@ -123,8 +128,8 @@ const ExecContent = () => {
     const [twoFaCode, setTwoFaCode] = useState("");
     const twoFaEnabled = Boolean(account?.["2fa_enabled"]);
     const grantRef = useRef("");
-    const pageInstanceIdRef = useRef(createRandomId());
     const grantExpiresAtRef = useRef(0);
+    const [hasGrant, setHasGrant] = useState(() => Boolean(loadStoredRemoteGrant("exec")));
     const {
         page: resultPage,
         setPage: setResultPage,
@@ -140,25 +145,30 @@ const ExecContent = () => {
     const commandEditorRef = useRef<HTMLDivElement | null>(null);
     const commandLineGutterRef = useRef<HTMLDivElement | null>(null);
 
-    useEffect(() => {
-        const revoke = () => {
-            const currentGrant = grantRef.current;
-            if (!currentGrant) return;
-            grantRef.current = "";
-            void fetch("/api/admin/client/remote/revoke", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ grant: currentGrant }),
-                credentials: "same-origin",
-                keepalive: true,
-            }).catch(() => undefined);
-        };
-        window.addEventListener("pagehide", revoke);
-        return () => {
-            window.removeEventListener("pagehide", revoke);
-            revoke();
-        };
+    const clearExecGrant = useCallback(() => {
+        grantRef.current = "";
+        grantExpiresAtRef.current = 0;
+        clearStoredRemoteGrant("exec");
+        setHasGrant(false);
     }, []);
+
+    useEffect(() => {
+        const stored = loadStoredRemoteGrant("exec");
+        if (!stored) return;
+        grantRef.current = stored.grant;
+        grantExpiresAtRef.current = stored.expiresAt;
+        setHasGrant(true);
+    }, []);
+
+    useEffect(() => {
+        if (!hasGrant) return;
+        if (!grantExpiresAtRef.current) return;
+        const timer = window.setInterval(() => {
+            if (isRemoteGrantLive(grantRef.current, grantExpiresAtRef.current)) return;
+            clearExecGrant();
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [clearExecGrant, hasGrant]);
 
     const commandLineCount = useMemo(() => {
         return command === "" ? 1 : command.split("\n").length;
@@ -322,11 +332,13 @@ const ExecContent = () => {
             return;
         }
 
-        if (twoFaEnabled && !grantRef.current && !twoFaCode.trim()) {
+        const hasLiveGrant = isRemoteGrantLive(grantRef.current, grantExpiresAtRef.current);
+        if (!hasLiveGrant) clearExecGrant();
+        if (twoFaEnabled && !hasLiveGrant && !twoFaCode.trim()) {
             toast.error(t("account.otp_empty_error"));
             return;
         }
-        if (!twoFaEnabled && !grantRef.current && !passwordInput.trim()) {
+        if (!twoFaEnabled && !hasLiveGrant && !passwordInput.trim()) {
             toast.error(t("terminal.session.reauth_password_prompt"));
             return;
         }
@@ -344,7 +356,7 @@ const ExecContent = () => {
         setTwoFaCode("");
 
         try {
-            if (!grantRef.current || (grantExpiresAtRef.current && Date.now() >= grantExpiresAtRef.current)) {
+            if (!hasLiveGrant) {
                 grantRef.current = "";
                 const authorizeResponse = await fetch("/api/admin/client/remote/authorize", {
                     method: "POST",
@@ -352,8 +364,7 @@ const ExecContent = () => {
                     credentials: "same-origin",
                     body: JSON.stringify({
                         scope: "exec",
-                        page_id: pageInstanceIdRef.current,
-                        password: twoFaEnabled ? undefined : password,
+                        password: twoFaEnabled ? undefined : password || undefined,
                         otp: twoFaEnabled ? otp : undefined,
                     }),
                 });
@@ -373,6 +384,8 @@ const ExecContent = () => {
                 grantRef.current = nextGrant;
                 const expiresAt = Date.parse(String(authorizePayload?.data?.expires_at ?? ""));
                 grantExpiresAtRef.current = Number.isFinite(expiresAt) ? expiresAt : 0;
+                saveStoredRemoteGrant("exec", nextGrant, grantExpiresAtRef.current);
+                setHasGrant(true);
             }
             const usedGrant = grantRef.current;
             grantRef.current = "";
@@ -385,7 +398,6 @@ const ExecContent = () => {
                     command,
                     clients: selectedNodes,
                     grant: usedGrant,
-                    page_id: pageInstanceIdRef.current,
                 }),
             });
 
@@ -408,6 +420,8 @@ const ExecContent = () => {
                 if (Number.isFinite(expiresAt)) {
                     grantExpiresAtRef.current = expiresAt;
                 }
+                saveStoredRemoteGrant("exec", rotatedGrant, grantExpiresAtRef.current);
+                setHasGrant(true);
             }
 
             if (data.success && data.task_id) {
@@ -422,7 +436,7 @@ const ExecContent = () => {
                 throw new Error(data.message);
             }
         } catch (err) {
-            grantRef.current = "";
+            clearExecGrant();
             const errorMessage = err instanceof Error ? err.message : t("common.error");
             toast.error(localizeRemoteError(errorMessage, t));
         } finally {
@@ -605,7 +619,7 @@ const ExecContent = () => {
                             disableElevation
                             className="w-full sm:w-auto"
                             onClick={executeCommand}
-                            disabled={executing || !command.trim() || selectedNodes.length === 0 || (!grantRef.current && (twoFaEnabled ? !twoFaCode.trim() : !passwordInput.trim()))}
+                            disabled={executing || !command.trim() || selectedNodes.length === 0 || (!hasGrant && (twoFaEnabled ? !twoFaCode.trim() : !passwordInput.trim()))}
                             sx={{ minWidth: 120, height: 40, borderRadius: "8px", textTransform: "none", fontWeight: 600 }}
                         >
                             {executing ? (

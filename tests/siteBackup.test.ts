@@ -52,12 +52,17 @@ test("node list region filter uses country/region wording", () => {
   assert.equal(locales.ja.admin.nodeTable.region, "国/地域");
 });
 
-test("auto discovery help opens the dedicated agent guide", () => {
-  assert.match(
-    generalSource,
-    /https:\/\/nuomiiiii\.github\.io\/komari-document\/install\/agent-ad["']/,
-  );
-  assert.doesNotMatch(generalSource, /agent-ad\.html/);
+test("general settings no longer expose auto-discovery", () => {
+  assert.doesNotMatch(generalSource, /auto[_-]?discovery/i);
+  assert.doesNotMatch(generalSource, /agent-ad/);
+  assert.doesNotMatch(source, /auto[_-]?discovery/i);
+  for (const locale of Object.values(locales)) {
+    const blob = JSON.stringify(locale);
+    assert.doesNotMatch(blob, /auto[_-]?discovery/i);
+    assert.doesNotMatch(blob, /自动发现/);
+    assert.doesNotMatch(blob, /自動發現/);
+    assert.doesNotMatch(blob, /自動発見/);
+  }
 });
 
 test("global pagination is wired into shared and server-backed admin lists", () => {

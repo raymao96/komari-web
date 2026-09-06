@@ -44,6 +44,18 @@ test("remote management sits beside GeoIP under general settings", () => {
   );
 });
 
+test("remote management pages stop immediately when the site switch is turned off", () => {
+  const apiSource = readFileSync("src/lib/api.ts", "utf8");
+  const syncSource = readFileSync("src/utils/adminSettingsSync.ts", "utf8");
+  assert.match(apiSource, /notifyAdminSettingsChanged\(\)/);
+  assert.match(apiSource, /subscribeAdminSettingsChanged/);
+  assert.doesNotMatch(syncSource, /lite\.remote-grant/);
+  assert.doesNotMatch(syncSource, /setItem\(ADMIN_SETTINGS_SYNC_KEY, .*grant/);
+  assert.match(gateSource, /clearStoredRemoteGrant\(\)/);
+  assert.match(gateSource, /setInterval\(refresh, 2_000\)/);
+  assert.match(gateSource, /visibilitychange/);
+});
+
 test("the remote switch writes back into settings so leaving the page keeps the new value", () => {
   assert.match(
     generalSource,

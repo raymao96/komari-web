@@ -2,6 +2,10 @@ import React from "react";
 import { toast } from "sonner";
 import { useOptionalAccount } from "@/contexts/AccountContext";
 import { planAdminSettingsFetch } from "@/utils/adminAuth";
+import {
+  notifyAdminSettingsChanged,
+  subscribeAdminSettingsChanged,
+} from "@/utils/adminSettingsSync";
 import { sameOriginApiPath, sameOriginFetchInit } from "@/utils/security";
 
 /**
@@ -131,6 +135,7 @@ export async function updateSettings(
     console.error("Failed to update settings:", message);
     throw new Error(message);
   }
+  notifyAdminSettingsChanged();
 }
 export async function updateSettingsWithToast(
   settings: Partial<SettingsResponse>,
@@ -253,6 +258,10 @@ function useSettingsController() {
     setSettings(data);
     setError(null);
   }, []);
+
+  React.useEffect(() => subscribeAdminSettingsChanged(() => {
+    void refetch().catch(() => undefined);
+  }), [refetch]);
 
   return {
     settings,

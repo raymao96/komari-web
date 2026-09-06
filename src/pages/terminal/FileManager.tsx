@@ -38,6 +38,10 @@ import { formatBytes } from "@/utils/unitHelper";
 import { createRandomId } from "@/utils/randomId";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import {
+  fileRootChoices,
+  selectedRootValue,
+} from "./fileManagerPath";
 
 export type FileEntry = {
   name: string;
@@ -160,6 +164,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   const pending = useRef(new Map<string, PendingRequest>());
   const downloads = useRef(new Map<string, DownloadState>());
   const [roots, setRoots] = useState<string[]>([]);
+  const [homePath, setHomePath] = useState("");
   const [separator, setSeparator] = useState("/");
   const [currentPath, setCurrentPath] = useState("");
   const [parentPath, setParentPath] = useState("");
@@ -281,9 +286,11 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       }
     },
     initialize(nextRoots, home, nextSeparator) {
+      const nextHome = home || nextRoots[0] || "";
       setRoots(nextRoots);
+      setHomePath(nextHome);
       setSeparator(nextSeparator || "/");
-      void load(home || nextRoots[0]);
+      void load(nextHome);
     },
     refresh() {
       void load();
@@ -323,6 +330,11 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   );
   const selectedEntries = entries.filter((entry) => selected.has(entry.path));
   const actionableEntries = selectedEntries.filter((entry) => !entry.protected);
+  const rootChoices = useMemo(
+    () => fileRootChoices(roots, homePath, separator, t("terminal.files.root")),
+    [roots, homePath, separator, t],
+  );
+  const selectedRoot = selectedRootValue(currentPath, rootChoices, separator);
 
   const toggleSelected = (entry: FileEntry) => {
     if (entry.protected) return;
@@ -657,9 +669,22 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         <IconButton size="1" variant="soft" title={t("terminal.files.parent")} disabled={!parentPath} onClick={() => void load(parentPath)}>
           <ArrowUp size={15} />
         </IconButton>
-        <select disabled={!connected} value={roots.includes(currentPath) ? currentPath : ""} onChange={(event) => event.target.value && void load(event.target.value)} title={t("terminal.files.roots")}>
-          <option value="">{t("terminal.files.root")}</option>
-          {roots.map((root) => <option key={root} value={root}>{root}</option>)}
+        <select
+          disabled={!connected}
+          value={selectedRoot}
+          onChange={(event) => {
+            if (event.target.value) void load(event.target.value);
+          }}
+          title={t("terminal.files.roots")}
+        >
+          {selectedRoot === "" && (
+            <option value="" disabled>
+              {t("terminal.files.roots")}
+            </option>
+          )}
+          {rootChoices.map((choice) => (
+            <option key={choice.value} value={choice.value}>{choice.label}</option>
+          ))}
         </select>
         <TextField.Root
           size="1"

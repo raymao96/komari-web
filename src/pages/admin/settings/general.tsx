@@ -3,7 +3,6 @@ import { Button, Code, Flex, Text, TextField } from "@/components/admin/ui";
 import {
   updateSettingsWithToast,
   useSettings,
-  type SettingsResponse,
 } from "@/lib/api";
 import {
   SettingCardButton,
@@ -51,7 +50,7 @@ export default function GeneralSettings() {
       <AdminPageTitle
         description={t(
           "settings.general.page_description",
-          "配置自动发现、GeoIP 与其他全局行为。",
+          "配置 GeoIP 与其他全局行为。",
         )}
       >
         {t("settings.general.title")}
@@ -104,10 +103,6 @@ export default function GeneralSettings() {
           }}
         />
       </div>
-      <SettingCardLabel>
-        {t("settings.general.auto_discovery")}
-      </SettingCardLabel>
-      <ApiCard settings={settings} />
       <SettingCardLabel>{t("settings.geoip.title")}</SettingCardLabel>
       <SettingCardSwitch
         title={t("settings.geoip.enable_title")}
@@ -201,74 +196,3 @@ export default function GeneralSettings() {
     </>
   );
 }
-
-const ApiCard = ({ settings }: { settings: SettingsResponse }) => {
-
-  //const { settings } = useSettings();
-  const { t } = useTranslation();
-  const [apiValues, setApiValues] = React.useState<string>(
-    settings?.auto_discovery_key || ""
-  );
-
-  // 生成32位随机字符串
-  const generateRandomString = () => {
-    const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < 24; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
-  // 处理生成按钮点击
-  const handleGenerateApiKey = () => {
-    const newApiKey = generateRandomString();
-    setApiValues(newApiKey);
-  };
-
-  // 初始化API值
-  React.useEffect(() => {
-    if (settings?.auto_discovery_key) {
-      setApiValues(settings.auto_discovery_key);
-    }
-  }, [settings?.auto_discovery_key]);
-
-  return (
-    <SettingCardShortTextInput
-      title={t("settings.general.auto_discovery_key")}
-      description={t("settings.general.auto_discovery_key_description")}
-      value={apiValues}
-      onChange={(e) => setApiValues(e.target.value)}
-      OnSave={async (values) => {
-        if (!values) {
-          await updateSettingsWithToast({ auto_discovery_key: "" }, t);
-          return;
-        }
-        if (values.length < 12) {
-          toast.error(t("settings.api.key_length_error"));
-          return;
-        }
-        await updateSettingsWithToast({ auto_discovery_key: values }, t);
-      }}
-    >
-      <div className="flex flex-row gap-2 justify-start items-center">
-        <Button variant="soft" color="green" onClick={handleGenerateApiKey}>
-          {t("common.generate")}
-        </Button>
-        <Button
-          variant="soft"
-          color="mint"
-          onClick={() => {
-            window.open(
-              "https://nuomiiiii.github.io/komari-document/install/agent-ad",
-              "_blank"
-            );
-          }}
-        >
-          {t("common.help")}
-        </Button>
-      </div>
-    </SettingCardShortTextInput>
-  );
-};

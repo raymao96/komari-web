@@ -186,13 +186,6 @@
       "addNode": "ノードを追加",
       "agent": "Agent",
       "allNodes": "すべてのノード",
-      "autoDiscovery": {
-        "disabledDescription": "自動検出を有効にすると、ノードを1台ずつ手動で追加する必要がなくなります。対象サーバーでコマンドを1つ実行するだけで、Agent がキーを使って自動的に登録・オンライン化されます。多数のサーバーを一括展開する場合に最適です。",
-        "enabledDescription": "対象サーバーで以下のコマンドを実行すると、Agent が自動的に登録・オンライン化されます。手動でのノード作成は不要です。",
-        "goToSettings": "「一般設定」へ移動して自動検出を有効化",
-        "title": "自動検出",
-        "tryIt": "自動検出を試す"
-      },
       "autoRenewal": "自動更新",
       "autoRenewalDescription": "サーバーが期限切れで現在オンラインの場合、Liteは期限を次の自然月（年）に自動的に設定します。",
       "billing": "請求書",
@@ -212,6 +205,8 @@
       "currency": "通貨",
       "currencyTips": "¥-人民元、$-米ドル、€-ユーロ、£-ポンド、₽-ルーブル、₣-フラン、₹-ルピー、₫-ベトナムドン、฿-バーツ、C$-カナダドル",
       "customColumns": "カスタム列",
+      "deleteFailed": "削除に失敗しました：{{error}}",
+      "deleteSuccess": "{{name}} を削除しました",
       "deleting": "削除中...",
       "deliveryApplied": "適用済み",
       "deliveryAppliedHint": "Agent が設定の適用を確認しました",
@@ -233,7 +228,7 @@
       "dragToReorder": "長押ししてドラッグで再配置",
       "editNodePrice": "請求書を編集",
       "emptyGuide": {
-        "description": "右上の「ノードを追加」をクリックして開始するか、自動検出を有効にしてサーバーを一括登録してください。",
+        "description": "右上の「ノードを追加」をクリックして開始してください。",
         "title": "まだサーバーがありません"
       },
       "enableGpuMonitoring": "詳細な GPU 監視を有効にする",
@@ -1740,12 +1735,9 @@
       "allow_remote_management_go_enable": "設定を開く",
       "allow_remote_management_required_description": "このサイトではリモート管理がオフです。先に有効にしてください。",
       "allow_remote_management_required_title": "リモート管理を有効にしてください",
-      "auto_discovery": "自動検出",
-      "auto_discovery_key": "自動検出キー",
-      "auto_discovery_key_description": "自動検出を使用すると、クライアントを一括登録できます。空白の場合、自動検出は無効になります。",
       "auto_order_new_clients": "新規サーバーの自動並び替え",
       "auto_order_new_clients_description": "オンにすると、新規サーバーが初めて報告され国/地域を識別したとき、同じグループ・同じ国/地域の最後のサーバーの後ろに自動で並びます。どのサーバーにもグループがない場合も、国/地域による並び替えは行われます。同じグループ・同じ国/地域の対象がない場合は、作成時の位置のままです。この機能をオンにしても既存サーバーの並びは変わりません。",
-      "page_description": "自動検出、GeoIP、その他の全体動作を設定します。",
+      "page_description": "GeoIP とその他の全体動作を設定します。",
       "title": "一般"
     },
     "geoip": {
