@@ -6,7 +6,8 @@ import {
   IOS_THIRD_PARTY_BROWSER,
   iosStatusBarFallbackPx,
   isIOSSafariTab,
-  looksLikeFullBleedViewport,
+  looksLikeStatusBarOverlay,
+  resolveIosSafeAreaTopPx,
 } from "../src/utils/safeArea.ts";
 
 const iphoneSafari =
@@ -32,12 +33,51 @@ test("locks safe-area padding only for iOS Safari browser tabs", () => {
   assert.equal(IOS_THIRD_PARTY_BROWSER.test(iphoneQuark), true);
 });
 
-test("uses Dynamic Island, notch, or classic status-bar fallbacks", () => {
+test("uses Dynamic Island fallback when iOS 18 Chrome reports no env inset", () => {
   assert.equal(iosStatusBarFallbackPx(393, 852), 59);
   assert.equal(iosStatusBarFallbackPx(390, 844), 47);
   assert.equal(iosStatusBarFallbackPx(375, 667), 20);
-  assert.equal(looksLikeFullBleedViewport(809, 852), true);
-  assert.equal(looksLikeFullBleedViewport(670, 852), false);
+  assert.equal(looksLikeStatusBarOverlay(809, 852), true);
+  assert.equal(looksLikeStatusBarOverlay(670, 852), false);
+  assert.equal(
+    resolveIosSafeAreaTopPx({
+      isIOS: true,
+      isSafariTab: false,
+      isThirdParty: true,
+      isStandalone: false,
+      measuredTop: 0,
+      innerHeight: 720,
+      screenWidth: 393,
+      screenHeight: 852,
+    }),
+    59,
+  );
+  assert.equal(
+    resolveIosSafeAreaTopPx({
+      isIOS: true,
+      isSafariTab: true,
+      isThirdParty: false,
+      isStandalone: false,
+      measuredTop: 0,
+      innerHeight: 670,
+      screenWidth: 393,
+      screenHeight: 852,
+    }),
+    null,
+  );
+  assert.equal(
+    resolveIosSafeAreaTopPx({
+      isIOS: true,
+      isSafariTab: true,
+      isThirdParty: false,
+      isStandalone: false,
+      measuredTop: 0,
+      innerHeight: 809,
+      screenWidth: 393,
+      screenHeight: 852,
+    }),
+    59,
+  );
 });
 
 test("admin chrome reads safe-area env outside Safari tabs", () => {
@@ -46,6 +86,7 @@ test("admin chrome reads safe-area env outside Safari tabs", () => {
   const main = readFileSync(new URL("../src/main.tsx", import.meta.url), "utf8");
   assert.match(html, /lite-safari-tab/);
   assert.match(html, IOS_THIRD_PARTY_BROWSER);
+  assert.match(html, /setProperty\("--safe-area-top"/);
   assert.match(css, /--safe-area-top: env\(safe-area-inset-top, 0px\)/);
   assert.match(css, /html\.lite-safari-tab/);
   assert.doesNotMatch(css, /display-mode: standalone/);

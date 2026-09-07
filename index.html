@@ -48,6 +48,11 @@
         const safariTab = iOS && /Safari/i.test(ua) && !thirdParty && !standalone;
         document.documentElement.classList.toggle("lite-standalone", Boolean(standalone));
         document.documentElement.classList.toggle("lite-safari-tab", Boolean(safariTab));
+        if (iOS && (standalone || thirdParty)) {
+          const long = Math.max(screen.width || 0, screen.height || 0);
+          const top = long >= 852 ? 59 : long >= 812 ? 47 : 20;
+          document.documentElement.style.setProperty("--safe-area-top", top + "px");
+        }
       })();
     </script>
     <style>

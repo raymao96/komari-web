@@ -41,8 +41,36 @@ export function iosStatusBarFallbackPx(screenWidth: number, screenHeight: number
   return 20;
 }
 
-export function looksLikeFullBleedViewport(innerHeight: number, screenHeight: number) {
-  return screenHeight > 0 && innerHeight / screenHeight >= 0.88;
+export function looksLikeStatusBarOverlay(innerHeight: number, screenHeight: number) {
+  return screenHeight > 0 && innerHeight / screenHeight >= 0.8;
+}
+
+export function shouldApplyIosStatusBarInset(input: {
+  isIOS: boolean;
+  isSafariTab: boolean;
+  isThirdParty: boolean;
+  isStandalone: boolean;
+  innerHeight: number;
+  screenHeight: number;
+}) {
+  if (!input.isIOS) return false;
+  if (input.isStandalone || input.isThirdParty || !input.isSafariTab) return true;
+  return looksLikeStatusBarOverlay(input.innerHeight, input.screenHeight);
+}
+
+export function resolveIosSafeAreaTopPx(input: {
+  isIOS: boolean;
+  isSafariTab: boolean;
+  isThirdParty: boolean;
+  isStandalone: boolean;
+  measuredTop: number;
+  innerHeight: number;
+  screenWidth: number;
+  screenHeight: number;
+}) {
+  if (!shouldApplyIosStatusBarInset(input)) return null;
+  if (input.measuredTop > 0) return Math.round(input.measuredTop);
+  return iosStatusBarFallbackPx(input.screenWidth, input.screenHeight);
 }
 
 function readCurrentRuntime(): SafeAreaRuntime {
@@ -58,39 +86,69 @@ function readCurrentRuntime(): SafeAreaRuntime {
 
 function measureInset(side: "top" | "bottom") {
   const probe = document.createElement("div");
-  probe.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;padding-${side}:env(safe-area-inset-${side}, 0px)`;
-  document.documentElement.appendChild(probe);
+  probe.style.cssText = [
+    "position:fixed",
+    "top:0",
+    "left:0",
+    "width:0",
+    "height:0",
+    "visibility:hidden",
+    "pointer-events:none",
+    `padding-${side}:env(safe-area-inset-${side}, 0px)`,
+  ].join(";");
+  (document.body ?? document.documentElement).appendChild(probe);
+  void probe.offsetHeight;
   const value =
-    Number.parseFloat(getComputedStyle(probe).getPropertyValue(`padding-${side}`)) || 0;
+    Number.parseFloat(
+      getComputedStyle(probe).getPropertyValue(side === "top" ? "padding-top" : "padding-bottom"),
+    ) || 0;
   probe.remove();
   return value;
 }
 
 export function syncIosSafeArea(root = document.documentElement) {
   const runtime = readCurrentRuntime();
-  const safariTab = isIOSSafariTab(runtime);
-  root.classList.toggle("lite-standalone", isStandaloneDisplay(runtime));
-  root.classList.toggle("lite-safari-tab", safariTab);
-  if (safariTab || !isIOSDevice(runtime)) {
+  const isIOS = isIOSDevice(runtime);
+  const isThirdParty = IOS_THIRD_PARTY_BROWSER.test(runtime.userAgent || "");
+  const isStandalone = isStandaloneDisplay(runtime);
+  const isSafariTab = isIOSSafariTab(runtime);
+  const apply = shouldApplyIosStatusBarInset({
+    isIOS,
+    isSafariTab,
+    isThirdParty,
+    isStandalone,
+    innerHeight: window.innerHeight,
+    screenHeight: window.screen.height,
+  });
+
+  root.classList.toggle("lite-standalone", isStandalone);
+  root.classList.toggle("lite-safari-tab", isSafariTab && !apply);
+
+  if (!apply) {
     root.style.removeProperty("--safe-area-top");
     root.style.removeProperty("--safe-area-bottom");
     return;
   }
 
-  const fullBleed = looksLikeFullBleedViewport(window.innerHeight, window.screen.height);
-  if (measureInset("top") > 0 || !fullBleed) {
-    root.style.removeProperty("--safe-area-top");
-  } else {
-    root.style.setProperty(
-      "--safe-area-top",
-      `${iosStatusBarFallbackPx(window.screen.width, window.screen.height)}px`,
-    );
-  }
+  const top = resolveIosSafeAreaTopPx({
+    isIOS,
+    isSafariTab,
+    isThirdParty,
+    isStandalone,
+    measuredTop: measureInset("top"),
+    innerHeight: window.innerHeight,
+    screenWidth: window.screen.width,
+    screenHeight: window.screen.height,
+  });
+  if (top != null) root.style.setProperty("--safe-area-top", `${top}px`);
 
-  if (measureInset("bottom") > 0 || !fullBleed) {
-    root.style.removeProperty("--safe-area-bottom");
-  } else if (Math.max(window.screen.width, window.screen.height) >= 812) {
+  const bottom = measureInset("bottom");
+  if (bottom > 0) {
+    root.style.setProperty("--safe-area-bottom", `${Math.round(bottom)}px`);
+  } else if (isStandalone && Math.max(window.screen.width, window.screen.height) >= 812) {
     root.style.setProperty("--safe-area-bottom", "34px");
+  } else {
+    root.style.removeProperty("--safe-area-bottom");
   }
 }
 
@@ -101,8 +159,10 @@ export function installIosSafeAreaSync() {
   installed = true;
   const run = () => syncIosSafeArea();
   run();
+  window.requestAnimationFrame(run);
   window.addEventListener("orientationchange", run);
   window.addEventListener("resize", run);
   window.visualViewport?.addEventListener("resize", run);
   window.addEventListener("pageshow", run);
+  [50, 200, 800].forEach((delay) => window.setTimeout(run, delay));
 }
