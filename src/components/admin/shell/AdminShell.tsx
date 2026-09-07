@@ -11,10 +11,6 @@ import { useAdminScrollRestore } from "@/hooks/useAdminScrollRestore";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { syncSubMenuForLocation, toggleSingleSubMenu } from "@/utils/adminMenu";
 import {
-  lockAdminDocumentScroll,
-  unlockAdminDocumentScroll,
-} from "@/utils/adminDocumentScroll";
-import {
   desktopNavWidth,
   readDesktopNavMini,
   writeDesktopNavMini,
@@ -56,12 +52,6 @@ export default function AdminShell({ content }: AdminShellProps) {
       syncSubMenuForLocation(current, shell.menuItems, location.pathname),
     );
   }, [location.pathname, shell.menuItems]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    lockAdminDocumentScroll(root);
-    return () => unlockAdminDocumentScroll(root);
-  }, []);
 
   useEffect(() => {
     const root = document.querySelector<HTMLElement>("[data-admin-shell]");

@@ -33,61 +33,11 @@
         } catch {
           document.documentElement.classList.remove("dark");
         }
-        const ua = navigator.userAgent || "";
-        const root = document.documentElement;
-        const isIPhone = /iP(hone|od)/.test(ua);
         const standalone =
           window.matchMedia?.("(display-mode: standalone)").matches ||
           window.matchMedia?.("(display-mode: fullscreen)").matches ||
-          window.matchMedia?.("(display-mode: minimal-ui)").matches ||
           window.navigator.standalone === true;
-        const nativeSafariTab =
-          isIPhone &&
-          !standalone &&
-          /Version\/[\d.]+ Mobile\/[A-Za-z0-9]+ Safari\/[\d.]+$/.test(ua);
-        let measuredTop = 0;
-        if (nativeSafariTab) {
-          const probe = document.createElement("div");
-          probe.style.cssText =
-            "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top, 0px)";
-          root.appendChild(probe);
-          measuredTop = Number.parseFloat(getComputedStyle(probe).paddingTop) || 0;
-          probe.remove();
-        }
-        const mode = !isIPhone
-          ? "none"
-          : standalone
-            ? "standalone"
-            : nativeSafariTab && measuredTop <= 0
-              ? "safari-tab"
-              : "ios-overlay";
-        root.classList.toggle("lite-safari-tab", mode === "safari-tab");
-        root.classList.toggle(
-          "lite-ios-overlay",
-          mode === "ios-overlay" || mode === "standalone",
-        );
-        root.classList.toggle("lite-standalone", mode === "standalone");
-        root.setAttribute("data-lite-ios-mode", mode);
-        if (mode === "ios-overlay" || mode === "standalone") {
-          const type = screen.orientation?.type || "";
-          const landscape =
-            type.startsWith("landscape") ||
-            (!type.startsWith("portrait") &&
-              (typeof window.orientation === "number"
-                ? Math.abs(window.orientation) === 90
-                : window.innerWidth > window.innerHeight));
-          const long = Math.max(screen.width || 0, screen.height || 0);
-          const fallback = landscape
-            ? 0
-            : long < 812
-              ? 20
-              : long === 896 || long === 926
-                ? 47
-                : long >= 852
-                  ? 59
-                  : 47;
-          root.style.setProperty("--ios-status-bar-fallback", fallback + "px");
-        }
+        document.documentElement.classList.toggle("lite-standalone", Boolean(standalone));
       })();
     </script>
     <style>
