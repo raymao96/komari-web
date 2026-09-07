@@ -151,6 +151,7 @@ test("login and admin chrome adapt to compact viewports", () => {
   assert.match(html, /lite-standalone/);
   assert.match(html, /lite-safari-tab/);
   assert.match(html, /lite-ios-overlay/);
+  assert.match(html, /display-mode: minimal-ui/);
   assert.match(html, /apple-mobile-web-app-status-bar-style" content="black-translucent"/);
   assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png/);
   assert.match(globalStyles, /html\.lite-safari-tab/);

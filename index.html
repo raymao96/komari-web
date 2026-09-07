@@ -39,16 +39,26 @@
         const standalone =
           window.matchMedia?.("(display-mode: standalone)").matches ||
           window.matchMedia?.("(display-mode: fullscreen)").matches ||
+          window.matchMedia?.("(display-mode: minimal-ui)").matches ||
           window.navigator.standalone === true;
         const nativeSafariTab =
           isIPhone &&
           !standalone &&
           /Version\/[\d.]+ Mobile\/[A-Za-z0-9]+ Safari\/[\d.]+$/.test(ua);
+        let measuredTop = 0;
+        if (nativeSafariTab) {
+          const probe = document.createElement("div");
+          probe.style.cssText =
+            "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top, 0px)";
+          root.appendChild(probe);
+          measuredTop = Number.parseFloat(getComputedStyle(probe).paddingTop) || 0;
+          probe.remove();
+        }
         const mode = !isIPhone
           ? "none"
           : standalone
             ? "standalone"
-            : nativeSafariTab
+            : nativeSafariTab && measuredTop <= 0
               ? "safari-tab"
               : "ios-overlay";
         root.classList.toggle("lite-safari-tab", mode === "safari-tab");

@@ -143,13 +143,17 @@ test("identifies a native iPhone Safari tab and does not add extra top inset", (
   assert.equal(root.styleMap["--safe-area-top"], undefined);
 });
 
-test("Safari standalone and PWA enter overlay mode", () => {
+test("Safari standalone, minimal-ui and PWA enter overlay mode", () => {
   assert.equal(
     classifyIosBrowseMode({ userAgent: iphoneSafari, standalone: true }),
     "standalone",
   );
   assert.equal(
     classifyIosBrowseMode({ userAgent: iphoneSafari, displayStandalone: true }),
+    "standalone",
+  );
+  assert.equal(
+    classifyIosBrowseMode({ userAgent: iphoneSafari, displayMinimalUi: true }),
     "standalone",
   );
   const root = mockRoot();
@@ -163,6 +167,82 @@ test("Safari standalone and PWA enter overlay mode", () => {
   assert.equal(root.classes.has("lite-ios-overlay"), true);
   assert.equal(root.classes.has("lite-safari-tab"), false);
   assert.equal(root.styleMap["--ios-status-bar-fallback"], "59px");
+});
+
+test("Safari home screen with a reported inset is overlay even without standalone", () => {
+  const runtime: SafeAreaRuntime = { userAgent: iphoneSafari, measuredTop: 59 };
+  assert.equal(classifyIosBrowseMode(runtime), "safari-tab");
+  assert.equal(
+    classifyIosBrowseMode(runtime, { useMeasuredTop: true }),
+    "ios-overlay",
+  );
+  const root = mockRoot();
+  const mode = syncIosSafeAreaFromRuntime(
+    root,
+    runtime,
+    { isLandscape: false, screenWidth: 393, screenHeight: 852 },
+    { reclassify: true, useMeasuredTop: true },
+  );
+  assert.equal(mode, "ios-overlay");
+  assert.equal(root.classes.has("lite-ios-overlay"), true);
+  assert.equal(root.classes.has("lite-safari-tab"), false);
+  assert.equal(root.styleMap["--ios-status-bar-fallback"], "59px");
+});
+
+test("a locked Safari tab can upgrade to home-screen overlay but not from later env or swipe", () => {
+  const root = mockRoot();
+  syncIosSafeAreaFromRuntime(
+    root,
+    { userAgent: iphoneSafari, measuredTop: 0 },
+    { isLandscape: false, screenWidth: 393, screenHeight: 852, innerHeight: 720 },
+    { reclassify: true },
+  );
+  assert.equal(root.getAttribute("data-lite-ios-mode"), "safari-tab");
+
+  const afterSwipe = syncIosSafeAreaFromRuntime(
+    root,
+    { userAgent: iphoneSafari, measuredTop: 59 },
+    { isLandscape: false, screenWidth: 393, screenHeight: 852, innerHeight: 809 },
+    { reclassify: false, allowUpgrade: true },
+  );
+  assert.equal(afterSwipe, "safari-tab");
+  assert.equal(root.classes.has("lite-safari-tab"), true);
+
+  const afterMeasuredInset = syncIosSafeAreaFromRuntime(
+    root,
+    { userAgent: iphoneSafari, measuredTop: 59 },
+    { isLandscape: false, screenWidth: 393, screenHeight: 852 },
+    { reclassify: false, allowUpgrade: true, useMeasuredTop: true },
+  );
+  assert.equal(afterMeasuredInset, "ios-overlay");
+  assert.equal(root.classes.has("lite-ios-overlay"), true);
+  assert.equal(root.classes.has("lite-safari-tab"), false);
+
+  syncIosSafeAreaFromRuntime(
+    root,
+    { userAgent: iphoneSafari },
+    { isLandscape: false, screenWidth: 393, screenHeight: 852 },
+    { reclassify: true },
+  );
+  assert.equal(root.getAttribute("data-lite-ios-mode"), "safari-tab");
+
+  const afterStandalone = syncIosSafeAreaFromRuntime(
+    root,
+    { userAgent: iphoneSafari, standalone: true },
+    { isLandscape: false, screenWidth: 393, screenHeight: 852 },
+    { reclassify: false, allowUpgrade: true },
+  );
+  assert.equal(afterStandalone, "standalone");
+  assert.equal(root.classes.has("lite-ios-overlay"), true);
+  assert.equal(root.classes.has("lite-safari-tab"), false);
+
+  const afterToolbar = syncIosSafeAreaFromRuntime(
+    root,
+    { userAgent: iphoneSafari, measuredTop: 0 },
+    { isLandscape: false, screenWidth: 393, screenHeight: 852, innerHeight: 670 },
+    { reclassify: false, allowUpgrade: true },
+  );
+  assert.equal(afterToolbar, "standalone");
 });
 
 test("Chrome, Firefox, Edge and Quark are not native Safari", () => {
@@ -359,6 +439,10 @@ test("third-party UA denylist and overlay-height heuristic are gone", () => {
   assert.doesNotMatch(html, /CriOS\|FxiOS\|EdgiOS/);
   assert.doesNotMatch(safeAreaSource, /visualViewport/);
   assert.doesNotMatch(html, /setProperty\("--safe-area-top"/);
+  assert.match(html, /display-mode: minimal-ui/);
+  assert.match(safeAreaSource, /display-mode: minimal-ui/);
+  assert.match(html, /padding-top:env\(safe-area-inset-top, 0px\)/);
+  assert.match(safeAreaSource, /allowUpgrade/);
   assert.match(html, /Version\\\/\[\\d\.\]\+ Mobile\\\/\[A-Za-z0-9\]\+ Safari\\\/\[\\d\.\]\+\$/);
   assert.match(
     safeAreaSource,

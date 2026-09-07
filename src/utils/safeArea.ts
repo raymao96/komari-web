@@ -13,6 +13,8 @@ export type SafeAreaRuntime = {
   standalone?: boolean;
   displayStandalone?: boolean;
   displayFullscreen?: boolean;
+  displayMinimalUi?: boolean;
+  measuredTop?: number;
 };
 
 export type IosOrientationInput = {
@@ -44,6 +46,12 @@ export type SafeAreaRoot = {
   };
 };
 
+export type SyncIosSafeAreaOptions = {
+  reclassify?: boolean;
+  allowUpgrade?: boolean;
+  useMeasuredTop?: boolean;
+};
+
 export function isIPhoneDevice(
   runtime: Pick<SafeAreaRuntime, "userAgent">,
 ) {
@@ -67,7 +75,10 @@ export function isIOSDevice(
 
 export function isStandaloneDisplay(runtime: SafeAreaRuntime) {
   return Boolean(
-    runtime.standalone || runtime.displayStandalone || runtime.displayFullscreen,
+    runtime.standalone ||
+      runtime.displayStandalone ||
+      runtime.displayFullscreen ||
+      runtime.displayMinimalUi,
   );
 }
 
@@ -79,11 +90,21 @@ export function isNativeIosSafariTab(runtime: SafeAreaRuntime) {
 
 export function classifyIosBrowseMode(
   runtime: SafeAreaRuntime,
+  options?: { useMeasuredTop?: boolean },
 ): IosBrowseMode | null {
   if (!isIPhoneDevice(runtime)) return null;
   if (isStandaloneDisplay(runtime)) return "standalone";
-  if (isNativeIosSafariTab(runtime)) return "safari-tab";
+  if (isNativeIosSafariTab(runtime)) {
+    if (options?.useMeasuredTop && (runtime.measuredTop ?? 0) > 0) {
+      return "ios-overlay";
+    }
+    return "safari-tab";
+  }
   return "ios-overlay";
+}
+
+function isOverlayLike(mode: IosBrowseMode | null) {
+  return mode === "ios-overlay" || mode === "standalone";
 }
 
 export function isLandscapeOrientation(input: IosOrientationInput) {
@@ -123,19 +144,30 @@ export function syncIosSafeAreaFromRuntime(
   root: SafeAreaRoot,
   runtime: SafeAreaRuntime,
   geometry: IosStatusBarFallbackInput,
-  options?: { reclassify?: boolean },
+  options?: SyncIosSafeAreaOptions,
 ) {
+  const reclassify =
+    options?.reclassify === true || !root.hasAttribute(IOS_BROWSE_MODE_ATTR);
+  const useMeasuredTop = options?.useMeasuredTop === true || reclassify;
+  const detected = classifyIosBrowseMode(runtime, { useMeasuredTop });
   const locked = root.getAttribute(IOS_BROWSE_MODE_ATTR);
-  const reclassify = options?.reclassify === true || !root.hasAttribute(IOS_BROWSE_MODE_ATTR);
-  const mode = reclassify
-    ? classifyIosBrowseMode(runtime)
-    : locked && locked !== "none"
-      ? (locked as IosBrowseMode)
-      : null;
+  let mode: IosBrowseMode | null;
 
-  if (reclassify) applyIosBrowseModeClasses(root, mode);
+  if (reclassify) {
+    mode = detected;
+    applyIosBrowseModeClasses(root, mode);
+  } else if (
+    options?.allowUpgrade === true &&
+    locked === "safari-tab" &&
+    isOverlayLike(detected)
+  ) {
+    mode = detected;
+    applyIosBrowseModeClasses(root, mode);
+  } else {
+    mode = locked && locked !== "none" ? (locked as IosBrowseMode) : null;
+  }
 
-  if (mode === "ios-overlay" || mode === "standalone") {
+  if (isOverlayLike(mode)) {
     root.style.setProperty(
       "--ios-status-bar-fallback",
       `${iosStatusBarFallbackPx(geometry)}px`,
@@ -147,14 +179,42 @@ export function syncIosSafeAreaFromRuntime(
   return mode;
 }
 
-function readCurrentRuntime(): SafeAreaRuntime {
+function measureInset(side: "top" | "bottom") {
+  const probe = document.createElement("div");
+  probe.style.cssText = [
+    "position:fixed",
+    "top:0",
+    "left:0",
+    "width:0",
+    "height:0",
+    "visibility:hidden",
+    "pointer-events:none",
+    `padding-${side}:env(safe-area-inset-${side}, 0px)`,
+  ].join(";");
+  (document.body ?? document.documentElement).appendChild(probe);
+  void probe.offsetHeight;
+  const value =
+    Number.parseFloat(
+      getComputedStyle(probe).getPropertyValue(
+        side === "top" ? "padding-top" : "padding-bottom",
+      ),
+    ) || 0;
+  probe.remove();
+  return value;
+}
+
+function readCurrentRuntime(useMeasuredTop = false): SafeAreaRuntime {
   return {
     userAgent: navigator.userAgent || "",
     platform: navigator.platform,
     maxTouchPoints: navigator.maxTouchPoints,
-    standalone: (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
+    standalone:
+      (window.navigator as Navigator & { standalone?: boolean }).standalone ===
+      true,
     displayStandalone: window.matchMedia?.("(display-mode: standalone)").matches,
     displayFullscreen: window.matchMedia?.("(display-mode: fullscreen)").matches,
+    displayMinimalUi: window.matchMedia?.("(display-mode: minimal-ui)").matches,
+    measuredTop: useMeasuredTop ? measureInset("top") : 0,
   };
 }
 
@@ -186,11 +246,12 @@ function readGeometry(): IosStatusBarFallbackInput {
 
 export function syncIosSafeArea(
   root: SafeAreaRoot = document.documentElement,
-  options?: { reclassify?: boolean },
+  options?: SyncIosSafeAreaOptions,
 ) {
+  const useMeasuredTop = options?.useMeasuredTop === true || options?.reclassify === true;
   return syncIosSafeAreaFromRuntime(
     root,
-    readCurrentRuntime(),
+    readCurrentRuntime(useMeasuredTop),
     readGeometry(),
     options,
   );
@@ -203,21 +264,41 @@ export function installIosSafeAreaSync() {
   if (installed) return;
   installed = true;
   lastOrientationKey = readOrientationKey();
-  syncIosSafeArea(document.documentElement, { reclassify: false });
+  const root = document.documentElement;
+  const upgradeFromHomeScreen = {
+    reclassify: false,
+    allowUpgrade: true,
+    useMeasuredTop: true,
+  } satisfies SyncIosSafeAreaOptions;
+
+  syncIosSafeArea(root, upgradeFromHomeScreen);
+  window.requestAnimationFrame(() => {
+    syncIosSafeArea(root, upgradeFromHomeScreen);
+  });
+
+  for (const query of [
+    "(display-mode: standalone)",
+    "(display-mode: fullscreen)",
+    "(display-mode: minimal-ui)",
+  ]) {
+    window.matchMedia?.(query)?.addEventListener("change", () => {
+      syncIosSafeArea(root, { reclassify: false, allowUpgrade: true });
+    });
+  }
 
   window.addEventListener("orientationchange", () => {
     lastOrientationKey = readOrientationKey();
-    syncIosSafeArea(document.documentElement, { reclassify: false });
+    syncIosSafeArea(root, { reclassify: false });
   });
 
   window.addEventListener("resize", () => {
     const next = readOrientationKey();
     if (next === lastOrientationKey) return;
     lastOrientationKey = next;
-    syncIosSafeArea(document.documentElement, { reclassify: false });
+    syncIosSafeArea(root, { reclassify: false });
   });
 
   window.addEventListener("pageshow", () => {
-    syncIosSafeArea(document.documentElement, { reclassify: false });
+    syncIosSafeArea(root, { reclassify: false, allowUpgrade: true });
   });
 }
