@@ -13,7 +13,7 @@ const billingErrorKeys: Record<string, string> = {
   "reason is required": "billing.errors.reasonRequired",
 };
 
-type Translate = (key: string, options?: Record<string, unknown>) => string;
+type Translate = (key: string, defaultValue?: string | Record<string, unknown>) => string;
 
 export function billingErrorI18nKey(message?: string) {
   const text = message?.trim() ?? "";

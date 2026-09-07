@@ -20,6 +20,10 @@ test("fee dialogs allow zero without a greater-than-zero check", () => {
   assert.match(detailSource, /disabled=\{saving \|\| !amount\.trim\(\)\}/);
   assert.doesNotMatch(detailSource, /amount.*>\s*0|greater than zero|必须大于/);
   assert.match(detailSource, /billingSaveFailedToast/);
+  assert.match(
+    readFileSync("src/utils/billingI18n.ts", "utf8"),
+    /defaultValue\?: string \| Record<string, unknown>/,
+  );
 });
 
 test("billing API English strings map to locale keys in every language", () => {
