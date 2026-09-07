@@ -33,11 +33,21 @@
         } catch {
           document.documentElement.classList.remove("dark");
         }
+        const ua = navigator.userAgent || "";
+        const iOS =
+          /iP(hone|od|ad)/.test(ua) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
         const standalone =
           window.matchMedia?.("(display-mode: standalone)").matches ||
           window.matchMedia?.("(display-mode: fullscreen)").matches ||
           window.navigator.standalone === true;
+        const thirdParty =
+          /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser|UCBrowser|UCWEB|Quark|MicroMessenger|MQQBrowser|baiduboxapp|baidubrowser|SogouMobileBrowser|SamsungBrowser|Helium|GSA|FBAN|FBAV|Instagram|Line\/|DingTalk|AliApp|Lark|Feishu/.test(
+            ua,
+          );
+        const safariTab = iOS && /Safari/i.test(ua) && !thirdParty && !standalone;
         document.documentElement.classList.toggle("lite-standalone", Boolean(standalone));
+        document.documentElement.classList.toggle("lite-safari-tab", Boolean(safariTab));
       })();
     </script>
     <style>

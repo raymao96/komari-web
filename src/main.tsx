@@ -33,6 +33,9 @@ import MuiAppProvider from "./theme/MuiAppProvider";
 import { applyAppearanceChrome } from "./theme/appearanceChrome";
 import { clientCookieSuffix, isSafeTempKey } from "./utils/security";
 import { preparePrivateApplication } from "./utils/preparePrivateApplication";
+import { installIosSafeAreaSync } from "./utils/safeArea";
+
+installIosSafeAreaSync();
 
 const RadixThemeRoot = lazy(() => import("./theme/RadixThemeRoot"));
 

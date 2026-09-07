@@ -537,6 +537,18 @@
       "periods": "暂无账单记录",
       "servers": "暂无账单服务器"
     },
+    "errors": {
+      "amountMustNotBeNegative": "金额不能为负数",
+      "amountOutOfRange": "金额超出范围",
+      "clientRequired": "缺少服务器或请求标识",
+      "currencyInvalid": "币种不是有效的 ISO 4217 代码",
+      "currencyMustBeCnyUsd": "币种只能是人民币或美元",
+      "invalidAmount": "金额格式无效",
+      "invalidMonth": "月份无效",
+      "reasonRequired": "请填写作废原因",
+      "reversalCannotVoid": "冲销记录不能再次作废",
+      "tooManyDecimals": "金额最多保留 6 位小数"
+    },
     "filters": {
       "allExpiry": "全部到期时间",
       "allMonths": "全部月份",

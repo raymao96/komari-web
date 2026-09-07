@@ -537,6 +537,18 @@
       "periods": "暫無帳單記錄",
       "servers": "暫無帳單伺服器"
     },
+    "errors": {
+      "amountMustNotBeNegative": "金額不能為負數",
+      "amountOutOfRange": "金額超出範圍",
+      "clientRequired": "缺少伺服器或請求識別碼",
+      "currencyInvalid": "幣別不是有效的 ISO 4217 代碼",
+      "currencyMustBeCnyUsd": "幣別只能是人民幣或美元",
+      "invalidAmount": "金額格式無效",
+      "invalidMonth": "月份無效",
+      "reasonRequired": "請填寫作廢原因",
+      "reversalCannotVoid": "沖銷紀錄不能再次作廢",
+      "tooManyDecimals": "金額最多保留 6 位小數"
+    },
     "filters": {
       "allExpiry": "全部",
       "allMonths": "全部月份",

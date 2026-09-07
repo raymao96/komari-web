@@ -366,8 +366,11 @@ test("admin tables align selection controls and use available text width", () =>
   assert.match(loadSource, /min-w-0 flex-1/);
   assert.match(loadSource, /truncate whitespace-nowrap/);
   assert.doesNotMatch(loadSource, /whitespace-normal break-words/);
-  assert.match(pingTaskSource, /admin-responsive-table admin-sortable-table table-fixed/);
+  assert.match(pingTaskSource, /admin-responsive-table admin-sortable-table table-fixed min-w-\[920px\]/);
   assert.match(pingTaskSource, /truncate whitespace-nowrap/);
+  assert.match(pingTaskSource, /data-label=\{t\("ping\.target"\)\}[\s\S]{0,80}clipCell\(task\.target\)/);
+  assert.match(pingTaskSource, /TableHead className="w-\[72px\]"/);
+  assert.match(pingTaskSource, /TableHead className="w-\[64px\]"/);
   assert.doesNotMatch(pingTaskSource, /whitespace-normal break-words/);
   assert.match(pingTaskSource, /admin-card-actions admin-dual-actions flex items-center gap-3/);
   assert.match(loadSource, /admin-card-actions admin-dual-actions flex items-center gap-3/);
