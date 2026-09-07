@@ -186,13 +186,6 @@
       "addNode": "新增伺服器",
       "agent": "Agent",
       "allNodes": "所有伺服器",
-      "autoDiscovery": {
-        "disabledDescription": "開啟 Auto Discovery 後，只需在各伺服器上執行一行通用指令，Agent 就會自動註冊並上線，非常適合配合自動化腳本大量部署伺服器。",
-        "enabledDescription": "在目標伺服器上執行以下通用指令，Agent 將自動註冊並上線，無需手動新增伺服器。",
-        "goToSettings": "前往「設定」開啟 Auto Discovery",
-        "title": "Auto Discovery",
-        "tryIt": "試用 Auto Discovery"
-      },
       "autoRenewal": "自動續訂",
       "autoRenewalDescription": "如果伺服器已到期但仍在線上，Lite 將自動將到期日順延至下一個月（年）。",
       "billing": "帳單",
@@ -212,6 +205,8 @@
       "currency": "貨幣",
       "currencyTips": "¥-人民幣，$-美元，€-歐元，£-英鎊，₽-盧布，₣-法郎，₹-盧比，₫-越南盾，฿-泰銖，C$-加元",
       "customColumns": "自訂列",
+      "deleteFailed": "刪除失敗：{{error}}",
+      "deleteSuccess": "已刪除 {{name}}",
       "deleting": "刪除中...",
       "deliveryApplied": "已套用",
       "deliveryAppliedHint": "Agent 已套用此線上設定",
@@ -233,7 +228,7 @@
       "dragToReorder": "長按拖曳重新排列",
       "editNodePrice": "編輯帳單",
       "emptyGuide": {
-        "description": "點選右上角的「新增伺服器」開始，或透過 Auto Discovery 批次串接伺服器。",
+        "description": "點選右上角的「新增伺服器」開始。",
         "title": "暫無伺服器"
       },
       "enableGpuMonitoring": "啟用 GPU 詳細監控",
@@ -355,8 +350,7 @@
       "trafficUsedShort": "已用",
       "twoFactorCode": "動態密碼（未啟用 2FA 可留空）",
       "twoFactorInvalid": "動態密碼錯誤",
-      "ungrouped": "未分組",
-      "disableWebSsh": "停用 Web SSH"
+      "ungrouped": "未分組"
     },
     "notification": {
       "expire_enable": "啟用伺服器續約提醒",
@@ -1741,12 +1735,9 @@
       "allow_remote_management_go_enable": "前往啟用",
       "allow_remote_management_required_description": "本站未啟用 Web SSH，請先啟用該功能。",
       "allow_remote_management_required_title": "需要啟用 Web SSH",
-      "auto_discovery": "Auto Discovery",
-      "auto_discovery_key": "Auto Discovery 金鑰",
-      "auto_discovery_key_description": "使用 Auto Discovery 可批次註冊 Client，留空表示停用 Auto Discovery。",
       "auto_order_new_clients": "新伺服器自動排列",
       "auto_order_new_clients_description": "啟用後，新伺服器首次回報地區時，將自動移至同分組與同地區的末端。若無相符分組則維持原位，且不影響現有順序。",
-      "page_description": "設定 Auto Discovery、GeoIP 等全域設定。",
+      "page_description": "設定 Web SSH、GeoIP 等全域設定。",
       "title": "一般設定"
     },
     "geoip": {

@@ -62,8 +62,8 @@ type Props = {
   online: boolean;
   active: boolean;
   grant: string;
-  pageId: string;
   onDuplicate: () => void;
+  onGrantRejected?: () => void;
 };
 
 type ConnectionState = "connecting" | "waiting" | "connected" | "disconnected" | "error";
@@ -137,7 +137,7 @@ function isEditableElement(element: Element | null) {
     Boolean(element?.closest('[role="dialog"]'));
 }
 
-export default function RemoteSession({ node, live, online, active, grant, pageId, onDuplicate }: Props) {
+export default function RemoteSession({ node, live, online, active, grant, onDuplicate, onGrantRejected }: Props) {
   const { t } = useTranslation();
   const { settings, loading: settingsLoading, error: settingsError } = useXtermjsSettings();
   const terminalHost = useRef<HTMLDivElement>(null);
@@ -470,13 +470,17 @@ export default function RemoteSession({ node, live, online, active, grant, pageI
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ uuid: node.uuid, grant, page_id: pageId }),
+          body: JSON.stringify({ uuid: node.uuid, grant }),
           signal: abortController.signal,
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           if (response.status === 429) {
             throw new Error(t("terminal.session.session_full"));
+          }
+          const message = String(payload?.message ?? "");
+          if (/grant/i.test(message)) {
+            onGrantRejected?.();
           }
           throw new Error(localizeRemoteError(payload?.message, t));
         }
@@ -586,7 +590,7 @@ export default function RemoteSession({ node, live, online, active, grant, pageI
       sessionLease?.release();
       if (socket.current === ws) socket.current = null;
     };
-  }, [grant, pageId, node.remote_control_enabled, node.remote_protocol, node.uuid, reconnectKey, resizeTerminal, t, terminalReady]);
+  }, [grant, node.remote_control_enabled, node.remote_protocol, node.uuid, onGrantRejected, reconnectKey, resizeTerminal, t, terminalReady]);
 
   useEffect(() => {
     if (!active) return;

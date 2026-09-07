@@ -241,6 +241,22 @@ test("delete confirmation names the server before the question", () => {
   assert.match(pageSource, /<Dialog\.Description>[\s\S]*<Text as="span" weight="bold">\{node\.name\}<\/Text>[\s\S]*confirmDeleteQuestion/);
 });
 
+test("delete toast uses translated success and error copy", () => {
+  assert.match(pageSource, /t\("admin\.nodeTable\.deleteSuccess", \{ name: node\.name \}\)/);
+  assert.match(pageSource, /t\("admin\.nodeTable\.deleteFailed"/);
+  assert.doesNotMatch(pageSource, /Delete \$\{node\.name\}/);
+  for (const filename of ["zh_CN.json", "zh_TW.json", "en.json", "ja_JP.json"]) {
+    const contents = JSON.parse(
+      readFileSync(`src/i18n/locales/${filename}`, "utf8"),
+    ) as { admin?: { nodeTable?: { deleteSuccess?: string; deleteFailed?: string } } };
+    const success = contents.admin?.nodeTable?.deleteSuccess ?? "";
+    const failed = contents.admin?.nodeTable?.deleteFailed ?? "";
+    assert.match(success, /\{\{name\}\}/, `${filename} deleteSuccess missing name`);
+    assert.match(failed, /\{\{error\}\}/, `${filename} deleteFailed missing error`);
+    assert.notEqual(success, "Delete {{name}}", `${filename} deleteSuccess still uses English Delete`);
+  }
+});
+
 test("admin tables share one header color and mobile actions stay compact", () => {
   assert.match(tableSource, /admin-table-header/);
   assert.match(globalCssSource, /\.admin-table-header/);

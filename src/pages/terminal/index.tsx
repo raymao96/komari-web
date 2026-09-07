@@ -26,7 +26,12 @@ import type { LiveDataResponse, Record as LiveRecord } from "@/types/LiveData";
 import RemoteSession, { type RemoteNode } from "./RemoteSession";
 import { getRemoteLaunchTarget } from "@/utils/remoteLaunch";
 import { createRandomId } from "@/utils/randomId";
-import { localizeRemoteError } from "@/utils/remoteSession";
+import {
+  clearStoredRemoteGrant,
+  loadStoredRemoteGrant,
+  localizeRemoteError,
+  saveStoredRemoteGrant,
+} from "@/utils/remoteSession";
 import { useAccount } from "@/contexts/AccountContext";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import { SettingsProvider } from "@/lib/api";
@@ -161,7 +166,6 @@ function TerminalWorkspaceInner() {
   const initialized = useRef(false);
   const authorizationStarted = useRef(false);
   const grantRef = useRef("");
-  const pageInstanceIdRef = useRef(createRandomId());
   const grantExpiresAtRef = useRef(0);
   const liveDataRef = useRef<LiveDataResponse | null>(null);
   const { callViaHTTP } = useRPC2Call();
@@ -207,7 +211,6 @@ function TerminalWorkspaceInner() {
         credentials: "same-origin",
         body: JSON.stringify({
           scope: "remote",
-          page_id: pageInstanceIdRef.current,
           password: password || undefined,
           otp: otp || undefined,
         }),
@@ -222,6 +225,7 @@ function TerminalWorkspaceInner() {
         setGrant(nextGrant);
         const expiresAt = Date.parse(String(payload?.data?.expires_at ?? ""));
         grantExpiresAtRef.current = Number.isFinite(expiresAt) ? expiresAt : 0;
+        saveStoredRemoteGrant("remote", nextGrant, grantExpiresAtRef.current);
         setAuthorization("authorized");
         return;
       }
@@ -254,29 +258,16 @@ function TerminalWorkspaceInner() {
   useEffect(() => {
     if (!nodesLoaded || authorizationStarted.current) return;
     authorizationStarted.current = true;
+    const stored = loadStoredRemoteGrant("remote");
+    if (stored) {
+      grantRef.current = stored.grant;
+      setGrant(stored.grant);
+      grantExpiresAtRef.current = stored.expiresAt;
+      setAuthorization("authorized");
+      return;
+    }
     setAuthorization("required");
   }, [nodesLoaded]);
-
-  useEffect(() => {
-    const revoke = () => {
-      const currentGrant = grantRef.current;
-      if (!currentGrant) return;
-      grantRef.current = "";
-      grantExpiresAtRef.current = 0;
-      void fetch("/api/admin/client/remote/revoke", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grant: currentGrant }),
-        credentials: "same-origin",
-        keepalive: true,
-      }).catch(() => undefined);
-    };
-    window.addEventListener("pagehide", revoke);
-    return () => {
-      window.removeEventListener("pagehide", revoke);
-      revoke();
-    };
-  }, []);
 
   useEffect(() => {
     if (authorization !== "authorized") return;
@@ -287,11 +278,20 @@ function TerminalWorkspaceInner() {
       grantRef.current = "";
       setGrant("");
       grantExpiresAtRef.current = 0;
+      clearStoredRemoteGrant("remote");
       setAuthorization("required");
       setOtpError("");
     }, 1000);
     return () => window.clearInterval(timer);
   }, [authorization]);
+
+  const handleGrantRejected = useCallback(() => {
+    grantRef.current = "";
+    setGrant("");
+    grantExpiresAtRef.current = 0;
+    clearStoredRemoteGrant("remote");
+    setAuthorization("required");
+  }, []);
 
   useEffect(() => {
     if (!nodesLoaded || authorization !== "authorized" || initialized.current) return;
@@ -457,8 +457,8 @@ function TerminalWorkspaceInner() {
                 online={online.has(tab.uuid)}
                 active={activeID === tab.id}
                 grant={grant}
-                pageId={pageInstanceIdRef.current}
                 onDuplicate={() => openNode(tab.uuid)}
+                onGrantRejected={handleGrantRejected}
               />
             );
           })}
@@ -543,8 +543,8 @@ function TerminalWorkspaceInner() {
           <Dialog.Title>{t("terminal.session.auth_failed_title")}</Dialog.Title>
           <Dialog.Description>{otpError || t("terminal.session.auth_failed")}</Dialog.Description>
           <div className="remote-dialog-actions"><Button onClick={() => {
-            setAuthorization("required");
             setOtpError("");
+            setAuthorization("required");
           }}>{t("common.retry")}</Button></div>
         </AppDialogContent>
       </Dialog.Root>

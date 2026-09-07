@@ -186,13 +186,6 @@
       "addNode": "Add",
       "agent": "Agent",
       "allNodes": "All servers",
-      "autoDiscovery": {
-        "disabledDescription": "With auto discovery enabled, you no longer need to add nodes one by one. Just run a single command on the target server and the Agent will register and come online automatically using the key. Ideal for deploying many servers at once.",
-        "enabledDescription": "Run the command below on the target server. The Agent will register and come online automatically, no manual node creation needed.",
-        "goToSettings": "Go to General settings to enable auto discovery",
-        "title": "Auto discovery",
-        "tryIt": "Try auto discovery"
-      },
       "autoRenewal": "Auto renewal",
       "autoRenewalDescription": "If the server expires and is currently online, Lite will automatically set the expiration time to the next natural month (year)",
       "billing": "Billing",
@@ -212,6 +205,8 @@
       "currency": "Currency",
       "currencyTips": "¥-RMB,$-Dollar,€-Euro,£-Pound,₽-Ruble,₣-Franc,₹-Rupee,₫-VND,฿-THB,C$-Canadian Dollar",
       "customColumns": "Custom columns",
+      "deleteFailed": "Failed to delete: {{error}}",
+      "deleteSuccess": "Deleted {{name}}",
       "deleting": "Delete...",
       "deliveryApplied": "Applied",
       "deliveryAppliedHint": "The Agent confirmed that the configuration is active",
@@ -233,7 +228,7 @@
       "dragToReorder": "Long press and drag to reorder",
       "editNodePrice": "Edit Price",
       "emptyGuide": {
-        "description": "Click \"Add\" in the top right to get started, or enable auto discovery to onboard servers in bulk.",
+        "description": "Click \"Add\" in the top right to get started.",
         "title": "No servers yet"
       },
       "enableGpuMonitoring": "Enable detailed GPU monitoring",
@@ -1740,12 +1735,9 @@
       "allow_remote_management_go_enable": "Go enable",
       "allow_remote_management_required_description": "Remote management is off for this site. Enable it first.",
       "allow_remote_management_required_title": "Enable remote management",
-      "auto_discovery": "Auto discovery",
-      "auto_discovery_key": "Auto discovery key",
-      "auto_discovery_key_description": "Use automatic discovery to register clients in bulk. Leave blank to disable automatic discovery.",
       "auto_order_new_clients": "Auto-order new servers",
       "auto_order_new_clients_description": "When enabled, a newly added server is placed after the last server in the same group and country/region once GeoIP identifies its region. If none of the servers have a group, they are still ordered by country/region. If there is no peer in the same group and country/region, it stays where it was created. Turning this on does not change the order of existing servers.",
-      "page_description": "Configure auto discovery, GeoIP, and other global behavior.",
+      "page_description": "Configure GeoIP and other global behavior.",
       "title": "General"
     },
     "geoip": {

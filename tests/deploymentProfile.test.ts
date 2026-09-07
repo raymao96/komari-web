@@ -127,12 +127,12 @@ test("deployment actions keep stable button content while a request is pending",
 });
 
 test("install commands always emit an explicit remote-control flag", () => {
-  assert.match(source, /args\.push\("--enable-remote-control"\)/);
-  assert.match(source, /args\.push\("--enable-remote-control=false"\)/);
-  const falseFlagCount = source.split('args.push("--enable-remote-control=false")').length - 1;
-  const trueFlagCount = source.split('args.push("--enable-remote-control")').length - 1;
-  assert.equal(falseFlagCount, 2);
-  assert.equal(trueFlagCount, 2);
+  assert.match(source, /const token = installToken \|\| ""/);
+  assert.match(source, /let args = \["-e", host, "-t", token\]/);
+  const falseFlagCount = [...source.matchAll(/args\.push\("--enable-remote-control=false"\)/g)].length;
+  const trueFlagCount = [...source.matchAll(/args\.push\("--enable-remote-control"\)/g)].length;
+  assert.equal(falseFlagCount, 1);
+  assert.equal(trueFlagCount, 1);
 });
 
 test("one-click Agent install uses Lite-agent latest paths", () => {

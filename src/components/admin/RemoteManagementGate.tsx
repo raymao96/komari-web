@@ -8,6 +8,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type MouseEvent,
@@ -22,6 +23,7 @@ import {
   isAllowRemoteManagementEnabled,
   isRemoteManagementPath,
 } from "@/utils/allowRemoteManagement";
+import { clearStoredRemoteGrant } from "@/utils/remoteSession";
 
 type GateValue = {
   enabled: boolean;
@@ -138,10 +140,32 @@ export function RequireAllowRemoteManagement({
   children: ReactNode;
   loadingFallback?: ReactNode;
 }) {
-  const { settings, loading } = useSettings();
+  const { settings, loading, refetch } = useSettings();
   const navigate = useNavigate();
+  const enabled = isAllowRemoteManagementEnabled(settings);
+
+  useEffect(() => {
+    if (!enabled) clearStoredRemoteGrant();
+  }, [enabled]);
+
+  useEffect(() => {
+    if (loading || !enabled) return;
+    const refresh = () => {
+      void refetch().catch(() => undefined);
+    };
+    const interval = window.setInterval(refresh, 2_000);
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [enabled, loading, refetch]);
+
   if (loading) return <>{loadingFallback ?? <SettingsPageSkeleton />}</>;
-  if (isAllowRemoteManagementEnabled(settings)) return <>{children}</>;
+  if (enabled) return <>{children}</>;
   return (
     <>
       {loadingFallback ?? <SettingsPageSkeleton />}

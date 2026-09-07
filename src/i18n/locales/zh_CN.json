@@ -186,13 +186,6 @@
       "addNode": "添加节点",
       "agent": "Agent",
       "allNodes": "全部节点",
-      "autoDiscovery": {
-        "disabledDescription": "开启自动发现后，无需逐台手动添加节点。只要在目标服务器上运行一条命令，Agent 就会携带密钥自动注册并上线，非常适合批量部署多台服务器。",
-        "enabledDescription": "在目标服务器上运行下面的命令，Agent 将自动注册并上线，无需手动添加节点。",
-        "goToSettings": "前往“设置”开启自动发现",
-        "title": "自动发现",
-        "tryIt": "试试自动发现"
-      },
       "autoRenewal": "自动续费",
       "autoRenewalDescription": "如果服务器过期且当前在线，Lite 将自动将到期时间设置为下个自然月（年）",
       "billing": "账单",
@@ -212,6 +205,8 @@
       "currency": "货币",
       "currencyTips": "¥-人民币，$-美元，€-欧元，£-英镑，₽-卢布，₣-法郎，₹-卢比，₫-越南盾，฿-泰铢，C$-加元",
       "customColumns": "自定义列",
+      "deleteFailed": "删除失败：{{error}}",
+      "deleteSuccess": "已删除 {{name}}",
       "deleting": "删除中...",
       "deliveryApplied": "已生效",
       "deliveryAppliedHint": "Agent 已确认配置生效",
@@ -233,7 +228,7 @@
       "dragToReorder": "长按拖拽重新排序",
       "editNodePrice": "编辑账单",
       "emptyGuide": {
-        "description": "点击右上角的“添加节点”开始，或开启自动发现批量接入服务器。",
+        "description": "点击右上角的“添加节点”开始。",
         "title": "还没有任何服务器"
       },
       "enableGpuMonitoring": "启用详细 GPU 监控",
@@ -1740,12 +1735,9 @@
       "allow_remote_management_go_enable": "前往开启",
       "allow_remote_management_required_description": "站点未启用远程管理，请先开启该功能。",
       "allow_remote_management_required_title": "需要开启远程管理",
-      "auto_discovery": "自动发现",
-      "auto_discovery_key": "自动发现密钥",
-      "auto_discovery_key_description": "使用自动发现可以批量注册客户端，留空表示禁用自动发现。",
       "auto_order_new_clients": "新增服务器自动排序",
       "auto_order_new_clients_description": "开启后，新服务器第一次上报并识别出国家\\地区时，会自动排到同一分组、同一国家\\地区的最后一台后面。所有服务器都没有分组时，也会按国家\\地区排序。没有同组同国家\\地区节点时，保持创建时的位置。开启功能不会修改已有服务器排序。",
-      "page_description": "配置自动发现、GeoIP 与其他全局行为。",
+      "page_description": "配置 GeoIP 与其他全局行为。",
       "title": "通用"
     },
     "geoip": {

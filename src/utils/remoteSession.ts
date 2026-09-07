@@ -151,3 +151,73 @@ export function createRemoteSessionLease(
     },
   };
 }
+
+const remoteGrantStorageKey = "lite.remote-grant";
+
+type StoredRemoteGrant = {
+  grant: string;
+  expiresAt: number;
+};
+
+type StoredRemoteGrants = Partial<Record<string, StoredRemoteGrant>>;
+
+let memoryGrants: StoredRemoteGrants = {};
+
+function webStorageSurfaces(): Storage[] {
+  const surfaces: Storage[] = [];
+  for (const candidate of [
+    typeof localStorage === "undefined" ? null : localStorage,
+    typeof sessionStorage === "undefined" ? null : sessionStorage,
+  ]) {
+    if (candidate) surfaces.push(candidate);
+  }
+  return surfaces;
+}
+
+function purgeGrantFromWebStorage() {
+  for (const storage of webStorageSurfaces()) {
+    try {
+      storage.removeItem(remoteGrantStorageKey);
+    } catch {
+      // Private mode or quota: ignore.
+    }
+  }
+}
+
+purgeGrantFromWebStorage();
+
+export function isRemoteGrantLive(
+  grant?: string | null,
+  expiresAt?: number | null,
+  now = Date.now(),
+) {
+  return Boolean(grant && expiresAt && expiresAt > now);
+}
+
+export function loadStoredRemoteGrant(scope: string): StoredRemoteGrant | null {
+  purgeGrantFromWebStorage();
+  const stored = memoryGrants[scope];
+  if (!stored || !isRemoteGrantLive(stored.grant, stored.expiresAt)) {
+    if (stored) delete memoryGrants[scope];
+    return null;
+  }
+  return stored;
+}
+
+export function saveStoredRemoteGrant(scope: string, grant: string, expiresAt: number) {
+  purgeGrantFromWebStorage();
+  if (!isRemoteGrantLive(grant, expiresAt)) {
+    clearStoredRemoteGrant(scope);
+    return;
+  }
+  memoryGrants[scope] = { grant, expiresAt };
+}
+
+export function clearStoredRemoteGrant(scope?: string) {
+  purgeGrantFromWebStorage();
+  if (!scope) {
+    memoryGrants = {};
+    return;
+  }
+  delete memoryGrants[scope];
+}

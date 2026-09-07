@@ -106,11 +106,15 @@ test("collapses long selected-node summaries into an inspectable popover", () =>
   assert.match(execPageSource, /selectedNodeNames\.map/);
 });
 
-test("keeps remote execution behind a page grant", () => {
+test("keeps remote execution behind a login grant", () => {
   assert.match(execPageSource, /const \{ account \} = useAccount\(\)/);
   assert.match(execPageSource, /Boolean\(account\?\.\["2fa_enabled"\]\)/);
   assert.match(execPageSource, /scope: "exec"/);
-  assert.match(execPageSource, /page_id: pageInstanceIdRef\.current/);
+  assert.doesNotMatch(execPageSource, /page_id: pageInstanceIdRef\.current/);
+  assert.doesNotMatch(execPageSource, /remote\/revoke/);
+  assert.doesNotMatch(execPageSource, /pagehide/);
+  assert.match(execPageSource, /loadStoredRemoteGrant\("exec"\)/);
+  assert.doesNotMatch(execPageSource, /ssoSession/);
   assert.match(execPageSource, /grant: usedGrant/);
   assert.match(execPageSource, /next_grant/);
   assert.match(execPageSource, /setPasswordInput\(""\)/);
@@ -122,4 +126,14 @@ test("keeps remote execution behind a page grant", () => {
   );
   assert.ok(passwordCopied >= 0 && passwordCleared > passwordCopied);
   assert.ok(authorizeFetch > passwordCleared);
+  const liveCheck = execPageSource.indexOf("const hasLiveGrant = isRemoteGrantLive(");
+  const otpGuard = execPageSource.indexOf("twoFaEnabled && !hasLiveGrant && !twoFaCode.trim()");
+  const passwordGuard = execPageSource.indexOf(
+    "!twoFaEnabled && !hasLiveGrant && !passwordInput.trim()",
+  );
+  assert.ok(liveCheck >= 0 && otpGuard > liveCheck && passwordGuard > otpGuard);
+  assert.ok(authorizeFetch > passwordGuard);
+  assert.match(execPageSource, /setInterval\(\(\) => \{/);
+  assert.match(execPageSource, /if \(isRemoteGrantLive\(grantRef\.current, grantExpiresAtRef\.current\)\) return;/);
+  assert.match(execPageSource, /if \(!hasLiveGrant\) clearExecGrant\(\);/);
 });

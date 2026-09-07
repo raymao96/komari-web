@@ -3,8 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  clearStoredRemoteGrant,
   createRemoteSessionLease,
+  isRemoteGrantLive,
+  loadStoredRemoteGrant,
   localizeRemoteError,
+  saveStoredRemoteGrant,
 } from "../src/utils/remoteSession.ts";
 
 const terminalSource = readFileSync("src/pages/terminal/RemoteSession.tsx", "utf8");
@@ -120,18 +124,85 @@ test("remote session no longer treats the Lite host as a protected node", () => 
   assert.doesNotMatch(terminalSource, /local_address_blocked/);
 });
 
-test("remote sessions submit a page grant instead of a 2FA code", () => {
+test("remote sessions submit a login grant instead of a page grant", () => {
   assert.match(terminalSource, /grant,/);
-  assert.match(terminalSource, /page_id: pageId/);
+  assert.doesNotMatch(terminalSource, /page_id: pageId/);
+  assert.doesNotMatch(terminalSource, /pageId:/);
   assert.doesNotMatch(terminalSource, /2fa_code/);
   assert.doesNotMatch(terminalSource, /otpCode/);
 });
 
-test("terminal workspace clears credentials before waiting on authorize", () => {
+test("terminal workspace keeps a login-scoped grant across page changes", () => {
   const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
   const cleared = workspace.indexOf('setPasswordInput("");');
   const authorize = workspace.indexOf('fetch("/api/admin/client/remote/authorize"');
   assert.ok(cleared >= 0 && authorize > cleared);
-  assert.match(workspace, /page_id: pageInstanceIdRef\.current/);
+  assert.doesNotMatch(workspace, /page_id: pageInstanceIdRef\.current/);
+  assert.doesNotMatch(workspace, /remote\/revoke/);
+  assert.doesNotMatch(workspace, /pagehide/);
+  assert.match(workspace, /loadStoredRemoteGrant\("remote"\)/);
+  assert.match(workspace, /saveStoredRemoteGrant\("remote"/);
+  assert.doesNotMatch(workspace, /account\?\.sso_type && !twoFaEnabled/);
   assert.match(workspace, /expires_at/);
+});
+
+test("login-scoped grant stays in memory and never writes web storage", () => {
+  const writes: string[] = [];
+  const leftover = new Map<string, string>([["lite.remote-grant", '{"remote":{"grant":"leaked","expiresAt":1}}']]);
+  const fakeStorage = {
+    getItem(key: string) {
+      return leftover.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      writes.push(`${key}=${value}`);
+    },
+    removeItem(key: string) {
+      leftover.delete(key);
+    },
+  };
+  const previousLocal = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const previousSession = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: fakeStorage,
+  });
+  Object.defineProperty(globalThis, "sessionStorage", {
+    configurable: true,
+    value: fakeStorage,
+  });
+  try {
+    clearStoredRemoteGrant();
+    assert.equal(loadStoredRemoteGrant("remote"), null);
+    saveStoredRemoteGrant("remote", "grant-live", Date.now() + 60_000);
+    assert.equal(loadStoredRemoteGrant("remote")?.grant, "grant-live");
+    saveStoredRemoteGrant("exec", "grant-exec", Date.now() + 60_000);
+    clearStoredRemoteGrant("remote");
+    assert.equal(loadStoredRemoteGrant("remote"), null);
+    assert.equal(loadStoredRemoteGrant("exec")?.grant, "grant-exec");
+    saveStoredRemoteGrant("exec", "grant-old", Date.now() - 1);
+    assert.equal(loadStoredRemoteGrant("exec"), null);
+    clearStoredRemoteGrant();
+    assert.deepEqual(writes, []);
+    assert.equal(leftover.has("lite.remote-grant"), false);
+  } finally {
+    if (previousLocal) Object.defineProperty(globalThis, "localStorage", previousLocal);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+    if (previousSession) Object.defineProperty(globalThis, "sessionStorage", previousSession);
+    else delete (globalThis as { sessionStorage?: unknown }).sessionStorage;
+  }
+});
+
+test("remote grant helper never writes localStorage or sessionStorage", () => {
+  const source = readFileSync("src/utils/remoteSession.ts", "utf8");
+  assert.doesNotMatch(source, /localStorage\.setItem/);
+  assert.doesNotMatch(source, /sessionStorage\.setItem/);
+  assert.match(source, /storage\.removeItem\(remoteGrantStorageKey\)/);
+});
+
+test("remote grant live check treats missing and expired grants as dead", () => {
+  assert.equal(isRemoteGrantLive("grant", Date.now() + 60_000), true);
+  assert.equal(isRemoteGrantLive("grant", Date.now() - 1), false);
+  assert.equal(isRemoteGrantLive("grant", 0), false);
+  assert.equal(isRemoteGrantLive("", Date.now() + 60_000), false);
+  assert.equal(isRemoteGrantLive("", 0), false);
 });
