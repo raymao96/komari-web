@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+
 const billingErrorKeys: Record<string, string> = {
   "a reversal entry cannot be voided": "billing.errors.reversalCannotVoid",
   "amount is out of range": "billing.errors.amountOutOfRange",
@@ -13,8 +15,6 @@ const billingErrorKeys: Record<string, string> = {
   "reason is required": "billing.errors.reasonRequired",
 };
 
-type Translate = (key: string, defaultValue?: string | Record<string, unknown>) => string;
-
 export function billingErrorI18nKey(message?: string) {
   const text = message?.trim() ?? "";
   const stripped = text
@@ -24,7 +24,7 @@ export function billingErrorI18nKey(message?: string) {
   return billingErrorKeys[stripped] || billingErrorKeys[text] || "";
 }
 
-export function localizeBillingError(message: string | undefined, t: Translate) {
+export function localizeBillingError(message: string | undefined, t: TFunction) {
   const key = billingErrorI18nKey(message);
   if (key) return String(t(key));
   const text = message?.trim() ?? "";
@@ -38,12 +38,12 @@ export function localizeBillingError(message: string | undefined, t: Translate) 
 export function billingSaveFailedToast(
   prefixKey: string,
   error: unknown,
-  t: Translate,
+  t: TFunction,
   fallback = "费用录入失败",
 ) {
   const detail = localizeBillingError(
     error instanceof Error ? error.message : String(error),
     t,
   );
-  return `${t(prefixKey, fallback)}: ${detail}`;
+  return `${String(t(prefixKey, fallback))}: ${detail}`;
 }

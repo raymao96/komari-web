@@ -22,7 +22,7 @@ test("fee dialogs allow zero without a greater-than-zero check", () => {
   assert.match(detailSource, /billingSaveFailedToast/);
   assert.match(
     readFileSync("src/utils/billingI18n.ts", "utf8"),
-    /defaultValue\?: string \| Record<string, unknown>/,
+    /import type \{ TFunction \} from "i18next"/,
   );
 });
 
