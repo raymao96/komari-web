@@ -34,24 +34,49 @@
           document.documentElement.classList.remove("dark");
         }
         const ua = navigator.userAgent || "";
-        const iOS =
-          /iP(hone|od|ad)/.test(ua) ||
-          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const root = document.documentElement;
+        const isIPhone = /iP(hone|od)/.test(ua);
         const standalone =
           window.matchMedia?.("(display-mode: standalone)").matches ||
           window.matchMedia?.("(display-mode: fullscreen)").matches ||
           window.navigator.standalone === true;
-        const thirdParty =
-          /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser|UCBrowser|UCWEB|Quark|MicroMessenger|MQQBrowser|baiduboxapp|baidubrowser|SogouMobileBrowser|SamsungBrowser|Helium|GSA|FBAN|FBAV|Instagram|Line\/|DingTalk|AliApp|Lark|Feishu/.test(
-            ua,
-          );
-        const safariTab = iOS && /Safari/i.test(ua) && !thirdParty && !standalone;
-        document.documentElement.classList.toggle("lite-standalone", Boolean(standalone));
-        document.documentElement.classList.toggle("lite-safari-tab", Boolean(safariTab));
-        if (iOS && (standalone || thirdParty)) {
+        const nativeSafariTab =
+          isIPhone &&
+          !standalone &&
+          /Version\/[\d.]+ Mobile\/[A-Za-z0-9]+ Safari\/[\d.]+$/.test(ua);
+        const mode = !isIPhone
+          ? "none"
+          : standalone
+            ? "standalone"
+            : nativeSafariTab
+              ? "safari-tab"
+              : "ios-overlay";
+        root.classList.toggle("lite-safari-tab", mode === "safari-tab");
+        root.classList.toggle(
+          "lite-ios-overlay",
+          mode === "ios-overlay" || mode === "standalone",
+        );
+        root.classList.toggle("lite-standalone", mode === "standalone");
+        root.setAttribute("data-lite-ios-mode", mode);
+        if (mode === "ios-overlay" || mode === "standalone") {
+          const type = screen.orientation?.type || "";
+          const landscape =
+            type.startsWith("landscape") ||
+            (!type.startsWith("portrait") &&
+              (typeof window.orientation === "number"
+                ? Math.abs(window.orientation) === 90
+                : window.innerWidth > window.innerHeight));
           const long = Math.max(screen.width || 0, screen.height || 0);
-          const top = long >= 852 ? 59 : long >= 812 ? 47 : 20;
-          document.documentElement.style.setProperty("--safe-area-top", top + "px");
+          const fallback = landscape
+            ? 0
+            : long < 812
+              ? 20
+              : long === 896 || long === 926
+                ? 47
+                : long >= 852
+                  ? 59
+                  : 47;
+          root.style.setProperty("--ios-status-bar-fallback", fallback + "px");
         }
       })();
     </script>

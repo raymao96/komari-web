@@ -802,7 +802,15 @@ export default function AdminSidebar({
         </Box>
       </Stack>
 
-      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+      <Box
+        data-admin-nav-scroll
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          overscrollBehaviorY: "none",
+        }}
+      >
         <List disablePadding sx={{ px: mini ? 0 : 0 }}>
           {menuItems.map(renderGroup)}
         </List>
