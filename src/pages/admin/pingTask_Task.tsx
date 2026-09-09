@@ -53,6 +53,15 @@ const getTaskSortableId = (task: { id?: number; name?: string; target?: string }
 const PREVIOUS_PAGE_DROP_ID = "ping-task-previous-page";
 const NEXT_PAGE_DROP_ID = "ping-task-next-page";
 
+function clipCell(value?: string) {
+  const text = value?.trim() || "--";
+  return (
+    <span className="admin-cell-clip" title={value?.trim() || undefined}>
+      {text}
+    </span>
+  );
+}
+
 export const TaskView = ({
   pingTasks,
   reorderEnabled = true,
@@ -193,16 +202,16 @@ export const TaskView = ({
         </SortableContext>
       ) : (
       <div className="admin-responsive-table-wrap overflow-x-auto">
-      <Table container={false} className="admin-responsive-table admin-sortable-table table-fixed min-w-[840px]">
+      <Table container={false} className="admin-responsive-table admin-sortable-table table-fixed min-w-[920px]">
         <TableHeader>
           <TableRow>
             <TableHead className="w-12 px-3" aria-label={t("common.sort")}></TableHead>
-            <TableHead className="w-[18%]">{t("common.name")}</TableHead>
-            <TableHead className="w-[32%]">{t("common.server")}</TableHead>
-            <TableHead className="w-[20%]">{t("ping.target")}</TableHead>
-            <TableHead className="w-[8%]">{t("ping.type")}</TableHead>
-            <TableHead className="w-[8%]">{t("ping.interval")}</TableHead>
-            <TableHead className="w-[10%]">{t("common.action")}</TableHead>
+            <TableHead className="w-[16%]">{t("common.name")}</TableHead>
+            <TableHead className="w-[28%]">{t("common.server")}</TableHead>
+            <TableHead className="w-[26%]">{t("ping.target")}</TableHead>
+            <TableHead className="w-[72px]">{t("ping.type")}</TableHead>
+            <TableHead className="w-[64px]">{t("ping.interval")}</TableHead>
+            <TableHead className="w-[96px]">{t("common.action")}</TableHead>
           </TableRow>
         </TableHeader>
           <SortableContext
@@ -523,7 +532,7 @@ const Row = ({
         }
         cells={[
           [t("common.server"), serverValue],
-          [t("ping.target"), task.target || "--"],
+          [t("ping.target"), clipCell(task.target)],
           [t("ping.type"), task.type],
           [t("ping.interval"), String(task.interval ?? "--")],
         ]}
@@ -555,14 +564,22 @@ const Row = ({
           <MenuIcon size={isMobile ? 18 : 16} color={"var(--gray-8)"} />
         </div>
       </TableCell>
-      <TableCell data-label={t("common.name")}>{task.name}</TableCell>
+      <TableCell className="max-w-0" data-label={t("common.name")}>
+        {clipCell(task.name)}
+      </TableCell>
       <TableCell className="max-w-0" data-label={t("common.server")}>
         {serverValue}
       </TableCell>
-      <TableCell data-label={t("ping.target")}>{task.target}</TableCell>
-      <TableCell data-label={t("ping.type")}>{task.type}</TableCell>
-      <TableCell data-label={t("ping.interval")}>{task.interval}</TableCell>
-      <TableCell data-label={t("common.action")}>{actionButtons}</TableCell>
+      <TableCell className="max-w-0" data-label={t("ping.target")}>
+        {clipCell(task.target)}
+      </TableCell>
+      <TableCell className="overflow-hidden" data-label={t("ping.type")}>
+        {task.type}
+      </TableCell>
+      <TableCell className="overflow-hidden tabular-nums" data-label={t("ping.interval")}>
+        {task.interval}
+      </TableCell>
+      <TableCell className="overflow-hidden" data-label={t("common.action")}>{actionButtons}</TableCell>
     </TableRow>
   );
 };

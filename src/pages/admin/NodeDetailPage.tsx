@@ -66,6 +66,7 @@ import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate
 import { nodeTrafficType, trafficUsed } from "@/utils/trafficAccounting";
 import { formatBytes, stringToBytes } from "@/utils/unitHelper";
 import { billingRequest } from "@/utils/billing";
+import { billingSaveFailedToast } from "@/utils/billingI18n";
 import { createRandomId } from "@/utils/randomId";
 import { LITE_BLUE, LITE_BLUE_SOFT_STRONG } from "@/theme/brand";
 import { getAdminMenuProps } from "@/components/admin/adminMenu";
@@ -1159,7 +1160,7 @@ function TrafficResetCostDialog({
       toast.success(t("admin.nodeDetail.trafficResetSaved", "流量重置费用已计入账单"));
       onSaved();
     } catch (error) {
-      toast.error(`${t("admin.nodeDetail.trafficResetSaveFailed", "费用录入失败")}: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(billingSaveFailedToast("admin.nodeDetail.trafficResetSaveFailed", error, t));
     } finally {
       setSaving(false);
     }
@@ -1259,7 +1260,7 @@ function IPChangeCostDialog({
       toast.success(t("admin.nodeDetail.ipChangeSaved", "更换 IP 费用已计入当天账单"));
       onSaved();
     } catch (error) {
-      toast.error(`${t("admin.nodeDetail.ipChangeSaveFailed", "费用录入失败")}: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(billingSaveFailedToast("admin.nodeDetail.ipChangeSaveFailed", error, t));
     } finally {
       setSaving(false);
     }
@@ -1353,7 +1354,7 @@ function OneTimeFeeDialog({
       toast.success(t("admin.nodeDetail.oneTimeFeeSaved", "一次性费用已计入当月账单"));
       onSaved();
     } catch (error) {
-      toast.error(`${t("admin.nodeDetail.oneTimeFeeSaveFailed", "费用录入失败")}: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(billingSaveFailedToast("admin.nodeDetail.oneTimeFeeSaveFailed", error, t));
     } finally {
       setSaving(false);
     }

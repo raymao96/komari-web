@@ -537,6 +537,18 @@
       "periods": "請求記録はありません",
       "servers": "請求対象サーバーはありません"
     },
+    "errors": {
+      "amountMustNotBeNegative": "金額を負の値にはできません",
+      "amountOutOfRange": "金額が範囲外です",
+      "clientRequired": "サーバーまたはリクエスト識別子がありません",
+      "currencyInvalid": "通貨コードが ISO 4217 として認識されません",
+      "currencyMustBeCnyUsd": "通貨は CNY または USD のみです",
+      "invalidAmount": "金額の形式が正しくありません",
+      "invalidMonth": "月が無効です",
+      "reasonRequired": "取消理由を入力してください",
+      "reversalCannotVoid": "相殺記録は再度取り消せません",
+      "tooManyDecimals": "金額は小数点以下 6 桁までです"
+    },
     "filters": {
       "allExpiry": "すべての有効期限",
       "allMonths": "すべての月",

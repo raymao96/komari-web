@@ -147,6 +147,8 @@ test("server rows use country flags, group-only subtitles, and the global page s
   assert.match(pageSource, /useAdminDefaultPageSize\(\)/);
   assert.match(pageSource, /admin-node-country-flag/);
   assert.match(pageSource, /<Flag flag=\{server\.region\} compact \/>/);
+  assert.match(pageSource, /import \{ getRegionCode, getRegionDisplayName \} from "@\/utils\/regionHelper"/);
+  assert.match(pageSource, /getRegionCode\(client\.region\)/);
   assert.match(pageSource, /server\.group \|\| groupFallback/);
   assert.doesNotMatch(pageSource, /\[server\.region, server\.group\]/);
 });

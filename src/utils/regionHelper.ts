@@ -5,6 +5,11 @@ export const emojiToRegionMap: Record<string, { en: string; zh: string; aliases:
     zh: '香港',
     aliases: ['hk', 'hongkong', 'hong kong', '香港', 'HK']
   },
+  '🇲🇴': {
+    en: 'Macao',
+    zh: '澳门',
+    aliases: ['mo', 'macao', 'macau', '澳门', '澳門', 'MO']
+  },
   '🇨🇳': {
     en: 'China',
     zh: '中国',
@@ -572,7 +577,7 @@ export const isRegionMatch = (regionEmoji: string, searchTerm: string): boolean 
   }
   
   // 从映射表中查找
-  const regionInfo = emojiToRegionMap[regionEmoji];
+  const regionInfo = resolveRegionInfo(regionEmoji);
   if (!regionInfo) {
     // 如果映射表中没有，则只进行简单的包含匹配
     return regionEmoji.toLowerCase().includes(lowerSearchTerm);
@@ -594,6 +599,20 @@ export const isRegionMatch = (regionEmoji: string, searchTerm: string): boolean 
   );
 };
 
+function flagEmojiFromRegionCode(code: string): string {
+  if (!/^[A-Z]{2}$/.test(code)) return "";
+  return String.fromCodePoint(
+    ...Array.from(code, (ch) => 0x1f1e6 + ch.charCodeAt(0) - 0x41),
+  );
+}
+
+function resolveRegionInfo(region: string) {
+  return (
+    emojiToRegionMap[region] ??
+    emojiToRegionMap[flagEmojiFromRegionCode(getRegionCode(region))]
+  );
+}
+
 /**
  * 获取地区的显示名称
  * @param regionEmoji 地区emoji
@@ -601,7 +620,7 @@ export const isRegionMatch = (regionEmoji: string, searchTerm: string): boolean 
  * @returns 地区名称
  */
 export const getRegionDisplayName = (regionEmoji: string, language: 'en' | 'zh' = 'zh'): string => {
-  const regionInfo = emojiToRegionMap[regionEmoji];
+  const regionInfo = resolveRegionInfo(regionEmoji);
   if (!regionInfo) {
     return regionEmoji;
   }

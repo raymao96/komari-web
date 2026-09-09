@@ -86,6 +86,7 @@ import {
   type BillingServer,
   type BillingServerPage,
 } from "@/utils/billing";
+import { localizeBillingError } from "@/utils/billingI18n";
 import { getRegionCode, getRegionDisplayName } from "@/utils/regionHelper";
 
 type BillingTab = "overview" | "monthly" | "yearly";
@@ -350,7 +351,7 @@ function ErrorPanel({ message, retry }: { message: string; retry: () => void }) 
   const { t } = useTranslation();
   return (
     <Alert severity="error" action={<Button color="inherit" size="small" onClick={retry}>{t("billing.actions.retry")}</Button>}>
-      {message}
+      {localizeBillingError(message, t)}
     </Alert>
   );
 }

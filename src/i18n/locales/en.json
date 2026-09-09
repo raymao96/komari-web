@@ -537,6 +537,18 @@
       "periods": "No billing records",
       "servers": "No billable servers"
     },
+    "errors": {
+      "amountMustNotBeNegative": "Amount cannot be negative",
+      "amountOutOfRange": "Amount is out of range",
+      "clientRequired": "Server and request key are required",
+      "currencyInvalid": "Currency is not a recognized ISO 4217 code",
+      "currencyMustBeCnyUsd": "Currency must be CNY or USD",
+      "invalidAmount": "Invalid amount",
+      "invalidMonth": "Invalid month",
+      "reasonRequired": "A reason is required",
+      "reversalCannotVoid": "A reversal cannot be voided",
+      "tooManyDecimals": "Amount supports at most 6 decimal places"
+    },
     "filters": {
       "allExpiry": "All expiry dates",
       "allMonths": "All months",
