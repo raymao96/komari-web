@@ -1026,7 +1026,7 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
 
   .admin-node-actions {
     display: grid !important;
-    grid-template-columns: repeat(6, minmax(2.5rem, 1fr));
+    grid-template-columns: repeat(7, minmax(2.5rem, 1fr));
     gap: 0.25rem !important;
   }
 

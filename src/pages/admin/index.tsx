@@ -49,6 +49,7 @@ import {
   Gauge,
   GripVertical,
   Pencil,
+  RefreshCw,
   Plus,
   Save,
   Send,
@@ -75,6 +76,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
+import {
+  isClientTokenTwoFactorInvalid,
+  isClientTokenTwoFactorRequired,
+  rotateClientToken,
+} from "@/lib/clientToken";
+import { localizeTokenRotationError } from "@/utils/tokenRotation";
 import Flag from "@/components/Flag";
 import { NODE_OFFLINE, NODE_ONLINE } from "@/theme/brand";
 import {
@@ -976,7 +983,7 @@ const NodeTable = ({
           </SortableContext>
         ) : (
         <div ref={tableWrapRef}>
-        <Table className={`admin-responsive-table admin-node-table min-w-[1136px] table-fixed text-sm${billingStack ? " admin-node-billing-stack" : ""}`}>
+        <Table className={`admin-responsive-table admin-node-table min-w-[1172px] table-fixed text-sm${billingStack ? " admin-node-billing-stack" : ""}`}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[44px]">
@@ -999,7 +1006,7 @@ const NodeTable = ({
               <TableHead className="w-[116px]">
                 {t("admin.nodeTable.tags", "标签")}
               </TableHead>
-              <TableHead className="w-[272px]">{t("common.action", "操作")}</TableHead>
+              <TableHead className="w-[308px]">{t("common.action", "操作")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1142,6 +1149,7 @@ const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) 
       <EditButton node={node} />
       <BillingButton node={node} />
       <TrafficCalibrationButton node={node} />
+      <RotateTokenButton node={node} />
       <DeleteButton node={node} />
     </div>
   );
@@ -1434,6 +1442,176 @@ function DeleteButton({ node }: { node: NodeDetail }) {
     </Dialog.Root>
   );
 }
+
+function RotateTokenButton({ node }: { node: NodeDetail }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = React.useState(false);
+  const [rotating, setRotating] = React.useState(false);
+  const [needTwoFactor, setNeedTwoFactor] = React.useState(false);
+  const [twoFactorInvalid, setTwoFactorInvalid] = React.useState(false);
+  const [otpInput, setOtpInput] = React.useState("");
+  const otpFieldRef = React.useRef<HTMLInputElement>(null);
+
+  const resetTwoFactor = () => {
+    setNeedTwoFactor(false);
+    setTwoFactorInvalid(false);
+    setOtpInput("");
+  };
+
+  const closeDialog = () => {
+    setOpen(false);
+    setRotating(false);
+    resetTwoFactor();
+  };
+
+  React.useEffect(() => {
+    if (!needTwoFactor || rotating) return;
+    const timer = window.setTimeout(() => otpFieldRef.current?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [needTwoFactor, rotating, twoFactorInvalid]);
+
+  const handleRotate = async (twoFactorCode?: string) => {
+    try {
+      setRotating(true);
+      setTwoFactorInvalid(false);
+      await rotateClientToken(node.uuid, { twoFactorCode });
+      toast.success(t("admin.nodeTable.rotateTokenSuccess", { name: node.name }));
+      closeDialog();
+    } catch (error) {
+      if (isClientTokenTwoFactorRequired(error)) {
+        setNeedTwoFactor(true);
+        setTwoFactorInvalid(false);
+        return;
+      }
+      if (isClientTokenTwoFactorInvalid(error)) {
+        setNeedTwoFactor(true);
+        setTwoFactorInvalid(true);
+        setOtpInput("");
+        return;
+      }
+      toast.error(
+        t("admin.nodeTable.rotateTokenFailed", {
+          error: localizeTokenRotationError(
+            error instanceof Error ? error.message : String(error),
+          ),
+        }),
+      );
+    } finally {
+      setRotating(false);
+    }
+  };
+
+  return (
+    <Dialog.Root
+      open={open}
+      disableEnforceFocus={needTwoFactor}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          setOpen(true);
+          return;
+        }
+        closeDialog();
+      }}
+    >
+      <Dialog.Trigger>
+        <IconButton variant="ghost" title={t("admin.nodeTable.rotateToken")}>
+          <RefreshCw size="18" />
+        </IconButton>
+      </Dialog.Trigger>
+      <AppDialogContent className="admin-install-dialog">
+        <Dialog.Title>{t("admin.nodeTable.rotateToken")}</Dialog.Title>
+        <Dialog.Description>
+          <Text as="span" weight="bold">{node.name}</Text>
+        </Dialog.Description>
+        <Text as="p" size="2" mt="3">
+          {t("admin.nodeTable.rotateTokenDescription")}
+        </Text>
+        <Text as="p" size="2" mt="2" color="gray">
+          {t("admin.nodeTable.rotateTokenInstructions")}
+        </Text>
+        <Flex justify="end" gap="2" mt="4">
+          <Dialog.Close>
+            <Button variant="soft" disabled={rotating}>
+              {t("admin.nodeTable.cancel")}
+            </Button>
+          </Dialog.Close>
+          <Button disabled={rotating} onClick={() => void handleRotate()}>
+            {t("admin.nodeTable.confirmRotateToken")}
+          </Button>
+        </Flex>
+      </AppDialogContent>
+      {needTwoFactor ? (
+        <Dialog.Root
+          open
+          zIndex={1400}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) return;
+            resetTwoFactor();
+          }}
+        >
+          <AppDialogContent className="admin-install-dialog">
+            <Dialog.Title>
+              {t("admin.nodeTable.identityAuthTitle", "身份验证")}
+            </Dialog.Title>
+            <Dialog.Description>
+              {t("admin.nodeTable.identityAuthDescription", "请输入身份验证器中的 6 位动态口令")}
+            </Dialog.Description>
+            <form
+              autoComplete="on"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (otpInput.length === 6 && !rotating) {
+                  void handleRotate(otpInput);
+                }
+              }}
+            >
+              <TextField.Root
+                ref={otpFieldRef}
+                id="admin-node-rotate-otp"
+                name="one-time-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                color={twoFactorInvalid ? "red" : undefined}
+                disabled={rotating}
+                value={otpInput}
+                onChange={(event) =>
+                  setOtpInput(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))
+                }
+                placeholder={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
+                aria-label={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
+              />
+              {twoFactorInvalid ? (
+                <Text size="2" color="red" className="mt-2" role="alert">
+                  {t("admin.nodeTable.twoFactorInvalid", "验证码错误")}
+                </Text>
+              ) : null}
+              <Flex justify="end" gap="2" mt="4">
+                <Button
+                  type="button"
+                  variant="soft"
+                  disabled={rotating}
+                  onClick={resetTwoFactor}
+                >
+                  {t("admin.nodeTable.cancel")}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={otpInput.length !== 6 || rotating}
+                >
+                  {t("common.confirm", "确认")}
+                </Button>
+              </Flex>
+            </form>
+          </AppDialogContent>
+        </Dialog.Root>
+      ) : null}
+    </Dialog.Root>
+  );
+}
+
 type InstallOptions = {
   enableRemoteControl: boolean;
   disableAutoUpdate: boolean;

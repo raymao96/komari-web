@@ -8,11 +8,14 @@ const source = readFileSync(path.resolve("src/pages/admin/index.tsx"), "utf8");
 test("traffic calibration action sits between billing and delete", () => {
   const billing = source.indexOf("<BillingButton node={node} />");
   const calibration = source.indexOf("<TrafficCalibrationButton node={node} />");
+  const rotate = source.indexOf("<RotateTokenButton node={node} />");
   const deletion = source.indexOf("<DeleteButton node={node} />");
   assert.ok(billing >= 0);
   assert.ok(calibration > billing);
-  assert.ok(deletion > calibration);
+  assert.ok(rotate > calibration);
+  assert.ok(deletion > rotate);
   assert.match(source, /<TrafficCalibrationButton node=\{node\} \/>/);
+  assert.match(source, /<RotateTokenButton node=\{node\} \/>/);
 });
 
 test("calibration dialog keeps form state independent from node polling", () => {
