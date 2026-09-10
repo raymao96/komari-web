@@ -43,21 +43,25 @@ async function readSafeErrorMessage(response: Response): Promise<string> {
   return `HTTP ${response.status}`;
 }
 
+function twoFactorHeaders(twoFactorCode?: string): HeadersInit {
+  const headers: Record<string, string> = {};
+  const code = twoFactorCode?.trim();
+  if (code) {
+    headers["X-2FA-Code"] = code;
+  }
+  return headers;
+}
+
 export async function fetchClientToken(
   uuid: string,
   options: { signal?: AbortSignal; twoFactorCode?: string } = {},
 ): Promise<string> {
-  const headers: HeadersInit = {};
-  const code = options.twoFactorCode?.trim();
-  if (code) {
-    headers["X-2FA-Code"] = code;
-  }
   const response = await fetch(
     `/api/admin/client/${encodeURIComponent(uuid)}/token`,
     {
       cache: "no-store",
       signal: options.signal,
-      headers,
+      headers: twoFactorHeaders(options.twoFactorCode),
     },
   );
   if (!response.ok) {
@@ -72,4 +76,26 @@ export async function fetchClientToken(
     throw new Error("Token is unavailable");
   }
   return token;
+}
+
+export async function rotateClientToken(
+  uuid: string,
+  options: { signal?: AbortSignal; twoFactorCode?: string } = {},
+): Promise<void> {
+  const response = await fetch("/api/admin/client/token/rotate", {
+    method: "POST",
+    cache: "no-store",
+    signal: options.signal,
+    headers: {
+      "Content-Type": "application/json",
+      ...twoFactorHeaders(options.twoFactorCode),
+    },
+    body: JSON.stringify({ uuid }),
+  });
+  if (!response.ok) {
+    throw new ClientTokenRequestError(
+      response.status,
+      await readSafeErrorMessage(response),
+    );
+  }
 }

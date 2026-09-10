@@ -264,7 +264,7 @@ test("admin tables share one header color and mobile actions stay compact", () =
   assert.match(globalCssSource, /\.admin-card-actions button \{[\s\S]*background-color: transparent !important/);
   assert.match(globalCssSource, /\.admin-card-actions button:hover \{[\s\S]*background-color: var\(--accent-a3\)/);
   assert.match(globalCssSource, /\.admin-node-table tbody td:first-child[\s\S]*position: absolute/);
-  assert.match(globalCssSource, /\.admin-node-actions[\s\S]*grid-template-columns: repeat\(6/);
+  assert.match(globalCssSource, /\.admin-node-actions[\s\S]*grid-template-columns: repeat\(7/);
   assert.match(globalCssSource, /\.admin-node-country-flag > span \{[\s\S]*width: 28px[\s\S]*height: 21px/);
   assert.match(globalCssSource, /\.admin-node-actions > button \{[\s\S]*min-width: 2rem[\s\S]*min-height: 2rem/);
   assert.match(globalCssSource, /\.admin-sortable-table tbody td:first-child[\s\S]*position: absolute/);
@@ -337,7 +337,7 @@ test("mobile lists reuse the server-list card instead of CSS table cards", () =>
 test("desktop node table keeps readable name and network columns while resizing", () => {
   assert.match(
     pageSource,
-    /admin-responsive-table admin-node-table min-w-\[1136px\] table-fixed/,
+    /admin-responsive-table admin-node-table min-w-\[1172px\] table-fixed/,
   );
   assert.match(pageSource, /TableCell className="w-\[44px\] px-2 !align-middle"/);
   assert.match(pageSource, /TableHead className="w-\[44px\]"/);
@@ -346,7 +346,7 @@ test("desktop node table keeps readable name and network columns while resizing"
   assert.match(pageSource, /TableHead className="w-\[64px\] text-center"/);
   assert.equal(pageSource.match(/TableHead className="w-\[64px\]/g)?.length, 3);
   assert.match(pageSource, /TableHead className="w-\[80px\]"/);
-  assert.match(pageSource, /TableHead className="w-\[272px\]"/);
+  assert.match(pageSource, /TableHead className="w-\[308px\]"/);
   assert.match(pageSource, /<BillingButton node=\{node\} \/>/);
   assert.match(pageSource, /<TrafficCalibrationButton node=\{node\} \/>/);
   assert.match(pageSource, /text-sm hover:bg-\[var\(--accent-a2\)\][^\n]*\[&>td\]:py-2\.5/);
