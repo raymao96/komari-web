@@ -95,7 +95,7 @@
       "memUsage": "記憶體使用率",
       "metrics": "用量統計",
       "network": "網路資訊",
-      "networkHistory": "網路用量走勢",
+      "networkHistory": "網路尖峰走勢",
       "networkPanel": "網路",
       "noData": "暫無資料",
       "notFound": "查無此伺服器",
