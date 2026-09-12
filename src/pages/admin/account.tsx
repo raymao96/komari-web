@@ -286,7 +286,7 @@ const InnerLayout = () => {
                 <>
                   <label className="flex items-center gap-2 text-base font-semibold leading-6">
                     {ssoInfo?.isBound ? icon : <User className="size-5" />}
-                    {ssoInfo?.isBound ? `${displayName}账户` : t("account_settings.sso_account")}
+                    {ssoInfo?.isBound ? `${displayName} ${t("account.title")}` : t("account_settings.sso_account")}
                   </label>
                   <div className="rounded-md bg-[var(--gray-a2)] p-3 text-sm">
                     <div>
