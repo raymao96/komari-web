@@ -1,6 +1,7 @@
 export const DASHBOARD_MODULE_IDS = [
   "server_status",
   "traffic_summary",
+  "traffic_30d_summary",
   "storage_summary",
   "cost_center",
   "resource_ranking",
@@ -31,6 +32,7 @@ export const DASHBOARD_GRID_COLUMNS = 12;
 export const DASHBOARD_SUMMARY_CARD_IDS = [
   "server_status",
   "traffic_summary",
+  "traffic_30d_summary",
   "storage_summary",
   "cost_center",
 ] as const;
@@ -207,6 +209,7 @@ export function dashboardSettingsForPreset(
 const DASHBOARD_BASE_SPANS: Record<DashboardModuleId, DashboardModuleSpan> = {
   server_status: 3,
   traffic_summary: 3,
+  traffic_30d_summary: 3,
   storage_summary: 3,
   cost_center: 3,
   resource_ranking: 12,
@@ -288,6 +291,15 @@ export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
   }
   for (const id of DASHBOARD_MODULE_IDS) {
     if (!seen.has(id)) {
+      if (id === "traffic_30d_summary") {
+        const trafficIndex = modules.findIndex((module) => module.id === "traffic_summary");
+        modules.splice(trafficIndex >= 0 ? trafficIndex + 1 : modules.length, 0, {
+          id,
+          enabled: false,
+          span: DASHBOARD_BASE_SPANS[id],
+        });
+        continue;
+      }
       if (id === "cost_center") {
         const storageIndex = modules.findIndex((module) => module.id === "storage_summary");
         modules.splice(storageIndex >= 0 ? storageIndex + 1 : modules.length, 0, {
@@ -382,6 +394,7 @@ export function dashboardChartSections(settings: DashboardSettings): string[] {
   const sections: string[] = [];
   if (
     enabled.has("traffic_summary")
+    || enabled.has("traffic_30d_summary")
     || enabled.has("traffic_trend")
     || enabled.has("billing_trend")
     || enabled.has("daily_traffic_ranking")

@@ -314,7 +314,8 @@ body, * {
   line-height: 0;
 }
 
-[data-admin-shell] .km-dashboard-chip {
+[data-admin-shell] .km-dashboard-chip,
+html[data-admin-shell-active="true"] .km-dashboard-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -438,6 +439,18 @@ body, * {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
+}
+
+.km-traffic-day-dialog-title.MuiDialogTitle-root {
+  padding-bottom: 16px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 36px;
+  letter-spacing: 0;
+}
+
+.km-traffic-day-dialog-title .km-admin-dialog-title-row {
+  align-items: flex-start;
 }
 
 .km-node-dialog > .MuiDialogContentText-root {
@@ -779,7 +792,7 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
 
   .admin-responsive-table tbody {
     display: grid;
-    gap: 0.75rem;
+    gap: 10px;
   }
 
   .admin-responsive-table tbody tr {
@@ -802,10 +815,14 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
     max-width: none !important;
     gap: 0.25rem;
     overflow: hidden;
-    padding: 0.7rem 0.85rem !important;
+    padding: 0.85rem 0.9rem !important;
     border: 0 !important;
     border-top: 1px solid var(--gray-a5) !important;
     white-space: normal !important;
+  }
+
+  .admin-responsive-table tbody td:nth-child(odd):not(:last-child) {
+    border-right: 1px solid var(--gray-a5) !important;
   }
 
   .admin-responsive-table tbody td::before {
@@ -828,6 +845,10 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
     margin-top: 0;
     border-right: 0 !important;
     text-align: left !important;
+  }
+
+  .km-traffic-day-table tbody td:last-child {
+    grid-column: auto;
   }
 
   .admin-responsive-table tbody td:last-child::before {
@@ -1320,7 +1341,8 @@ html.dark [data-admin-shell] .km-theme-config-tabs-trigger[data-state="active"] 
   align-items: center !important;
 }
 
-[data-admin-shell] .km-admin-node-list {
+[data-admin-shell] .km-admin-node-list,
+html[data-admin-shell-active="true"] .km-admin-node-list {
   overflow: hidden;
   border: 1px solid rgba(145, 158, 171, 0.2);
   border-radius: 8px;
@@ -1345,7 +1367,8 @@ html.dark .admin-mobile-card-stack {
   background: #212b36;
 }
 
-[data-admin-shell] .km-admin-node-list-filters {
+[data-admin-shell] .km-admin-node-list-filters,
+html[data-admin-shell-active="true"] .km-admin-node-list-filters {
   padding: 16px 16px 20px;
   background: #f4f6f8;
   border-bottom: 1px solid rgba(145, 158, 171, 0.16);
@@ -1356,22 +1379,26 @@ html.dark .admin-mobile-card-stack {
   margin-bottom: 20px;
 }
 
-[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root {
+[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root,
+html[data-admin-shell-active="true"] .km-admin-node-list-filters .MuiOutlinedInput-root {
   background-color: #fff;
 }
 
-[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-notchedOutline {
+[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-notchedOutline,
+html[data-admin-shell-active="true"] .km-admin-node-list-filters .MuiOutlinedInput-notchedOutline {
   border-radius: inherit;
 }
 
-[data-admin-shell] .km-admin-node-list .admin-responsive-table-wrap {
+[data-admin-shell] .km-admin-node-list .admin-responsive-table-wrap,
+html[data-admin-shell-active="true"] .km-admin-node-list .admin-responsive-table-wrap {
   border: 0;
   border-radius: 0;
   background: #fff;
   box-shadow: none;
 }
 
-[data-admin-shell] .km-admin-node-list .km-admin-list-empty {
+[data-admin-shell] .km-admin-node-list .km-admin-list-empty,
+html[data-admin-shell-active="true"] .km-admin-node-list .km-admin-list-empty {
   padding: 24px 20px;
   background: #fff;
   color: #637381;
@@ -1401,6 +1428,20 @@ html[data-admin-shell-active="true"] .km-table td {
   font-size: 14.5px;
   font-weight: 400;
   vertical-align: middle;
+}
+
+[data-admin-shell] .km-traffic-day-table th:first-child,
+[data-admin-shell] .km-traffic-day-table td:first-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table th:first-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table td:first-child {
+  padding-left: 24px;
+}
+
+[data-admin-shell] .km-traffic-day-table th:last-child,
+[data-admin-shell] .km-traffic-day-table td:last-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table th:last-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table td:last-child {
+  padding-right: 32px;
 }
 
 table.return-route-task-table thead th,
@@ -1677,7 +1718,8 @@ html.dark .admin-pagination-btn {
   box-shadow: none;
 }
 
-[data-admin-shell] .km-admin-node-list .admin-pagination {
+[data-admin-shell] .km-admin-node-list .admin-pagination,
+html[data-admin-shell-active="true"] .km-admin-node-list .admin-pagination {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1894,23 +1936,29 @@ html.dark [data-admin-shell] .admin-responsive-table-wrap {
   box-shadow: none;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list {
+html.dark [data-admin-shell] .km-admin-node-list,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list {
   background: #212b36;
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: none;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list-filters {
+html.dark [data-admin-shell] .km-admin-node-list-filters,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list-filters {
   background: #161c24;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root {
+html.dark [data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list-filters .MuiOutlinedInput-root {
   background-color: #212b36;
 }
 
 html.dark [data-admin-shell] .km-admin-node-list .admin-responsive-table-wrap,
 html.dark [data-admin-shell] .km-admin-node-list .admin-pagination,
-html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty {
+html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .admin-responsive-table-wrap,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .admin-pagination,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .km-admin-list-empty {
   background: #212b36;
 }
 
@@ -1924,11 +1972,13 @@ html.dark [data-admin-shell] .admin-table-header th {
   color: #919eab;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty {
+html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .km-admin-list-empty {
   color: #919eab;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list .admin-pagination {
+html.dark [data-admin-shell] .km-admin-node-list .admin-pagination,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .admin-pagination {
   border-top-color: rgba(255, 255, 255, 0.12);
 }
 

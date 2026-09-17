@@ -5,12 +5,39 @@ import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import type { Theme } from "@mui/material/styles";
 import type { ReactNode } from "react";
 
 import LiteBrand from "@/components/LiteBrand";
 import { LITE_NAME } from "@/theme/brand";
 import { getAppAssetUrl } from "@/utils/assetUrl";
 import { LanguageMenu, ThemeMenu } from "./ChromeActions";
+
+export const authFieldSx = (theme: Theme) => {
+  const fill = theme.palette.background.paper;
+  const text = theme.palette.text.primary;
+  return {
+    "& .MuiOutlinedInput-root": {
+      minHeight: 60,
+      bgcolor: fill,
+      "& input": {
+        px: 2,
+        py: 1.75,
+      },
+      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
+        {
+          WebkitTextFillColor: text,
+          caretColor: text,
+          borderRadius: "inherit",
+          WebkitBoxShadow: `0 0 0 100px ${fill} inset`,
+          transition: "background-color 99999s ease-out 0s",
+        },
+    },
+    "& .MuiInputLabel-root": {
+      fontWeight: 600,
+    },
+  };
+};
 
 export const authPrimaryButtonSx = {
   mt: 0.25,
@@ -27,6 +54,19 @@ export const authPrimaryButtonSx = {
     color: "#fff",
     opacity: 0.48,
   },
+} as const;
+
+export const authCancelButtonSx = {
+  mt: 0.5,
+  minHeight: 36,
+  py: 0.5,
+  bgcolor: "transparent",
+  boxShadow: "none",
+  fontSize: 15,
+  fontWeight: 700,
+  color: "primary.main",
+  textDecoration: "none",
+  "&:hover": { bgcolor: "transparent", textDecoration: "none" },
 } as const;
 
 function AuthToolbar() {
@@ -141,13 +181,18 @@ export default function AuthStandAlonePage({
       >
         <Card
           data-testid={cardTestId}
-          sx={{
-            width: "100%",
-            maxWidth: 484,
-            borderRadius: "8px",
-            border: 0,
-            boxShadow:
-              "0 2px 4px rgba(28, 37, 46, 0.04), 0 20px 48px rgba(28, 37, 46, 0.10)",
+          sx={(theme) => {
+            const dark = theme.palette.mode === "dark";
+            return {
+              width: "100%",
+              maxWidth: 484,
+              borderRadius: "8px",
+              border: dark ? "1px solid rgba(145, 158, 171, 0.40)" : 0,
+              bgcolor: dark ? "rgba(255, 255, 255, 0.04)" : undefined,
+              boxShadow: dark
+                ? "0 2px 4px rgba(0, 0, 0, 0.40), 0 24px 48px rgba(0, 0, 0, 0.36)"
+                : "0 2px 4px rgba(28, 37, 46, 0.04), 0 20px 48px rgba(28, 37, 46, 0.10)",
+            };
           }}
         >
           <CardContent sx={{ p: { xs: 2.5, sm: 5.5 }, "&:last-child": { pb: { xs: 2.5, sm: 5.5 } } }}>

@@ -20,8 +20,6 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -54,6 +52,7 @@ export {
   requestDashboard,
   requestDashboardCharts,
 } from "@/utils/dashboardApi";
+export { BillingTrendPanel } from "@/components/admin/DashboardTraffic30d";
 
 export function SummaryCardSkeleton() {
   return (
@@ -67,7 +66,7 @@ export function SummaryCardSkeleton() {
 
 export function OverviewSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[0, 1, 2, 3].map((item) => (
         <SummaryCardSkeleton key={item} />
       ))}
@@ -828,56 +827,6 @@ export function TrafficTrendPanel({
             <Line type="monotone" dataKey="up" stroke="var(--color-up)" strokeWidth={2} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
             <Line type="monotone" dataKey="down" stroke="var(--color-down)" strokeWidth={2} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
           </LineChart>
-        </ChartContainer>
-      ) : <Skeleton className="min-h-[220px] w-full flex-1" />}
-    </section>
-  );
-}
-
-export function BillingTrendPanel({
-  charts,
-  error,
-  data,
-  axisWidth,
-}: {
-  charts: DashboardChartsData | null;
-  error: string | null;
-  data: Array<DashboardChartsData["traffic"]["daily"][number] & { label: string }>;
-  axisWidth: number;
-}) {
-  const { t } = useTranslation();
-  return (
-    <section className="@container flex h-full min-w-0 flex-col km-admin-surface p-3">
-      <PanelHeader
-        title={t("admin_dashboard.daily_billable")}
-        description={t("admin_dashboard.daily_billable_hint")}
-        responsive
-        trailing={<DashboardChip>{t("admin_dashboard.recent_month")}</DashboardChip>}
-      />
-      {charts && !charts.traffic.error && !charts.traffic.history_ready ? (
-        <p className="mb-2 text-xs text-muted-foreground">{t("admin_dashboard.history_preparing")}</p>
-      ) : null}
-      {error || charts?.traffic.error ? (
-        <div className="flex min-h-[220px] flex-1 items-center justify-center text-sm text-[var(--red-11)]">
-          {t("admin_dashboard.data_unavailable")}
-        </div>
-      ) : charts ? (
-        <ChartContainer config={{ billable: { label: t("admin_dashboard.billable"), color: "var(--accent-9)" } }} className="min-h-[220px] w-full flex-1 aspect-auto">
-          <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis tickLine={false} axisLine={false} width={axisWidth} tickFormatter={(value) => formatBytes(Number(value)).replace(" ", "")} />
-            <Tooltip
-              cursor={{ fill: "var(--accent-a3)" }}
-              content={({ active, payload, label }) => active && payload?.length ? (
-                <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
-                  <div className="mb-1 text-muted-foreground">{label}</div>
-                  <div className="font-medium">{t("admin_dashboard.billable")}: {formatBytes(Number(payload[0]?.value ?? 0))}</div>
-                </div>
-              ) : null}
-            />
-            <Bar dataKey="billable" fill="var(--color-billable)" radius={[2, 2, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-          </BarChart>
         </ChartContainer>
       ) : <Skeleton className="min-h-[220px] w-full flex-1" />}
     </section>

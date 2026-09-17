@@ -49,7 +49,6 @@ import {
 } from "@/hooks/useDashboardSettings";
 import {
   DASHBOARD_PRESETS,
-  DASHBOARD_SUMMARY_CARD_IDS,
   dashboardModuleSpans,
   dashboardSettingsEqual,
   dashboardSettingsForPreset,
@@ -521,13 +520,11 @@ export default function DashboardSettingsPage() {
               {draft.preset === "overview" ? (
                 <>
                   <div className="col-span-1 grid grid-cols-1 gap-2 sm:col-span-12 sm:grid-cols-4">
-                    {DASHBOARD_SUMMARY_CARD_IDS.map((id) => previewModule(id))}
+                    {(["server_status", "traffic_summary", "storage_summary", "cost_center"] as const).map((id) => previewModule(id))}
                   </div>
                   {previewModule("latency_trend", "col-span-1 sm:col-span-12")}
-                  <div className="col-span-1 grid grid-cols-1 gap-2 sm:col-span-12 sm:grid-cols-2">
-                    {(["traffic_trend", "billing_trend"] as const)
-                      .map((id) => previewModule(id))}
-                  </div>
+                  {previewModule("traffic_trend", "col-span-1 sm:col-span-6")}
+                  {previewModule("billing_trend", "col-span-1 sm:col-span-6")}
                   <div className="col-span-1 grid grid-cols-1 gap-2 sm:col-span-12 sm:grid-cols-2">
                     {(["return_route", "alerts"] as const)
                       .map((id) => previewModule(id))}

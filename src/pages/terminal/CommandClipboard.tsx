@@ -1,4 +1,3 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import Loading from "@/components/loading";
 import {
   CommandClipboardProvider,
@@ -6,17 +5,21 @@ import {
   type CommandClipboard,
 } from "@/contexts/CommandClipboardContext";
 import { useTerminal } from "@/contexts/TerminalContext";
-import {
-  Button,
-  Card,
-  Code,
-  Dialog,
-  Flex,
-  IconButton,
-  TextArea,
-  TextField,
-} from "@radix-ui/themes";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { PlusIcon, Trash2Icon, Edit2Icon } from "@/components/admin/muiIcons";
+import { remoteConfirmDialogProps } from "./remoteChrome";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -35,29 +38,30 @@ const CommandClipboardContent = ({ className }: CommandClipboardPanelProps) => {
     return <div>{t("command_clipboard.load_failed", { message: error.message })}</div>;
   }
   return (
-    <Flex
-      direction="column"
-      gap="2"
-      overflowX="clip"
-      overflowY="scroll"
-      style={{ height: "100%" }}
+    <Stack
       className={`command-clipboard-container${className ? ` ${className}` : ""}`}
+      spacing={1}
+      sx={{
+        height: "100%",
+        minHeight: 0,
+        overflowX: "clip",
+        overflowY: "auto",
+        justifyContent: "flex-start",
+        "& > .remote-command-card": { flex: "0 0 auto" },
+      }}
     >
-      <Flex>
-        <label className="text-lg font-semibold">
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1, flex: "0 0 auto" }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: 14, lineHeight: 1.3 }}>
           {t("command_clipboard.title")}
-        </label>
-      </Flex>
-      <Flex justify="between" align="center" className="mr-2">
+        </Typography>
         <AddButton />
-      </Flex>
-
+      </Stack>
       {[...commands]
         .sort((a, b) => b.weight - a.weight)
         .map((item) => (
           <CommandCard key={item.id} {...item} />
         ))}
-    </Flex>
+    </Stack>
   );
 };
 
@@ -93,45 +97,33 @@ const AddButton = () => {
     }
   };
   return (
-    <Dialog.Root open={isOpen} onOpenChange={setOpen}>
-      <Dialog.Trigger>
-        <IconButton aria-label={t("common.add")}>
-          <PlusIcon size="16" />
-        </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent className="remote-command-dialog">
-        <Dialog.Title>{t("common.add")}</Dialog.Title>
-        <form onSubmit={handleAddCommand}>
-          <Flex direction="column" gap="2">
-            <label htmlFor="name">{t("common.name")}</label>
-            <TextField.Root
-              autoFocus
-              required
-              id="name"
-              name="name"
-            />
-            <label htmlFor="text">{t("common.content")}</label>
-            <TextArea id="text" name="text" required />
-            <label htmlFor="remark">{t("common.remark")}</label>
-            <TextField.Root id="remark" name="remark" />
-            <label htmlFor="weight">{t("common.weight")}</label>
-            <TextField.Root
-              defaultValue={0}
-              type="number"
-              id="weight"
-              name="weight"
-            />
-            <Button type="submit" variant="solid" disabled={adding}>
-              {t("common.add")}
-            </Button>
-          </Flex>
-        </form>
-      </AppDialogContent>
-    </Dialog.Root>
+    <>
+      <IconButton size="small" aria-label={t("common.add")} onClick={() => setOpen(true)}>
+        <PlusIcon size="16" />
+      </IconButton>
+      <Dialog open={isOpen} onClose={() => setOpen(false)} {...remoteConfirmDialogProps}>
+        <Box
+          component="form"
+          onSubmit={handleAddCommand}
+          sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}
+        >
+          <DialogTitle>{t("common.add")}</DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+            <TextField size="small" autoFocus required id="add-command-name" name="name" label={t("common.name")} fullWidth />
+            <TextField size="small" required id="add-command-text" name="text" label={t("common.content")} fullWidth multiline minRows={3} />
+            <TextField size="small" id="add-command-remark" name="remark" label={t("common.remark")} fullWidth />
+            <TextField size="small" defaultValue={0} type="number" id="add-command-weight" name="weight" label={t("common.weight")} fullWidth />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+            <Button type="submit" variant="contained" disabled={adding}>{t("common.add")}</Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </>
   );
 };
 
-// DeleteButton: 删除命令
 const DeleteButton = ({ id }: { id: number }) => {
   const { t } = useTranslation();
   const { deleteCommand } = useCommandClipboard();
@@ -150,29 +142,26 @@ const DeleteButton = ({ id }: { id: number }) => {
     }
   };
   return (
-    <Dialog.Root open={isOpen} onOpenChange={setOpen}>
-      <Dialog.Trigger>
-        <IconButton aria-label={t("common.delete")} color="red">
-          <Trash2Icon size="16" />
-        </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent>
-        <Dialog.Title>{t("common.delete")}</Dialog.Title>
-        <Dialog.Description>{t("common.confirm_delete")}</Dialog.Description>
-        <Flex justify="end" gap="2" className="mt-4">
-          <Dialog.Close>
-            <Button variant="soft">{t("common.cancel")}</Button>
-          </Dialog.Close>
-          <Button onClick={handleDelete} disabled={deleting} color="red">
+    <>
+      <IconButton size="small" aria-label={t("common.delete")} color="error" onClick={() => setOpen(true)}>
+        <Trash2Icon size="16" />
+      </IconButton>
+      <Dialog open={isOpen} onClose={() => setOpen(false)} {...remoteConfirmDialogProps}>
+        <DialogTitle>{t("common.delete")}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t("common.confirm_delete")}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+          <Button onClick={handleDelete} disabled={deleting} color="error" variant="contained">
             {t("common.delete")}
           </Button>
-        </Flex>
-      </AppDialogContent>
-    </Dialog.Root>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 
-// EditButton: 编辑命令
 const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
   const { t } = useTranslation();
   const { updateCommand } = useCommandClipboard();
@@ -185,7 +174,7 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
     const newName = formData.get("name") as string;
     const newText = formData.get("text") as string;
     const newRemark = formData.get("remark") as string;
-    const weight = formData.get("weight") as string;
+    const nextWeight = formData.get("weight") as string;
     try {
       setUpdating(true);
       await updateCommand(
@@ -193,7 +182,7 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
         newName,
         newText,
         newRemark,
-        weight ? parseInt(weight) : 0
+        nextWeight ? parseInt(nextWeight) : 0,
       );
       setOpen(false);
       toast.success(t("common.updated_successfully"));
@@ -204,73 +193,76 @@ const EditButton = ({ id, name, text, remark, weight }: CommandClipboard) => {
     }
   };
   return (
-    <Dialog.Root open={isOpen} onOpenChange={setOpen}>
-      <Dialog.Trigger>
-        <IconButton aria-label={t("common.edit")}>
-          <Edit2Icon size="16" />
-        </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent>
-        <Dialog.Title>{t("common.edit")}</Dialog.Title>
-        <form onSubmit={handleUpdate}>
-          <Flex direction="column" gap="2">
-            <label htmlFor={`name`}>{t("common.name")}</label>
-            <TextField.Root id={`name`} name="name" defaultValue={name} />
-            <label htmlFor={`text`}>{t("common.content")}</label>
-            <TextArea id={`text`} name="text" defaultValue={text} />
-            <label htmlFor={`remark`}>{t("common.remark")}</label>
-            <TextField.Root id={`remark`} name="remark" defaultValue={remark} />
-            <label htmlFor={`weight`}>{t("common.weight")}</label>
-            <TextField.Root
-              type="number"
-              id={`weight`}
-              name="weight"
-              defaultValue={weight}
-            />
-            <Flex justify="end" gap="2" className="mt-4">
-              <Dialog.Close>
-                <Button variant="soft">{t("common.cancel")}</Button>
-              </Dialog.Close>
-              <Button type="submit" disabled={updating}>
-                {t("common.update")}
-              </Button>
-            </Flex>
-          </Flex>
-        </form>
-      </AppDialogContent>
-    </Dialog.Root>
+    <>
+      <IconButton size="small" aria-label={t("common.edit")} onClick={() => setOpen(true)}>
+        <Edit2Icon size="16" />
+      </IconButton>
+      <Dialog open={isOpen} onClose={() => setOpen(false)} {...remoteConfirmDialogProps}>
+        <Box
+          component="form"
+          onSubmit={handleUpdate}
+          sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}
+        >
+          <DialogTitle>{t("common.edit")}</DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+            <TextField size="small" id="edit-command-name" name="name" label={t("common.name")} defaultValue={name} fullWidth />
+            <TextField size="small" id="edit-command-text" name="text" label={t("common.content")} defaultValue={text} fullWidth multiline minRows={3} />
+            <TextField size="small" id="edit-command-remark" name="remark" label={t("common.remark")} defaultValue={remark} fullWidth />
+            <TextField size="small" type="number" id="edit-command-weight" name="weight" label={t("common.weight")} defaultValue={weight} fullWidth />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+            <Button type="submit" variant="contained" disabled={updating}>{t("common.update")}</Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </>
   );
 };
 
 const CommandCard = (item: CommandClipboard) => {
   const { t } = useTranslation();
   const { sendCommand } = useTerminal();
+  const remark = item.remark?.trim();
   return (
-    <Flex key={item.id} direction="column">
-      <Card>
-        <Flex direction="column" gap="2">
-          <Flex justify="between" align="center">
-            <label className="text-lg font-semibold">{item.name}</label>
-            <Button onClick={() => sendCommand(item.text)}>
+    <Card className="remote-command-card" variant="outlined">
+      <CardContent sx={{ p: "12px 14px !important" }}>
+        <Stack spacing={0.75}>
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>{item.name}</Typography>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => sendCommand(item.text)}
+              sx={{ minHeight: 26, px: 1, fontSize: 12 }}
+            >
               {t("common.execute")}
             </Button>
-          </Flex>
-          <Code className="command-text" style={{ whiteSpace: "pre-wrap" }}>
+          </Stack>
+          <Typography
+            component="pre"
+            className="command-text"
+            sx={{ m: 0, whiteSpace: "pre-wrap", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", fontSize: 12, lineHeight: 1.45 }}
+          >
             {item.text.length > 300
               ? item.text.substring(0, 300) +
                 `\n...(${t("common.have_been_omitted", {
                   count: item.text.length - 300,
                 })})`
               : item.text}
-          </Code>
-          <label className="text-sm text-gray-500">{item.remark}</label>
-          <Flex justify="end" gap="2">
+          </Typography>
+          {remark ? (
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.4 }}>
+              {remark}
+            </Typography>
+          ) : null}
+          <Stack direction="row" spacing={0} sx={{ justifyContent: "flex-end" }}>
             <EditButton {...item} />
             <DeleteButton id={item.id} />
-          </Flex>
-        </Flex>
-      </Card>
-    </Flex>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 };
 

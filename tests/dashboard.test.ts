@@ -7,6 +7,7 @@ import {
   dashboardOnlinePercent,
   dashboardRuntimeStorageTotal,
   dashboardTrafficAxisWidth,
+  filterAndSortTrafficDayItems,
   groupByVisualRow,
   shortDashboardDay,
   type DashboardData,
@@ -198,8 +199,9 @@ test("cost center uses the this-month-cost title and banknote badge without an o
 
 test("today's billable summary always lists upload and download together", () => {
   const source = readFileSync(new URL("../src/pages/admin/dashboard.tsx", import.meta.url), "utf8");
-  const block = source.match(/case "traffic_summary":[\s\S]*?case "storage_summary":/);
+  const block = source.match(/case "traffic_summary":[\s\S]*?case "traffic_30d_summary":/);
   assert.ok(block);
+  assert.match(block[0], /admin_dashboard\.today_overview/);
   assert.match(block[0], /admin_dashboard\.upload/);
   assert.match(block[0], /admin_dashboard\.download/);
   assert.match(block[0], /today_up/);
@@ -229,4 +231,35 @@ test("dashboard ranking chips share the same pressed chip style", () => {
   assert.match(css, /\.km-dashboard-chip/);
   assert.match(css, /html\.dark \[data-admin-shell\][\s\S]*--accent-a3: rgba\(59, 158, 255, 0\.24\)/);
   assert.match(css, /html\.dark \[data-admin-shell\][\s\S]*--accent-11: #70b8ff/);
+});
+
+test("day traffic details can be searched and sorted without loading on dashboard open", () => {
+  const items = [
+    { uuid: "b", name: "beta", ipv4: "10.0.0.2", group: "lab", tags: "dev;edge<blue>", up: 20, down: 5, billable: 25 },
+    { uuid: "a", name: "alpha", ipv4: "10.0.0.1", group: "prod", tags: "core", up: 10, down: 40, billable: 50 },
+  ];
+  assert.deepEqual(
+    filterAndSortTrafficDayItems(items, "alp", "billable", "desc").map((item) => item.name),
+    ["alpha"],
+  );
+  assert.deepEqual(
+    filterAndSortTrafficDayItems(items, "10.0.0.2", "name", "asc").map((item) => item.name),
+    ["beta"],
+  );
+  assert.deepEqual(
+    filterAndSortTrafficDayItems(items, "prod", "up", "desc").map((item) => item.name),
+    ["alpha"],
+  );
+  assert.deepEqual(
+    filterAndSortTrafficDayItems(items, "edge", "billable", "desc").map((item) => item.name),
+    ["beta"],
+  );
+  assert.deepEqual(
+    filterAndSortTrafficDayItems(items, "", "name", "asc").map((item) => item.name),
+    ["alpha", "beta"],
+  );
+  assert.deepEqual(
+    filterAndSortTrafficDayItems(items, "", "up", "desc").map((item) => item.name),
+    ["beta", "alpha"],
+  );
 });

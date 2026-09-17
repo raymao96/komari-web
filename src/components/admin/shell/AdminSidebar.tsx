@@ -120,6 +120,13 @@ const nestedNavRowSx = {
   alignItems: "center",
 } as const;
 
+const navLabelSx = {
+  fontSize: 16,
+  lineHeight: "20px",
+  whiteSpace: "normal",
+  overflowWrap: "break-word",
+} as const;
+
 function NavLinkItem({
   item,
   onNavigate,
@@ -145,7 +152,7 @@ function NavLinkItem({
   const handleNavigateClick = (event: MouseEvent<HTMLElement>) => {
     if (
       remoteGate &&
-      guardRemoteManagementNav(event, item.path, remoteGate.ensureEnabled)
+      guardRemoteManagementNav(event, item.path, remoteGate)
     ) {
       return;
     }
@@ -165,15 +172,13 @@ function NavLinkItem({
         {renderIcon(item.icon, label, active)}
       </ListItemIcon>
       <ListItemText
-        sx={{ my: 0, display: "flex", alignItems: "center" }}
+        sx={{ my: 0, minWidth: 0, display: "flex", alignItems: "center" }}
         primary={label}
         slotProps={{
           primary: {
             sx: {
-              fontSize: 16,
+              ...navLabelSx,
               fontWeight: active ? 600 : 400,
-              lineHeight: "20px",
-              whiteSpace: "nowrap",
             },
           },
         }}
@@ -418,7 +423,7 @@ function MiniFlyoutMenu({
           className: `admin-mini-nav-menu${slide ? " admin-mini-nav-slide" : ""}`,
           sx: {
             ml: 1,
-            minWidth: 200,
+            minWidth: 248,
             py: 0.75,
             overflow: "hidden",
             pointerEvents: "auto",
@@ -478,14 +483,13 @@ function MiniFlyoutMenu({
                     {renderIcon(child.icon, childLabel, active)}
                   </ListItemIcon>
                   <ListItemText
+                    sx={{ minWidth: 0 }}
                     primary={childLabel}
                     slotProps={{
                       primary: {
                         sx: {
-                          fontSize: 16,
-                          lineHeight: "20px",
+                          ...navLabelSx,
                           fontWeight: active ? 600 : 400,
-                          whiteSpace: "nowrap",
                         },
                       },
                     }}
@@ -511,7 +515,7 @@ function MiniFlyoutMenu({
                         guardRemoteManagementNav(
                           event,
                           child.path,
-                          remoteGate.ensureEnabled,
+                          remoteGate,
                         )
                       ) {
                         return;
@@ -540,7 +544,7 @@ function MiniFlyoutMenu({
                       guardRemoteManagementNav(
                         event,
                         child.path,
-                        remoteGate.ensureEnabled,
+                        remoteGate,
                       )
                     ) {
                       return;
@@ -715,15 +719,13 @@ export default function AdminSidebar({
             {renderIcon(item.icon, item.rawLabel || t(item.labelKey), childActive)}
           </ListItemIcon>
           <ListItemText
-            sx={{ my: 0, display: "flex", alignItems: "center" }}
+            sx={{ my: 0, minWidth: 0, mr: 0.5, display: "flex", alignItems: "center" }}
             primary={item.rawLabel || t(item.labelKey)}
             slotProps={{
               primary: {
                 sx: {
-                  fontSize: 16,
+                  ...navLabelSx,
                   fontWeight: childActive || open ? 600 : 400,
-                  lineHeight: "20px",
-                  whiteSpace: "nowrap",
                 },
               },
             }}
@@ -731,6 +733,7 @@ export default function AdminSidebar({
           <ExpandMore
             sx={{
               fontSize: 18,
+              flexShrink: 0,
               transform: open ? "rotate(0deg)" : "rotate(-90deg)",
               transition: "transform 0.2s",
             }}
