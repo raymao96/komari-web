@@ -231,3 +231,17 @@ test("remote management copy is shortened and present in every locale", () => {
     assert.equal(typeof locale.admin.nodeTable.enableRemoteControl, "string");
   }
 });
+
+test("MCP grant notes are not treated as a username field", () => {
+  assert.match(mcpSource, /name="mcp-purpose-note"/);
+  assert.match(mcpSource, /autoComplete="off"/);
+  assert.match(mcpSource, /data-bwignore/);
+  assert.match(mcpSource, /multiline/);
+  assert.match(mcpSource, /readOnlyUntilFocus/);
+  assert.match(mcpSource, /component="form"/);
+  assert.match(mcpSource, /left: "-10000px"/);
+  assert.match(mcpSource, /name="username"/);
+  assert.match(mcpSource, /autoComplete="username"/);
+  assert.match(mcpSource, /name=\{twoFaEnabled \? "otp" : "password"\}/);
+  assert.match(mcpSource, /autoComplete=\{twoFaEnabled \? "one-time-code" : "current-password"\}/);
+});

@@ -87,9 +87,8 @@ type Props = {
   online: boolean;
   active: boolean;
   compact: boolean;
-  grant: string;
+  createSession: (uuid: string, signal?: AbortSignal) => Promise<{ session_id: string; browser_ticket: string }>;
   onDuplicate: () => void;
-  onGrantRejected?: () => void;
   onConnectionChange?: (tabId: string, state: ConnectionState) => void;
 };
 
@@ -191,7 +190,7 @@ function isEditableElement(element: Element | null) {
     Boolean(element?.closest('[role="dialog"]'));
 }
 
-export default function RemoteSession({ tabId, node, live, online, active, compact, grant, onDuplicate, onGrantRejected, onConnectionChange }: Props) {
+export default function RemoteSession({ tabId, node, live, online, active, compact, createSession, onDuplicate, onConnectionChange }: Props) {
   const { t } = useTranslation();
   const { settings, loading: settingsLoading, error: settingsError } = useXtermjsSettings();
   const terminalHost = useRef<HTMLDivElement>(null);
@@ -520,40 +519,20 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
       remoteReadyRef.current = false;
       setRemoteReady(false);
       try {
-        if (!grant) {
-          throw new Error(t("terminal.session.errors.grant_required"));
-        }
         if (node.remote_protocol !== 2) {
           throw new Error(t("terminal.session.errors.agent_too_old"));
         }
         if (node.remote_control_enabled === false) {
           throw new Error(t("terminal.session.errors.agent_disabled"));
         }
-        const response = await fetch("/api/admin/client/remote/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ uuid: node.uuid, grant }),
-          signal: abortController.signal,
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error(t("terminal.session.session_full"));
-          }
-          const message = String(payload?.message ?? "");
-          if (/grant/i.test(message)) {
-            onGrantRejected?.();
-          }
-          throw new Error(localizeRemoteError(payload?.message, t));
-        }
-        sessionLease = createRemoteSessionLease(payload.data.session_id);
+        const payload = await createSession(node.uuid, abortController.signal);
+        sessionLease = createRemoteSessionLease(payload.session_id);
         if (disposed) {
           sessionLease.release();
           return;
         }
         const sessionID = sessionLease.sessionID;
-        const browserTicket = payload.data.browser_ticket;
+        const browserTicket = payload.browser_ticket;
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         ws = new WebSocket(`${protocol}//${window.location.host}/api/admin/client/remote`);
         ws.binaryType = "arraybuffer";
@@ -653,7 +632,7 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
       sessionLease?.release();
       if (socket.current === ws) socket.current = null;
     };
-  }, [grant, node.remote_control_enabled, node.remote_protocol, node.uuid, onGrantRejected, reconnectKey, resizeTerminal, t, terminalReady]);
+  }, [createSession, node.remote_control_enabled, node.remote_protocol, node.uuid, reconnectKey, resizeTerminal, t, terminalReady]);
 
   useEffect(() => {
     if (!active) return;

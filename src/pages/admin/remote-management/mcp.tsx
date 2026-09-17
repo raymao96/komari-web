@@ -889,38 +889,72 @@ function FieldBox({
   onChange,
   placeholder,
   type,
+  name,
   autoComplete,
   inputMode,
   maxLength,
   ariaLabel,
+  multiline,
+  readOnlyUntilFocus,
 }: {
   icon?: ReactNode;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  name?: string;
   autoComplete?: string;
   inputMode?: "text" | "numeric" | "search";
   maxLength?: number;
   ariaLabel?: string;
+  multiline?: boolean;
+  readOnlyUntilFocus?: boolean;
 }) {
+  const ignorePasswordManager = autoComplete === "off";
+  const [readOnly, setReadOnly] = useState(Boolean(readOnlyUntilFocus));
+  const unlock = () => {
+    if (readOnlyUntilFocus) setReadOnly(false);
+  };
   return (
     <Box sx={FIELD_SX}>
       {icon ? <Box sx={{ color: "text.secondary", display: "flex" }}>{icon}</Box> : null}
       <InputBase
+        name={name}
         value={value}
         placeholder={placeholder}
         type={type}
         autoComplete={autoComplete}
-        inputProps={{ inputMode, maxLength, "aria-label": ariaLabel }}
+        multiline={multiline}
+        rows={multiline ? 1 : undefined}
+        readOnly={readOnly}
+        onFocus={unlock}
+        onPointerDown={unlock}
+        inputProps={{
+          inputMode,
+          maxLength,
+          "aria-label": ariaLabel,
+          autoCorrect: ignorePasswordManager ? "off" : undefined,
+          autoCapitalize: ignorePasswordManager ? "none" : undefined,
+          spellCheck: ignorePasswordManager ? false : undefined,
+          "data-1p-ignore": ignorePasswordManager || undefined,
+          "data-lpignore": ignorePasswordManager ? "true" : undefined,
+          "data-bwignore": ignorePasswordManager || undefined,
+          "data-form-type": ignorePasswordManager ? "other" : undefined,
+        }}
         onChange={(event) => onChange(event.target.value)}
         sx={{
           flex: 1,
           minWidth: 0,
           fontSize: 14,
           height: 40,
-          "& input": { p: 0, height: 40 },
-          "& input::placeholder": { color: "text.disabled", opacity: 1 },
+          "& input, & textarea": {
+            p: 0,
+            height: 40,
+            lineHeight: "40px",
+            resize: "none !important",
+            overflow: "hidden",
+          },
+          "& input::placeholder, & textarea::placeholder": { color: "text.disabled", opacity: 1 },
         }}
       />
     </Box>
@@ -2507,6 +2541,7 @@ function MCPAuthorizeDialog({
             onChange={setQuery}
             placeholder={t("mcp.search_nodes")}
             inputMode="search"
+            autoComplete="off"
             ariaLabel={t("mcp.search_nodes")}
           />
         </Box>
@@ -2733,14 +2768,46 @@ function MCPAuthorizeDialog({
               {t("mcp.note")}{" "}
               <Box component="span" sx={{ color: "text.secondary" }}>{t("mcp.note_optional")}</Box>
             </Typography>
-            <FieldBox value={note} onChange={setNote} ariaLabel={t("mcp.note")} />
+            <FieldBox
+              name="mcp-purpose-note"
+              value={note}
+              onChange={setNote}
+              autoComplete="off"
+              multiline
+              readOnlyUntilFocus
+              ariaLabel={t("mcp.note")}
+            />
           </Box>
-          <Box>
+          <Box
+            component="form"
+            autoComplete="on"
+            onSubmit={(event) => event.preventDefault()}
+            sx={{ position: "relative" }}
+          >
+            <Box
+              component="input"
+              type="text"
+              name="username"
+              autoComplete="username"
+              tabIndex={-1}
+              aria-hidden
+              sx={{
+                position: "absolute",
+                left: "-10000px",
+                top: 0,
+                width: 200,
+                height: 40,
+                border: 0,
+                padding: 0,
+                margin: 0,
+              }}
+            />
             <Typography sx={{ display: "block", fontSize: 13, mb: 1 }}>
               {twoFaEnabled ? t("mcp.totp_label") : t("login.password")}
             </Typography>
             <FieldBox
               icon={twoFaEnabled ? <LockKeyhole size={16} /> : undefined}
+              name={twoFaEnabled ? "otp" : "password"}
               value={secret}
               onChange={setSecret}
               type={twoFaEnabled ? "text" : "password"}

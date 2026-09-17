@@ -1,6 +1,5 @@
 import Loading from "@/components/loading";
 import {
-  CommandClipboardProvider,
   useCommandClipboard,
   type CommandClipboard,
 } from "@/contexts/CommandClipboardContext";
@@ -66,9 +65,7 @@ const CommandClipboardContent = ({ className }: CommandClipboardPanelProps) => {
 };
 
 const CommandClipboardPanel = (props: CommandClipboardPanelProps) => (
-  <CommandClipboardProvider>
-    <CommandClipboardContent {...props} />
-  </CommandClipboardProvider>
+  <CommandClipboardContent {...props} />
 );
 
 const AddButton = () => {

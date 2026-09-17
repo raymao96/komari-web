@@ -90,6 +90,17 @@ const trafficDayCache = new Map<string, DashboardTrafficDayResponse>();
 const trafficDayCacheLimit = 8;
 let pendingTrafficDayRequest: { day: string; request: Promise<DashboardTrafficDayResponse> } | null = null;
 
+export function getCachedDashboardTrafficDay(day: string): DashboardTrafficDayResponse | null {
+  return trafficDayCache.get(day) ?? null;
+}
+
+export function prefetchDashboardTrafficDay(day: string) {
+  if (!day || trafficDayCache.has(day)) return;
+  void requestDashboardTrafficDay(day).catch(() => {
+    // Hover prefetch is best-effort; clicking the bar still reports errors.
+  });
+}
+
 export async function requestDashboardTrafficDay(day: string): Promise<DashboardTrafficDayResponse> {
   const cached = trafficDayCache.get(day);
   if (cached) return cached;

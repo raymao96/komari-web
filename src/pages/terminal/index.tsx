@@ -5,6 +5,8 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Drawer from "@mui/material/Drawer";
 import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import Fade from "@mui/material/Fade";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
@@ -36,7 +38,9 @@ import RemoteSession, { type ConnectionState, type RemoteNode } from "./RemoteSe
 import { getRemoteLaunchTarget } from "@/utils/remoteLaunch";
 import { createRandomId } from "@/utils/randomId";
 import {
+  captureRotatedRemoteGrant,
   clearStoredRemoteGrant,
+  isRemoteGrantLive,
   loadStoredRemoteGrant,
   localizeRemoteError,
   saveStoredRemoteGrant,
@@ -45,6 +49,7 @@ import { useAccount } from "@/contexts/AccountContext";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import { SettingsProvider } from "@/lib/api";
 import { RequireAllowRemoteManagement } from "@/components/admin/RemoteManagementGate";
+import { CommandClipboardProvider } from "@/contexts/CommandClipboardContext";
 import Loading from "@/components/loading";
 import { mergeLatestStatus } from "@/utils/liveData";
 import { resolveAdminAuthView } from "@/utils/adminAuth";
@@ -54,7 +59,7 @@ import LiteBrand from "@/components/LiteBrand";
 import { AppearanceSegment, ThemeMenu } from "@/components/admin/shell/ChromeActions";
 import AuthStandAlonePage, { authCancelButtonSx, authFieldSx, authPrimaryButtonSx } from "@/components/admin/shell/AuthStandAlonePage";
 import { useTranslation } from "react-i18next";
-import { clearRemoteVisualViewport, firstNodeTag, REMOTE_COMPACT_QUERY, SiteFavicon, syncRemoteVisualViewport } from "./remoteChrome";
+import { clearRemoteVisualViewport, firstNodeTag, REMOTE_COMPACT_QUERY, SiteFavicon, remoteConfirmDialogProps, syncRemoteVisualViewport } from "./remoteChrome";
 import "./Terminal.css";
 
 type RemoteTab = {
@@ -127,6 +132,126 @@ function SortableRemoteTab({
   );
 }
 
+type RemoteAuthFieldsProps = {
+  twoFaEnabled: boolean;
+  authFailed: boolean;
+  otpInput: string;
+  passwordInput: string;
+  otpError: string;
+  submitLabel: string;
+  cancelLabel: string;
+  onOtp: (value: string) => void;
+  onPassword: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  onRetry: () => void;
+  cancelAsText?: boolean;
+};
+
+function RemoteAuthFields({
+  twoFaEnabled,
+  authFailed,
+  otpInput,
+  passwordInput,
+  otpError,
+  submitLabel,
+  cancelLabel,
+  onOtp,
+  onPassword,
+  onSubmit,
+  onCancel,
+  onRetry,
+  cancelAsText = false,
+}: RemoteAuthFieldsProps) {
+  const { t } = useTranslation();
+  if (authFailed) {
+    return (
+      <Button variant="contained" fullWidth onClick={onRetry} sx={authPrimaryButtonSx}>
+        {t("common.retry")}
+      </Button>
+    );
+  }
+  return (
+    <Box
+      component="form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <Stack spacing={2}>
+        {twoFaEnabled ? (
+          <TextField
+            fullWidth
+            type="text"
+            inputMode="numeric"
+            autoFocus
+            autoComplete="one-time-code"
+            label={t("login.two_factor")}
+            value={otpInput}
+            error={Boolean(otpError)}
+            helperText={otpError || undefined}
+            onChange={(event) => onOtp(event.target.value.replace(/\D/g, ""))}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={authFieldSx}
+          />
+        ) : (
+          <TextField
+            fullWidth
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            label={t("login.password")}
+            value={passwordInput}
+            error={Boolean(otpError)}
+            helperText={otpError || undefined}
+            onChange={(event) => onPassword(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={authFieldSx}
+          />
+        )}
+        <Button
+          type="submit"
+          variant="contained"
+          fullWidth
+          disabled={twoFaEnabled ? !otpInput : !passwordInput}
+          sx={authPrimaryButtonSx}
+        >
+          {submitLabel}
+        </Button>
+        {cancelAsText ? (
+          <Box sx={{ display: "flex", justifyContent: "center" }}>
+            <Box
+              component="button"
+              type="button"
+              onClick={onCancel}
+              sx={{
+                ...authCancelButtonSx,
+                mt: 0.25,
+                minHeight: "auto",
+                minWidth: 0,
+                width: "auto",
+                px: 0,
+                py: 0,
+                lineHeight: 1.4,
+                border: 0,
+                cursor: "pointer",
+                font: "inherit",
+              }}
+            >
+              {cancelLabel}
+            </Box>
+          </Box>
+        ) : (
+          <Button fullWidth onClick={onCancel} sx={authCancelButtonSx}>
+            {cancelLabel}
+          </Button>
+        )}
+      </Stack>
+    </Box>
+  );
+}
+
 export default function TerminalWorkspace() {
   const { t } = useTranslation();
   const accountState = useAccount();
@@ -173,15 +298,23 @@ function TerminalWorkspaceInner() {
   const [connectionByTab, setConnectionByTab] = useState<Record<string, ConnectionState>>({});
   const [nodesLoaded, setNodesLoaded] = useState(false);
   const [authorization, setAuthorization] = useState<AuthorizationState>("checking");
+  const [workspaceEntered, setWorkspaceEntered] = useState(false);
+  const [grantLive, setGrantLive] = useState(false);
+  const [reauthOpen, setReauthOpen] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [otpError, setOtpError] = useState("");
-  const [grant, setGrant] = useState("");
   const initialized = useRef(false);
   const authorizationStarted = useRef(false);
   const grantRef = useRef("");
   const grantExpiresAtRef = useRef(0);
+  const pageIDRef = useRef(loadStoredRemoteGrant("remote")?.pageID || createRandomId());
+  const sessionQueue = useRef(Promise.resolve());
   const liveDataRef = useRef<LiveDataResponse | null>(null);
+  const tabsRef = useRef(tabs);
+  const workspaceEnteredRef = useRef(false);
+  tabsRef.current = tabs;
+  workspaceEnteredRef.current = workspaceEntered;
   const { callViaHTTP } = useRPC2Call();
   const tabSensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -190,16 +323,16 @@ function TerminalWorkspaceInner() {
   );
 
   useEffect(() => {
-    if (authorization !== "authorized") {
+    if (!workspaceEntered) {
       document.documentElement.classList.remove("remote-terminal-open");
       return;
     }
     document.documentElement.classList.add("remote-terminal-open");
     return () => document.documentElement.classList.remove("remote-terminal-open");
-  }, [authorization]);
+  }, [workspaceEntered]);
 
   useLayoutEffect(() => {
-    if (authorization !== "authorized" || !compact) {
+    if (!workspaceEntered || !compact) {
       clearRemoteVisualViewport();
       return;
     }
@@ -216,10 +349,14 @@ function TerminalWorkspaceInner() {
       window.visualViewport?.removeEventListener("scroll", update);
       clearRemoteVisualViewport();
     };
-  }, [authorization, compact]);
+  }, [compact, workspaceEntered]);
 
   const addTab = useCallback((uuid: string) => {
     if (!uuid) return;
+    if (!isRemoteGrantLive(grantRef.current, grantExpiresAtRef.current)) {
+      setReauthOpen(true);
+      return;
+    }
     if (tabs.length >= maxTabs) {
       toast.error(t("terminal.session.max_tabs", { count: maxTabs }));
       return;
@@ -254,6 +391,7 @@ function TerminalWorkspaceInner() {
         credentials: "same-origin",
         body: JSON.stringify({
           scope: "remote",
+          page_id: pageIDRef.current,
           password: password || undefined,
           otp: otp || undefined,
         }),
@@ -265,33 +403,40 @@ function TerminalWorkspaceInner() {
           throw new Error(t("terminal.session.auth_failed"));
         }
         grantRef.current = nextGrant;
-        setGrant(nextGrant);
         const expiresAt = Date.parse(String(payload?.data?.expires_at ?? ""));
         grantExpiresAtRef.current = Number.isFinite(expiresAt) ? expiresAt : 0;
-        saveStoredRemoteGrant("remote", nextGrant, grantExpiresAtRef.current);
+        saveStoredRemoteGrant("remote", nextGrant, grantExpiresAtRef.current, pageIDRef.current);
+        workspaceEnteredRef.current = true;
+        setWorkspaceEntered(true);
+        setGrantLive(true);
         setAuthorization("authorized");
+        setReauthOpen(false);
         return;
       }
-      if (response.status === 429) {
-        setAuthorization("required");
-        setOtpError(
-          localizeRemoteError(payload?.message, t) || t("terminal.session.auth_rate_limited"),
-        );
+      const message = localizeRemoteError(payload?.message, t) || (
+        response.status === 429 ? t("terminal.session.auth_rate_limited") : t("common.error")
+      );
+      setOtpError(message);
+      if (workspaceEnteredRef.current) {
+        setReauthOpen(true);
         return;
       }
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 429 || response.status === 401 || response.status === 403) {
         setAuthorization("required");
-        setOtpError(localizeRemoteError(payload?.message, t) || t("common.error"));
         return;
       }
       throw new Error(localizeRemoteError(payload?.message, t) || t("terminal.session.auth_failed"));
     } catch (error) {
-      setAuthorization("error");
       setOtpError(
         error instanceof Error
           ? localizeRemoteError(error.message, t)
           : t("terminal.session.auth_failed"),
       );
+      if (!workspaceEnteredRef.current) {
+        setAuthorization("error");
+      } else {
+        setReauthOpen(true);
+      }
     } finally {
       setPasswordInput("");
       setOtpInput("");
@@ -304,8 +449,11 @@ function TerminalWorkspaceInner() {
     const stored = loadStoredRemoteGrant("remote");
     if (stored) {
       grantRef.current = stored.grant;
-      setGrant(stored.grant);
       grantExpiresAtRef.current = stored.expiresAt;
+      if (stored.pageID) pageIDRef.current = stored.pageID;
+      workspaceEnteredRef.current = true;
+      setWorkspaceEntered(true);
+      setGrantLive(true);
       setAuthorization("authorized");
       return;
     }
@@ -313,28 +461,87 @@ function TerminalWorkspaceInner() {
   }, []);
 
   useEffect(() => {
-    if (authorization !== "authorized") return;
-    const expiresAt = grantExpiresAtRef.current;
-    if (!expiresAt) return;
+    if (!grantLive) return;
     const timer = window.setInterval(() => {
       if (Date.now() < grantExpiresAtRef.current) return;
       grantRef.current = "";
-      setGrant("");
       grantExpiresAtRef.current = 0;
       clearStoredRemoteGrant("remote");
-      setAuthorization("required");
+      setGrantLive(false);
       setOtpError("");
+      if (workspaceEnteredRef.current) {
+        setPickerOpen(false);
+        setReauthOpen(true);
+        return;
+      }
+      setAuthorization("required");
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [authorization]);
+  }, [grantLive]);
 
   const handleGrantRejected = useCallback(() => {
     grantRef.current = "";
-    setGrant("");
     grantExpiresAtRef.current = 0;
     clearStoredRemoteGrant("remote");
+    setGrantLive(false);
+    setOtpError("");
+    if (tabsRef.current.length > 0) {
+      setPickerOpen(false);
+      setReauthOpen(true);
+      return;
+    }
+    workspaceEnteredRef.current = false;
+    setWorkspaceEntered(false);
+    setReauthOpen(false);
     setAuthorization("required");
   }, []);
+
+  const createRemoteSession = useCallback((uuid: string, signal?: AbortSignal) => {
+    let outcome: Promise<{ session_id: string; browser_ticket: string }>;
+    const queued = sessionQueue.current.catch(() => undefined).then(async () => {
+      const grant = grantRef.current;
+      if (!grant) {
+        handleGrantRejected();
+        throw new Error(t("terminal.session.errors.grant_required"));
+      }
+      const response = await fetch("/api/admin/client/remote/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ uuid, grant, page_id: pageIDRef.current }),
+        signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      const rotated = captureRotatedRemoteGrant(payload);
+      if (rotated) {
+        grantRef.current = rotated.grant;
+        if (rotated.expiresAt) {
+          grantExpiresAtRef.current = rotated.expiresAt;
+        }
+        saveStoredRemoteGrant("remote", rotated.grant, grantExpiresAtRef.current, pageIDRef.current);
+      }
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error(t("terminal.session.session_full"));
+        }
+        const message = String(payload?.message ?? "");
+        if (!rotated && /grant/i.test(message)) {
+          handleGrantRejected();
+        }
+        throw new Error(localizeRemoteError(payload?.message, t));
+      }
+      const data = payload?.data ?? {};
+      const sessionID = String(data.session_id ?? "");
+      const browserTicket = String(data.browser_ticket ?? "");
+      if (!sessionID || !browserTicket) {
+        throw new Error(t("terminal.session.errors.secure_session_failed"));
+      }
+      return { session_id: sessionID, browser_ticket: browserTicket };
+    });
+    outcome = queued;
+    sessionQueue.current = queued.then(() => undefined, () => undefined);
+    return outcome;
+  }, [handleGrantRejected, t]);
 
   const handleConnectionChange = useCallback((tabId: string, state: ConnectionState) => {
     setConnectionByTab((current) => {
@@ -344,7 +551,7 @@ function TerminalWorkspaceInner() {
   }, []);
 
   useEffect(() => {
-    if (!nodesLoaded || authorization !== "authorized" || initialized.current) return;
+    if (!nodesLoaded || !workspaceEntered || !grantLive || initialized.current) return;
     initialized.current = true;
     if (!initialUUID) return;
     const requested = nodes.find((node) => node.uuid === initialUUID);
@@ -353,10 +560,10 @@ function TerminalWorkspaceInner() {
       return;
     }
     addTab(requested.uuid);
-  }, [addTab, authorization, initialUUID, nodes, nodesLoaded, t]);
+  }, [addTab, grantLive, initialUUID, nodes, nodesLoaded, t, workspaceEntered]);
 
   useEffect(() => {
-    if (authorization !== "authorized") return;
+    if (!workspaceEntered) return;
 
     let timer: number | undefined;
     let stopped = false;
@@ -412,7 +619,7 @@ function TerminalWorkspaceInner() {
       clearTimer();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [authorization, callViaHTTP]);
+  }, [callViaHTTP, workspaceEntered]);
 
   useEffect(() => {
     const active = tabs.find((tab) => tab.id === activeID);
@@ -468,6 +675,10 @@ function TerminalWorkspaceInner() {
   }, [addTab, nodes, t]);
 
   const openPicker = (side: PickerOrigin = "right") => {
+    if (!isRemoteGrantLive(grantRef.current, grantExpiresAtRef.current)) {
+      setReauthOpen(true);
+      return;
+    }
     setSessionSheetOpen(false);
     if (!compact) setPickerSide(side);
     setPickerUUID(
@@ -497,21 +708,52 @@ function TerminalWorkspaceInner() {
   const activeNode = activeTab ? nodeMap.get(activeTab.uuid) : undefined;
   const openedUUIDs = useMemo(() => new Set(tabs.map((tab) => tab.uuid)), [tabs]);
   const selectedPickerNode = nodes.find((node) => node.uuid === pickerUUID);
-  const authorized = authorization === "authorized";
   const pickerCentered = !compact && pickerSide === "center";
+  const authFailed = authorization === "error";
+  const leaveRemote = () => {
+    window.close();
+    window.setTimeout(() => {
+      if (!window.closed) window.location.assign("/admin");
+    }, 100);
+  };
+  const authFields = (
+    <RemoteAuthFields
+      twoFaEnabled={twoFaEnabled}
+      authFailed={authFailed}
+      otpInput={otpInput}
+      passwordInput={passwordInput}
+      otpError={otpError}
+      submitLabel={t("terminal.session.verify_and_enter")}
+      cancelLabel={workspaceEntered ? t("common.close") : t("common.cancel")}
+      cancelAsText={workspaceEntered}
+      onOtp={setOtpInput}
+      onPassword={setPasswordInput}
+      onSubmit={() => {
+        void authorizeRemote(twoFaEnabled ? { otp: otpInput } : { password: passwordInput });
+      }}
+      onCancel={() => {
+        if (workspaceEntered) {
+          setReauthOpen(false);
+          return;
+        }
+        leaveRemote();
+      }}
+      onRetry={() => {
+        setOtpError("");
+        if (workspaceEntered) {
+          setReauthOpen(true);
+          return;
+        }
+        setAuthorization("required");
+      }}
+    />
+  );
 
   if (authorization === "checking") {
     return <Loading fullscreen />;
   }
 
-  if (!authorized) {
-    const authFailed = authorization === "error";
-    const leaveRemote = () => {
-      window.close();
-      window.setTimeout(() => {
-        if (!window.closed) window.location.assign("/admin");
-      }, 100);
-    };
+  if (!workspaceEntered) {
     return (
       <AuthStandAlonePage
         title={authFailed ? t("terminal.session.auth_failed_title") : twoFaEnabled ? t("login.two_factor") : t("terminal.session.reauth_title")}
@@ -525,64 +767,7 @@ function TerminalWorkspaceInner() {
         testId="remote-auth-page"
         cardTestId="remote-auth-card"
       >
-        {authFailed ? (
-          <Button variant="contained" fullWidth onClick={() => { setOtpError(""); setAuthorization("required"); }} sx={authPrimaryButtonSx}>
-            {t("common.retry")}
-          </Button>
-        ) : (
-          <Box
-            component="form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void authorizeRemote(twoFaEnabled ? { otp: otpInput } : { password: passwordInput });
-            }}
-          >
-            <Stack spacing={2}>
-              {twoFaEnabled ? (
-                <TextField
-                  fullWidth
-                  type="text"
-                  inputMode="numeric"
-                  autoFocus
-                  autoComplete="one-time-code"
-                  label={t("login.two_factor")}
-                  value={otpInput}
-                  error={Boolean(otpError)}
-                  helperText={otpError || undefined}
-                  onChange={(event) => setOtpInput(event.target.value.replace(/\D/g, ""))}
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  sx={authFieldSx}
-                />
-              ) : (
-                <TextField
-                  fullWidth
-                  type="password"
-                  autoFocus
-                  autoComplete="current-password"
-                  label={t("login.password")}
-                  value={passwordInput}
-                  error={Boolean(otpError)}
-                  helperText={otpError || undefined}
-                  onChange={(event) => setPasswordInput(event.target.value)}
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  sx={authFieldSx}
-                />
-              )}
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                disabled={twoFaEnabled ? !otpInput : !passwordInput}
-                sx={authPrimaryButtonSx}
-              >
-                {t("terminal.session.verify_and_enter")}
-              </Button>
-              <Button fullWidth onClick={leaveRemote} sx={authCancelButtonSx}>
-                {t("common.cancel")}
-              </Button>
-            </Stack>
-          </Box>
-        )}
+        {authFields}
       </AuthStandAlonePage>
     );
   }
@@ -667,7 +852,7 @@ function TerminalWorkspaceInner() {
           <Button onClick={() => setPickerOpen(false)}>{t("common.cancel")}</Button>
           <Button
             variant="contained"
-            disabled={!pickerUUID || !online.has(pickerUUID) || !authorized}
+            disabled={!pickerUUID || !online.has(pickerUUID)}
             onClick={confirmPicker}
             sx={{ gap: 0.75 }}
           >
@@ -680,6 +865,7 @@ function TerminalWorkspaceInner() {
   );
 
   return (
+    <CommandClipboardProvider>
     <Box className="remote-workspace">
       <Box className="remote-chrome" component="header" aria-label={t("terminal.session.brand")}>
         <Stack direction="row" spacing={2} sx={{ minWidth: 0, alignItems: "center" }}>
@@ -730,7 +916,6 @@ function TerminalWorkspaceInner() {
           <Button
             variant="contained"
             size={compact ? "small" : "medium"}
-            disabled={!authorized}
             onClick={() => openPicker("right")}
             aria-label={t("terminal.session.open_server")}
             sx={compact ? { minWidth: 40, px: 1 } : { gap: 0.75 }}
@@ -753,7 +938,6 @@ function TerminalWorkspaceInner() {
               className="remote-rail-open"
               size="small"
               variant="outlined"
-              disabled={!authorized}
               onClick={() => openPicker("left")}
               sx={{ gap: 0.75 }}
             >
@@ -775,14 +959,13 @@ function TerminalWorkspaceInner() {
                 online={online.has(tab.uuid)}
                 active={activeID === tab.id}
                 compact={compact}
-                grant={grant}
+                createSession={createRemoteSession}
                 onDuplicate={() => openNode(tab.uuid)}
-                onGrantRejected={handleGrantRejected}
                 onConnectionChange={handleConnectionChange}
               />
             );
           })}
-          {tabs.length === 0 && authorized && (
+          {tabs.length === 0 && (
             <Box className="remote-empty-workspace">
               <Paper
                 variant="outlined"
@@ -800,7 +983,7 @@ function TerminalWorkspaceInner() {
               >
                 <Server size={28} />
                 <Typography component="strong">{t("terminal.session.workspace_empty")}</Typography>
-                <Button variant="contained" disabled={!authorized} onClick={() => openPicker("center")} sx={{ gap: 0.75 }}>
+                <Button variant="contained" onClick={() => openPicker("center")} sx={{ gap: 0.75 }}>
                   <Plus size={15} />
                   {t("terminal.session.open_server")}
                 </Button>
@@ -909,7 +1092,6 @@ function TerminalWorkspaceInner() {
         {sessionList}
         <Button
           variant="contained"
-          disabled={!authorized}
           onClick={() => openPicker("right")}
           sx={{ mt: 2, gap: 0.75 }}
         >
@@ -917,6 +1099,30 @@ function TerminalWorkspaceInner() {
           {t("terminal.session.open_server")}
         </Button>
       </Drawer>
+
+      <Dialog
+        {...remoteConfirmDialogProps}
+        open={reauthOpen}
+        onClose={(_event, reason) => {
+          if (reason === "backdropClick" || reason === "escapeKeyDown") return;
+          setReauthOpen(false);
+        }}
+        maxWidth="sm"
+        data-testid="remote-auth-dialog"
+      >
+        <DialogTitle>
+          {twoFaEnabled ? t("login.two_factor") : t("terminal.session.reauth_title")}
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ mb: 2, fontSize: 14 }}>
+            {twoFaEnabled
+              ? `${t("account.2fa_otp_input_prompt")} ${t("terminal.session.two_factor_valid_for")}`
+              : t("terminal.session.reauth_password_prompt")}
+          </Typography>
+          {authFields}
+        </DialogContent>
+      </Dialog>
     </Box>
+    </CommandClipboardProvider>
   );
 }

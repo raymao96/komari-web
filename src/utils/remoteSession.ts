@@ -11,6 +11,7 @@ const remoteErrorKeys: Record<string, string> = {
   "Remote connection failed": "terminal.session.errors.connection_failed",
   "client is being deleted": "terminal.session.errors.client_deleting",
   "too many active remote sessions": "terminal.session.errors.too_many_sessions",
+  "远程会话数量已满，请关闭不用的终端后重试": "terminal.session.errors.too_many_sessions",
   "Agent 版本过旧，请升级": "terminal.session.errors.agent_too_old",
   "节点未启用远程控制": "terminal.session.errors.agent_disabled",
   "站点未启用远程管理": "terminal.session.errors.server_disabled",
@@ -123,6 +124,28 @@ export function localizeRemoteError(message?: string | null, t?: Translate): str
   return normalized;
 }
 
+export function captureRotatedRemoteGrant(payload: unknown): {
+  grant: string;
+  expiresAt: number;
+} | null {
+  const root =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : null;
+  const nested =
+    root?.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : null;
+  const data = nested ?? root;
+  const grant = data?.next_grant;
+  if (typeof grant !== "string" || !grant.trim()) return null;
+  const expiresAt = Date.parse(String(data?.grant_expires ?? data?.expires_at ?? ""));
+  return {
+    grant,
+    expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+  };
+}
+
 type ReleaseRemoteSession = (sessionID: string) => void;
 
 function requestRemoteSessionRelease(sessionID: string) {
@@ -157,6 +180,7 @@ const remoteGrantStorageKey = "lite.remote-grant";
 type StoredRemoteGrant = {
   grant: string;
   expiresAt: number;
+  pageID: string;
 };
 
 type StoredRemoteGrants = Partial<Record<string, StoredRemoteGrant>>;
@@ -204,13 +228,18 @@ export function loadStoredRemoteGrant(scope: string): StoredRemoteGrant | null {
   return stored;
 }
 
-export function saveStoredRemoteGrant(scope: string, grant: string, expiresAt: number) {
+export function saveStoredRemoteGrant(
+  scope: string,
+  grant: string,
+  expiresAt: number,
+  pageID: string,
+) {
   purgeGrantFromWebStorage();
-  if (!isRemoteGrantLive(grant, expiresAt)) {
+  if (!isRemoteGrantLive(grant, expiresAt) || !pageID) {
     clearStoredRemoteGrant(scope);
     return;
   }
-  memoryGrants[scope] = { grant, expiresAt };
+  memoryGrants[scope] = { grant, expiresAt, pageID };
 }
 
 export function clearStoredRemoteGrant(scope?: string) {

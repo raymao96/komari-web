@@ -43,7 +43,11 @@ import {
   type DashboardTrafficDaySortKey,
   type DashboardTrafficRankItem,
 } from "@/utils/dashboard";
-import { requestDashboardTrafficDay } from "@/utils/dashboardApi";
+import {
+  getCachedDashboardTrafficDay,
+  prefetchDashboardTrafficDay,
+  requestDashboardTrafficDay,
+} from "@/utils/dashboardApi";
 import { formatBytes } from "@/utils/unitHelper";
 
 type DailyChartPoint = DashboardChartsData["traffic"]["daily"][number] & { label: string };
@@ -71,10 +75,42 @@ export function BillingTrendPanel({
   const [reloadKey, setReloadKey] = React.useState(0);
   const selectedPoint = data.find((item) => item.day === selectedDay) ?? null;
   const chartUnavailable = Boolean(error || charts?.traffic.error);
+  const hoverPrefetchTimer = React.useRef(0);
+
+  React.useEffect(() => {
+    return () => window.clearTimeout(hoverPrefetchTimer.current);
+  }, []);
+
+  const scheduleHoverPrefetch = (day: string) => {
+    if (!day) return;
+    window.clearTimeout(hoverPrefetchTimer.current);
+    hoverPrefetchTimer.current = window.setTimeout(() => {
+      prefetchDashboardTrafficDay(day);
+    }, 80);
+  };
+
+  const openDay = (day: string) => {
+    const cached = getCachedDashboardTrafficDay(day);
+    setSelectedDay(day);
+    setDayError(null);
+    if (cached) {
+      setDayItems(cached.items);
+      setDayLoading(false);
+      return;
+    }
+    setDayItems(null);
+    setDayLoading(true);
+  };
 
   React.useEffect(() => {
     if (!selectedDay) {
-      setDayItems(null);
+      setDayError(null);
+      setDayLoading(false);
+      return;
+    }
+    const cached = getCachedDashboardTrafficDay(selectedDay);
+    if (cached) {
+      setDayItems(cached.items);
       setDayError(null);
       setDayLoading(false);
       return;
@@ -156,9 +192,13 @@ export function BillingTrendPanel({
           <BarChart
             data={data}
             margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+            onMouseMove={(state) => {
+              const day = (state?.activePayload?.[0]?.payload as DailyChartPoint | undefined)?.day;
+              if (day) scheduleHoverPrefetch(day);
+            }}
             onClick={(state) => {
               const day = (state?.activePayload?.[0]?.payload as DailyChartPoint | undefined)?.day;
-              if (day) setSelectedDay(day);
+              if (day) openDay(day);
             }}
           >
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -248,8 +288,8 @@ export function BillingTrendPanel({
               </Stack>
             </AdminListFiltersBar>
             {dayLoading && !dayItems ? (
-              <div className="km-admin-list-empty">
-                <Skeleton className="h-[180px] w-full" />
+              <div className="km-admin-list-empty min-h-[min(56vh,32rem)]">
+                <Skeleton className="h-[min(56vh,32rem)] w-full" />
               </div>
             ) : dayError ? (
               <div className="km-admin-list-empty flex flex-col items-center justify-center gap-3 text-[var(--red-11)]">

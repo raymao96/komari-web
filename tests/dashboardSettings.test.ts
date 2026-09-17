@@ -122,6 +122,12 @@ test("daily billable chart inspects a day in a dialog instead of expanding the c
   assert.match(dashboardTraffic30dSource, /text-center tabular-nums/);
   assert.match(dashboardTraffic30dSource, /km-dashboard-chip km-dashboard-chip--accent/);
   assert.match(dashboardTraffic30dSource, /requestDashboardTrafficDay/);
+  assert.doesNotMatch(adminDashboardSource, /prefetchDashboardTrafficDay/);
+  assert.match(dashboardTraffic30dSource, /prefetchDashboardTrafficDay/);
+  assert.match(dashboardTraffic30dSource, /getCachedDashboardTrafficDay/);
+  assert.match(dashboardTraffic30dSource, /onMouseMove/);
+  assert.match(dashboardTraffic30dSource, /min-h-\[min\(56vh,32rem\)\]/);
+  assert.doesNotMatch(dashboardTraffic30dSource, /h-\[180px\]/);
   assert.match(dashboardTraffic30dSource, /AdminMobileListCard/);
   assert.match(dashboardTraffic30dSource, /toggleSort/);
   assert.match(dashboardTraffic30dSource, /max-h-\[min\(56vh,32rem\)\]/);

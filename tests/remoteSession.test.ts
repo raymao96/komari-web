@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  captureRotatedRemoteGrant,
   clearStoredRemoteGrant,
   createRemoteSessionLease,
   isRemoteGrantLive,
@@ -13,6 +14,29 @@ import {
 
 const terminalSource = readFileSync("src/pages/terminal/RemoteSession.tsx", "utf8");
 const terminalCss = readFileSync("src/pages/terminal/Terminal.css", "utf8");
+
+test("rotated grant on session errors is captured without treating it as invalid", () => {
+  assert.equal(captureRotatedRemoteGrant(null), null);
+  assert.equal(captureRotatedRemoteGrant({ message: "remote grant is invalid" }), null);
+  assert.deepEqual(
+    captureRotatedRemoteGrant({
+      status: "error",
+      message: "远程会话数量已满，请关闭不用的终端后重试",
+      data: {
+        next_grant: "rotated-grant",
+        grant_expires: "2026-09-16T12:00:00.000Z",
+      },
+    }),
+    {
+      grant: "rotated-grant",
+      expiresAt: Date.parse("2026-09-16T12:00:00.000Z"),
+    },
+  );
+  assert.equal(
+    localizeRemoteError("远程会话数量已满，请关闭不用的终端后重试", (key) => key),
+    "terminal.session.errors.too_many_sessions",
+  );
+});
 
 test("releases each of three consecutive remote sessions exactly once", () => {
   const released: string[] = [];
@@ -189,25 +213,26 @@ test("remote session no longer treats the Lite host as a protected node", () => 
   assert.doesNotMatch(terminalSource, /local_address_blocked/);
 });
 
-test("remote sessions submit a login grant instead of a page grant", () => {
-  assert.match(terminalSource, /grant,/);
-  assert.doesNotMatch(terminalSource, /page_id: pageId/);
-  assert.doesNotMatch(terminalSource, /pageId:/);
+test("remote sessions create terminals through a page-bound rotating grant", () => {
+  assert.match(terminalSource, /createSession\(node\.uuid, abortController\.signal\)/);
   assert.doesNotMatch(terminalSource, /2fa_code/);
   assert.doesNotMatch(terminalSource, /otpCode/);
 });
 
-test("terminal workspace keeps a login-scoped grant across page changes", () => {
+test("terminal workspace binds the grant to this page and rotates it per session", () => {
   const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
   const cleared = workspace.indexOf('setPasswordInput("");');
   const authorize = workspace.indexOf('fetch("/api/admin/client/remote/authorize"');
   assert.ok(cleared >= 0 && authorize > cleared);
-  assert.doesNotMatch(workspace, /page_id: pageInstanceIdRef\.current/);
+  assert.match(workspace, /page_id: pageIDRef\.current/);
+  assert.match(workspace, /captureRotatedRemoteGrant\(payload\)/);
   assert.doesNotMatch(workspace, /remote\/revoke/);
   assert.doesNotMatch(workspace, /pagehide/);
   assert.match(workspace, /loadStoredRemoteGrant\("remote"\)/);
   assert.match(workspace, /saveStoredRemoteGrant\("remote"/);
   assert.doesNotMatch(workspace, /account\?\.sso_type && !twoFaEnabled/);
+  assert.match(workspace, /captureRotatedRemoteGrant\(payload\)/);
+  assert.match(workspace, /if \(!rotated && \/grant\/i\.test\(message\)\)/);
   assert.match(workspace, /expires_at/);
 });
 
@@ -238,13 +263,14 @@ test("login-scoped grant stays in memory and never writes web storage", () => {
   try {
     clearStoredRemoteGrant();
     assert.equal(loadStoredRemoteGrant("remote"), null);
-    saveStoredRemoteGrant("remote", "grant-live", Date.now() + 60_000);
+    saveStoredRemoteGrant("remote", "grant-live", Date.now() + 60_000, "page-a");
     assert.equal(loadStoredRemoteGrant("remote")?.grant, "grant-live");
-    saveStoredRemoteGrant("exec", "grant-exec", Date.now() + 60_000);
+    assert.equal(loadStoredRemoteGrant("remote")?.pageID, "page-a");
+    saveStoredRemoteGrant("exec", "grant-exec", Date.now() + 60_000, "page-b");
     clearStoredRemoteGrant("remote");
     assert.equal(loadStoredRemoteGrant("remote"), null);
     assert.equal(loadStoredRemoteGrant("exec")?.grant, "grant-exec");
-    saveStoredRemoteGrant("exec", "grant-old", Date.now() - 1);
+    saveStoredRemoteGrant("exec", "grant-old", Date.now() - 1, "page-b");
     assert.equal(loadStoredRemoteGrant("exec"), null);
     clearStoredRemoteGrant();
     assert.deepEqual(writes, []);
@@ -257,27 +283,50 @@ test("login-scoped grant stays in memory and never writes web storage", () => {
   }
 });
 
-test("remote reauth is a standalone page until the grant is issued", () => {
+test("remote reauth is a standalone page until the workspace is entered", () => {
   const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
   assert.match(workspace, /AuthStandAlonePage/);
   assert.match(workspace, /if \(authorization === "checking"\)/);
-  assert.match(workspace, /if \(!authorized\)/);
+  assert.match(workspace, /if \(!workspaceEntered\)/);
   assert.match(workspace, /remote-terminal-open/);
+  assert.match(workspace, /className="remote-workspace"/);
+  assert.match(workspace, /open=\{reauthOpen\}/);
+  assert.match(workspace, /data-testid="remote-auth-dialog"/);
+  assert.match(workspace, /reason === "backdropClick"/);
+  assert.match(workspace, /reason === "escapeKeyDown"/);
+  assert.match(workspace, /cancelAsText=\{workspaceEntered\}/);
+  assert.match(workspace, /width: "auto"/);
+  assert.doesNotMatch(workspace, /if \(!authorized\)/);
   assert.doesNotMatch(workspace, /Dialog open=\{authorization === "required"\}/);
-  assert.doesNotMatch(workspace, /className="remote-workspace"[\s\S]*authorization === "required"/);
+});
+
+test("renewing the remote grant does not reconnect mounted sessions", () => {
+  const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
+  const session = readFileSync("src/pages/terminal/RemoteSession.tsx", "utf8");
+  assert.doesNotMatch(workspace, /grant=\{/);
+  assert.doesNotMatch(session, /grant: string/);
+  assert.doesNotMatch(session, /if \(!grant\)/);
+  const connectDeps = session.match(/void connect\(\);[\s\S]*?\}, \[([^\]]+)\]/);
+  assert.ok(connectDeps, "connect effect dependency list is missing");
+  assert.doesNotMatch(connectDeps[1], /\bgrant\b/);
+  assert.match(workspace, /grantRef\.current = nextGrant/);
+  assert.match(workspace, /saveStoredRemoteGrant\("remote"/);
+  assert.match(workspace, /setGrantLive\(true\)/);
+  assert.doesNotMatch(workspace, /setReconnectKey/);
+  assert.match(workspace, /if \(!isRemoteGrantLive\(grantRef\.current, grantExpiresAtRef\.current\)\) \{\s*setReauthOpen\(true\)/);
 });
 
 test("remote auth fields share the login field height", () => {
   const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
   const authPage = readFileSync("src/components/admin/shell/AuthStandAlonePage.tsx", "utf8");
-  const authForm = workspace.slice(
-    workspace.indexOf('cardTestId="remote-auth-card"'),
-    workspace.indexOf("verify_and_enter"),
+  const fields = workspace.slice(
+    workspace.indexOf("function RemoteAuthFields"),
+    workspace.indexOf("export default function TerminalWorkspace"),
   );
   assert.match(workspace, /authFieldSx/);
   assert.match(authPage, /minHeight: 60/);
-  assert.match(authForm, /sx=\{authFieldSx\}/);
-  assert.doesNotMatch(authForm, /size="small"/);
+  assert.match(fields, /sx=\{authFieldSx\}/);
+  assert.doesNotMatch(fields, /size="small"/);
 });
 
 test("desktop chrome shows a live session status and appearance segment", () => {
@@ -300,6 +349,15 @@ test("desktop chrome shows a live session status and appearance segment", () => 
   assert.match(commands, /remoteConfirmDialogProps/);
   assert.match(terminalCss, /\.remote-confirm-paper \{[\s\S]*background: var\(--remote-paper\)/);
   assert.match(terminalCss, /\.remote-confirm-backdrop \{[\s\S]*backdrop-filter: blur\(8px\)/);
+});
+
+test("open remote sessions share one command clipboard", () => {
+  const workspace = readFileSync("src/pages/terminal/index.tsx", "utf8");
+  const panel = readFileSync("src/pages/terminal/CommandClipboard.tsx", "utf8");
+  assert.match(workspace, /CommandClipboardProvider/);
+  assert.match(workspace, /<CommandClipboardProvider>/);
+  assert.match(panel, /CommandClipboardContent \{\.\.\.props\}/);
+  assert.doesNotMatch(panel, /CommandClipboardProvider/);
 });
 
 test("auth cancel stays a text action without a hover underline", () => {

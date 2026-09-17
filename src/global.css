@@ -290,6 +290,21 @@ body, * {
   background: transparent !important;
 }
 
+.admin-node-name-cell,
+.admin-node-name-select {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.admin-node-name-link {
+  display: inline;
+  max-width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: pointer;
+}
+
 .admin-node-detail-country-flag {
   display: inline-flex;
   flex: 0 0 auto;

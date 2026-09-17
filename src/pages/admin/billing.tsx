@@ -15,6 +15,7 @@ import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
 import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -418,6 +419,7 @@ function BreakdownPanel({ overview, currency }: { overview: BillingOverview; cur
 
 function TrendPanel({ overview, currency }: { overview: BillingOverview; currency: BillingCurrency }) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const chartData = overview.monthly_trend.map((item) => ({
     period: item.period.slice(5),
     base: Number(item.base),
@@ -425,6 +427,14 @@ function TrendPanel({ overview, currency }: { overview: BillingOverview; currenc
     other: Number(item.other),
     one_time: Number(item.one_time),
   }));
+  const tooltipStyle = {
+    borderRadius: 8,
+    fontSize: 12,
+    backgroundColor: theme.palette.background.paper,
+    borderColor: theme.palette.divider,
+    color: theme.palette.text.primary,
+    boxShadow: theme.shadows[2],
+  };
   return (
     <Paper variant="outlined" sx={{ ...panelSx, width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       <Box sx={{ minHeight: 44, px: 2, display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider" }}>
@@ -437,7 +447,13 @@ function TrendPanel({ overview, currency }: { overview: BillingOverview; currenc
             <CartesianGrid stroke="rgba(145,158,171,.16)" vertical={false} />
             <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fill: "#919EAB", fontSize: 11 }} />
             <YAxis axisLine={false} tickLine={false} width={48} tick={{ fill: "#919EAB", fontSize: 11 }} />
-            <Tooltip formatter={(value) => formatBillingMoney(String(value ?? "0"), currency)} contentStyle={{ borderRadius: 8, borderColor: "rgba(145,158,171,.24)", fontSize: 12 }} />
+            <Tooltip
+              formatter={(value) => formatBillingMoney(String(value ?? "0"), currency)}
+              contentStyle={tooltipStyle}
+              labelStyle={{ color: theme.palette.text.secondary }}
+              itemStyle={{ color: theme.palette.text.primary }}
+              cursor={{ fill: theme.palette.action.hover }}
+            />
             <Bar dataKey="base" name={t("billing.types.base")} fill="#0E86DD" radius={[4, 4, 0, 0]} maxBarSize={32} />
             <Bar dataKey="extra" name={t("billing.types.trafficReset")} fill="#FFAB00" radius={[4, 4, 0, 0]} maxBarSize={32} />
             <Bar dataKey="other" name={t("billing.types.ipChange")} fill="#118D57" radius={[4, 4, 0, 0]} maxBarSize={32} />
