@@ -207,6 +207,15 @@ export default defineConfig(({ mode }) => {
         target: apiTarget,
         changeOrigin: true,
       },
+      "/mcp": {
+        target: apiTarget,
+      },
+      "/oauth": {
+        target: apiTarget,
+      },
+      "/.well-known": {
+        target: apiTarget,
+      },
     };
     baseConfig.plugins = [
       ...(baseConfig.plugins ?? []),

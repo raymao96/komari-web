@@ -33,6 +33,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   AppDialogContent,
+  Badge,
   Button,
   Dialog,
   Flex,
@@ -42,6 +43,7 @@ import {
 } from "@/components/admin/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GripVertical, MenuIcon, Pencil, Trash } from "@/components/admin/muiIcons";
+import Stack from "@mui/material/Stack";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -364,19 +366,22 @@ const Row = ({
       .finally(() => setDeleteLoading(false));
   };
 
+  const serverNamesBlock = (
+    <div
+      className="truncate whitespace-nowrap leading-5"
+      title={serverNames || undefined}
+    >
+      {serverNames || t("common.none")}
+    </div>
+  );
   const serverValue = (
     <div className="min-w-0 overflow-hidden">
-      <div
-        className="truncate whitespace-nowrap leading-5"
-        title={serverNames || undefined}
-      >
-        {serverNames || t("common.none")}
-      </div>
-      {task.default_on && (
+      {serverNamesBlock}
+      {task.default_on ? (
         <div className="mt-1 truncate text-xs text-accent-11">
           {t("ping.default_on_short")}
         </div>
-      )}
+      ) : null}
     </div>
   );
   const actionButtons = (
@@ -513,25 +518,30 @@ const Row = ({
         sx={{ transform: style.transform, transition: style.transition }}
         title={task.name || "--"}
         headerExtra={
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            disabled={!reorderEnabled}
-            className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--gray-9)] ${
-              reorderEnabled
-                ? "cursor-grab hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)] active:cursor-grabbing"
-                : "cursor-not-allowed opacity-40"
-            } touch-manipulation select-none`}
-            style={{ touchAction: "none" }}
-            title={t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")}
-            aria-label={t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")}
-          >
-            <GripVertical size={18} />
-          </button>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+            {task.default_on ? (
+              <Badge color="blue">{t("ping.default_on_short")}</Badge>
+            ) : null}
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              disabled={!reorderEnabled}
+              className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--gray-9)] ${
+                reorderEnabled
+                  ? "cursor-grab hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)] active:cursor-grabbing"
+                  : "cursor-not-allowed opacity-40"
+              } touch-manipulation select-none`}
+              style={{ touchAction: "none" }}
+              title={t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")}
+              aria-label={t("admin.nodeTable.dragToReorder", "长按拖拽重新排序")}
+            >
+              <GripVertical size={18} />
+            </button>
+          </Stack>
         }
         cells={[
-          [t("common.server"), serverValue],
+          [t("common.server"), serverNamesBlock],
           [t("ping.target"), clipCell(task.target)],
           [t("ping.type"), task.type],
           [t("ping.interval"), String(task.interval ?? "--")],

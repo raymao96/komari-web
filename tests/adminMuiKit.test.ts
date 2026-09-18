@@ -41,12 +41,12 @@ test("radix space tokens stay in CSS pixels for MUI sx", () => {
 test("node list filters use a gray toolbar and white search field", () => {
   const css = readFileSync("src/global.css", "utf8");
   const layout = readFileSync("src/components/admin/adminListLayout.ts", "utf8");
-  assert.match(css, /\.km-admin-node-list-filters \{\s*padding: 16px 16px 20px;\s*background: #f4f6f8;/);
-  assert.match(css, /\.km-admin-node-list-filters \.MuiOutlinedInput-root \{\s*background-color: #fff;/);
+  assert.match(css, /\.km-admin-node-list-filters[\s\S]*?padding: 16px 16px 20px;\s*background: #f4f6f8;/);
+  assert.match(css, /\.km-admin-node-list-filters \.MuiOutlinedInput-root[\s\S]*?background-color: #fff;/);
   assert.match(layout, /const FILTER_BAR = NEBURST_NEUTRAL/);
   assert.match(layout, /const FILTER_FIELD = "#FFFFFF"/);
   assert.match(layout, /palette\.mode === "dark" \? INPUT_FILL_DARK : FILTER_FIELD/);
-  assert.match(css, /html\.dark \[data-admin-shell\] \.km-admin-node-list-filters \.MuiOutlinedInput-root \{\s*background-color: #212b36;/);
+  assert.match(css, /html\.dark \[data-admin-shell\] \.km-admin-node-list-filters \.MuiOutlinedInput-root[\s\S]*?background-color: #212b36;/);
   const theme = readFileSync("src/theme/createAppTheme.ts", "utf8");
   assert.match(theme, /primary: \{\s*main: ACCENT/);
   assert.match(theme, /MuiAppBar:[\s\S]*color: "inherit"/);
@@ -65,7 +65,9 @@ test("error screens use MUI Alert and keep icon text aligned", () => {
   assert.match(main, /MuiAppProvider[\s\S]*<ErrorBoundary>/);
   assert.doesNotMatch(main, /from "@radix-ui\/themes"/);
   assert.match(main, /lazy\(\(\) => import\("\.\/theme\/RadixThemeRoot"\)\)/);
-  assert.match(main, /isAdminRoute \? \(/);
+  assert.match(main, /isRemoteRoute/);
+  assert.match(main, /usePlainThemeRoot \? \(/);
+  assert.match(main, /isAdminRoute \|\| isRemoteRoute/);
   assert.match(theme, /MuiAlert:[\s\S]*alignItems: "flex-start"/);
   assert.match(theme, /MuiAlertTitle:[\s\S]*marginTop: 0/);
 });

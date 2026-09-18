@@ -135,6 +135,13 @@ test("install commands always emit an explicit remote-control flag", () => {
   assert.equal(trueFlagCount, 1);
 });
 
+test("install commands do not emit a separate MCP flag", () => {
+  assert.doesNotMatch(source, /enableMCP/);
+  assert.doesNotMatch(source, /enable_mcp/);
+  assert.doesNotMatch(source, /--enable-mcp/);
+  assert.doesNotMatch(source, /admin\.nodeTable\.enableMCP/);
+});
+
 test("one-click Agent install uses Lite-agent latest paths", () => {
   assert.match(source, /from "@\/utils\/agentInstall"/);
   assert.match(source, /liteAgentInstallScriptUrl\(/);

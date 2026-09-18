@@ -247,3 +247,9 @@ test("ships complete billing copy for every administrator locale", () => {
   assert.ok(keys[0].length >= 100);
   keys.slice(1).forEach((current) => assert.deepEqual(current, keys[0]));
 });
+
+test("yearly cost trend tooltip follows the current appearance", () => {
+  assert.match(pageSource, /useTheme\(\)/);
+  assert.match(pageSource, /backgroundColor: theme\.palette\.background\.paper/);
+  assert.match(pageSource, /itemStyle=\{\{ color: theme\.palette\.text\.primary \}\}/);
+});

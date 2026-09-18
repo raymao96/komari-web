@@ -43,6 +43,13 @@ export default function AdminShell({ content }: AdminShellProps) {
     : desktopNavWidth(mini);
 
   useEffect(() => {
+    document.documentElement.setAttribute("data-admin-shell-active", "true");
+    return () => {
+      document.documentElement.removeAttribute("data-admin-shell-active");
+    };
+  }, []);
+
+  useEffect(() => {
     setSidebarOpen(!isMobile);
     if (isMobile) setMiniNav(false);
   }, [isMobile]);
@@ -228,7 +235,7 @@ export default function AdminShell({ content }: AdminShellProps) {
         sx={{
           width: navWidth,
           flexShrink: 0,
-          whiteSpace: "nowrap",
+          whiteSpace: mini ? "nowrap" : "normal",
           transition: (theme) =>
             theme.transitions.create("width", navMotion),
           "& .MuiBackdrop-root": {
@@ -239,6 +246,7 @@ export default function AdminShell({ content }: AdminShellProps) {
             boxSizing: "border-box",
             overflowX: "hidden",
             overflowY: "hidden",
+            whiteSpace: mini ? "nowrap" : "normal",
             zIndex: isMobile ? 50 : 12,
             pt: isMobile ? "var(--safe-area-top)" : 0,
             pb: isMobile ? "var(--safe-area-bottom)" : 0,

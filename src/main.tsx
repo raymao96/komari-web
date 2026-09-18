@@ -104,6 +104,8 @@ const AccountScopedRPC2 = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
 	const currentPath = window.location.pathname.replace(/\/$/, "");
 	const isAdminRoute = currentPath === "/admin" || currentPath.startsWith("/admin/");
+	const isRemoteRoute = currentPath === "/terminal" || currentPath.startsWith("/terminal/");
+	const usePlainThemeRoot = isAdminRoute || isRemoteRoute;
 	const isUpgradeRoute =
 		currentPath === "/admin/update/1.2.7" ||
 		currentPath === "/admin/update/storage-v4";
@@ -200,7 +202,7 @@ const App = () => {
     <ThemeContext.Provider value={themeContextValue}>
       <MuiAppProvider appearance={resolvedAppearance}>
       <ErrorBoundary>
-      {isAdminRoute ? (
+      {usePlainThemeRoot ? (
         <div className="theme-root" style={appShellStyle}>
           {appTree}
         </div>

@@ -106,6 +106,7 @@ test("keeps the admin navigation in the intended groups", () => {
     remoteManagement?.children?.map((item) => item.path),
     [
       "/admin/exec",
+      "/admin/remote-management/mcp",
       "/admin/settings/xtermjs",
     ],
   );
@@ -204,7 +205,7 @@ test("sidebar groups stay collapsed until opened", () => {
 });
 
 test("desktop navigation expands by default and can collapse to a mini rail", () => {
-  assert.match(adminPanelSource, /DESKTOP_SIDEBAR_WIDTH = 220/);
+  assert.match(adminPanelSource, /DESKTOP_SIDEBAR_WIDTH = 256/);
   assert.match(adminPanelSource, /lite-admin-nav-rail/);
   assert.match(adminPanelSource, /=== "mini"/);
   assert.match(adminPanelSource, /data-testid="admin-nav-toggle"/);
@@ -222,6 +223,8 @@ test("desktop navigation expands by default and can collapse to a mini rail", ()
   assert.match(adminPanelSource, /const navRowSx = \{/);
   assert.match(adminPanelSource, /sx=\{navRowSx\}/);
   assert.match(adminPanelSource, /nestedNavRowSx/);
+  assert.match(adminPanelSource, /const navLabelSx = \{/);
+  assert.match(adminPanelSource, /whiteSpace: "normal"/);
   assert.match(adminPanelSource, /px: 1\.25/);
   assert.match(
     adminPanelSource,

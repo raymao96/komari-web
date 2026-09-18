@@ -38,6 +38,8 @@ test("searches remote nodes by name, IPv4, IPv6, group and tags", () => {
   assert.deepEqual(filterRemoteNodes(nodes, "euro", "all", online).map((node) => node.uuid), ["de"]);
   const tagged = { ...nodes[1], tags: "hetzner;cn2" };
   assert.deepEqual(filterRemoteNodes([tagged], "hetzner", "all", online).map((node) => node.uuid), ["de"]);
+  const colored = { ...nodes[1], tags: "落地机<green>" };
+  assert.deepEqual(filterRemoteNodes([colored], "落地机", "all", online).map((node) => node.uuid), ["de"]);
 });
 
 test("does not include the region field in remote node search", () => {
@@ -104,29 +106,66 @@ test("keeps the terminal portal aligned with the dashboard visual language", () 
   assert.equal(pickerSource.includes('role="button"'), true);
   assert.equal(pickerSource.includes("if (knownOnline) onSelect(node)"), true);
   assert.equal(pickerSource.includes('event.key !== "Enter" && event.key !== " "'), true);
-  assert.equal(terminalStyles.includes("width: min(94vw, 1040px)"), true);
-  assert.equal(terminalStyles.includes("max-height: calc(100dvh - 24px)"), true);
+  assert.equal(terminalStyles.includes("width: min(864px, calc(100vw - 48px))"), true);
+  assert.equal(terminalStyles.includes("width: min(94vw, 1040px)"), false);
   assert.equal(terminalStyles.includes("height: min(calc(100vh - 24px), 820px)"), false);
   assert.equal(terminalStyles.includes("grid-template-columns: repeat(2, minmax(0, 1fr))"), true);
   assert.equal(terminalStyles.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"), false);
-  assert.equal(terminalSource.includes('maxWidth="1040px"'), true);
+  assert.equal(terminalSource.includes('maxWidth="1040px"'), false);
   assert.equal(terminalSource.includes("pageSize={6}"), true);
   assert.equal(terminalSource.includes("columns={2}"), true);
-  assert.match(terminalSource, /ThemeProvider theme=\{terminalMuiTheme\}/);
-  assert.match(pickerSource, /gridTemplateColumns: "1fr 1fr"/);
+  assert.match(terminalSource, /from "@mui\/material\/Drawer"/);
+  assert.doesNotMatch(terminalSource, /ThemeProvider theme=\{terminalMuiTheme\}/);
+  assert.doesNotMatch(pickerSource, /minHeight: \{ xs: 0, sm: 204 \}/);
   assert.match(pickerSource, /bgcolor: "background.paper"/);
   assert.doesNotMatch(pickerSource, /bgcolor: selected \? "action.hover"/);
   assert.match(pickerSource, /NODE_ONLINE/);
   assert.match(pickerSource, /NODE_OFFLINE/);
   assert.doesNotMatch(pickerSource, /RemoteNodePicker\.css/);
   assert.match(pickerSource, /common\.tags/);
-  assert.match(pickerSource, /<CustomTags tags=\{node\.tags/);
+  assert.match(pickerSource, /<CustomTags tags=\{tag \|\| node\.tags/);
   assert.doesNotMatch(pickerSource, /SquareTerminal/);
+  assert.match(pickerSource, /openedUUIDs/);
   assert.match(pickerSource, /remote-node-picker-results/);
   assert.match(pickerSource, /remote-node-picker-controls/);
   assert.match(pickerSource, /flex: \{ xs: "0 0 auto", sm: "1 1 280px" \}/);
   assert.doesNotMatch(pickerSource, /flex: "1 1 280px"/);
-  assert.equal(terminalSource.includes("rowsPerPage={3}"), true);
+  assert.doesNotMatch(terminalSource, /rowsPerPage=\{compact \? 6 : 3\}/);
+  assert.match(pickerSource, /resultsAreaRef/);
   assert.match(terminalStyles, /overflow: hidden/);
   assert.match(terminalStyles, /\.remote-dialog-actions \{[\s\S]*flex: 0 0 auto/);
+  assert.match(terminalStyles, /\.remote-picker-paper\.is-compact \.remote-node-picker-meta \{[\s\S]*border-top: 0/);
+  assert.match(pickerSource, /justifyContent: compact \? "flex-start"/);
+  assert.match(pickerSource, /clipOverflow === "top" \? "end" : "start"/);
+  assert.match(terminalSource, /openPicker\("right"\)/);
+  assert.match(terminalSource, /openPicker\("left"\)/);
+  assert.match(terminalSource, /openPicker\("center"\)/);
+  assert.match(terminalSource, /from "@mui\/material\/Fade"/);
+  assert.match(terminalSource, /slots=\{\{ transition: Fade \}\}/);
+  assert.match(terminalSource, /transitionDuration=\{\{ enter: 360, exit: 200 \}\}/);
+  assert.match(terminalSource, /pickerCentered/);
+  assert.match(terminalSource, /anchor=\{compact \? "bottom" : pickerSide === "left" \? "left" : "right"\}/);
+  assert.match(terminalStyles, /\.remote-picker-paper\.is-center/);
+  assert.match(terminalStyles, /@keyframes remote-picker-center-in/);
+  assert.match(terminalStyles, /animation: remote-picker-center-in 360ms/);
+  assert.match(terminalStyles, /\.remote-picker-paper \{[\s\S]*?\n  height: auto;/);
+  assert.match(pickerSource, /overflow: compact \? "auto" : "hidden"/);
+});
+
+test("remote workspace chrome uses MUI instead of Radix Themes", () => {
+  const files = [
+    "src/pages/terminal/index.tsx",
+    "src/pages/terminal/RemoteSession.tsx",
+    "src/pages/terminal/FileManager.tsx",
+    "src/pages/terminal/CommandClipboard.tsx",
+    "src/components/remote/RemoteNodePicker.tsx",
+  ];
+  for (const file of files) {
+    const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /from "@radix-ui\/themes"/, `${file} should not import Radix Themes`);
+  }
+  const main = readFileSync(new URL("../src/main.tsx", import.meta.url), "utf8");
+  assert.match(main, /isRemoteRoute/);
+  assert.match(main, /usePlainThemeRoot/);
+  assert.match(main, /isAdminRoute \|\| isRemoteRoute/);
 });

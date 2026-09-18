@@ -14,13 +14,14 @@ type AdminMobileListCardProps = {
   actions?: React.ReactNode;
   style?: React.CSSProperties;
   sx?: SxProps<Theme>;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 };
 
 export const AdminMobileListCard = React.forwardRef<
   HTMLDivElement,
   AdminMobileListCardProps
 >(function AdminMobileListCard(
-  { title, headerExtra, cells, actions, style, sx },
+  { title, headerExtra, cells, actions, style, sx, onClick },
   ref,
 ) {
   return (
@@ -28,11 +29,13 @@ export const AdminMobileListCard = React.forwardRef<
       ref={ref}
       variant="outlined"
       style={style}
+      onClick={onClick}
       sx={[
         {
           borderRadius: "8px",
           overflow: "hidden",
           borderColor: "divider",
+          cursor: onClick ? "pointer" : undefined,
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
       ]}

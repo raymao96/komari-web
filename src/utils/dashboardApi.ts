@@ -1,6 +1,7 @@
 import {
   type DashboardChartsData,
   type DashboardData,
+  type DashboardTrafficDayResponse,
 } from "@/utils/dashboard";
 import { readDashboardSession, writeDashboardSession } from "@/utils/dashboardSession";
 
@@ -82,6 +83,59 @@ export async function requestDashboardCharts(
       }
     });
   pendingDashboardChartsRequest = { accountKey, key, request };
+  return request;
+}
+
+const trafficDayCache = new Map<string, DashboardTrafficDayResponse>();
+const trafficDayCacheLimit = 8;
+let pendingTrafficDayRequest: { day: string; request: Promise<DashboardTrafficDayResponse> } | null = null;
+
+export function getCachedDashboardTrafficDay(day: string): DashboardTrafficDayResponse | null {
+  return trafficDayCache.get(day) ?? null;
+}
+
+export function prefetchDashboardTrafficDay(day: string) {
+  if (!day || trafficDayCache.has(day)) return;
+  void requestDashboardTrafficDay(day).catch(() => {
+    // Hover prefetch is best-effort; clicking the bar still reports errors.
+  });
+}
+
+export async function requestDashboardTrafficDay(day: string): Promise<DashboardTrafficDayResponse> {
+  const cached = trafficDayCache.get(day);
+  if (cached) return cached;
+  if (pendingTrafficDayRequest?.day === day) {
+    return pendingTrafficDayRequest.request;
+  }
+  const params = new URLSearchParams({ day });
+  const request = fetch(`/api/admin/dashboard/traffic-day?${params}`, { cache: "no-store" })
+    .then(async (response) => {
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const payload = await response.json();
+          if (payload?.message) message = String(payload.message);
+        } catch {
+          // Keep the HTTP status fallback.
+        }
+        throw new Error(message);
+      }
+      return response.json() as Promise<DashboardTrafficDayResponse>;
+    })
+    .then((data) => {
+      trafficDayCache.set(day, data);
+      if (trafficDayCache.size > trafficDayCacheLimit) {
+        const oldest = trafficDayCache.keys().next().value;
+        if (oldest) trafficDayCache.delete(oldest);
+      }
+      return data;
+    })
+    .finally(() => {
+      if (pendingTrafficDayRequest?.day === day) {
+        pendingTrafficDayRequest = null;
+      }
+    });
+  pendingTrafficDayRequest = { day, request };
   return request;
 }
 

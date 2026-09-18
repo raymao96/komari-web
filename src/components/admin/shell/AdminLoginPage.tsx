@@ -8,7 +8,6 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import type { Theme } from "@mui/material/styles";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
 import { useEffect, useRef, useState } from "react";
@@ -22,33 +21,7 @@ import {
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import { localizeLoginError, submitPasswordLogin } from "@/utils/adminAuth";
 import { sameOriginApiPath } from "@/utils/security";
-import AuthStandAlonePage, { authPrimaryButtonSx } from "./AuthStandAlonePage";
-
-const loginFieldSx = (theme: Theme) => {
-  const fill = theme.palette.background.paper;
-  const text = theme.palette.text.primary;
-  return {
-    "& .MuiOutlinedInput-root": {
-      minHeight: 60,
-      bgcolor: fill,
-      "& input": {
-        px: 2,
-        py: 1.75,
-      },
-      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
-        {
-          WebkitTextFillColor: text,
-          caretColor: text,
-          borderRadius: "inherit",
-          WebkitBoxShadow: `0 0 0 100px ${fill} inset`,
-          transition: "background-color 99999s ease-out 0s",
-        },
-    },
-    "& .MuiInputLabel-root": {
-      fontWeight: 600,
-    },
-  };
-};
+import AuthStandAlonePage, { authFieldSx, authPrimaryButtonSx } from "./AuthStandAlonePage";
 
 function AdminLoginForm() {
   const { account, loading, error, refresh } = useAccount();
@@ -177,7 +150,7 @@ function AdminLoginForm() {
                 autoComplete="username"
                 autoFocus={!compact}
                 slotProps={{ inputLabel: { shrink: true } }}
-                sx={loginFieldSx}
+                sx={authFieldSx}
               />
               <TextField
                 id="admin-login-password"
@@ -206,7 +179,7 @@ function AdminLoginForm() {
                     ),
                   },
                 }}
-                sx={loginFieldSx}
+                sx={authFieldSx}
               />
               {needTwoFactor ? (
                 <TextField
@@ -223,7 +196,7 @@ function AdminLoginForm() {
                   placeholder="000000"
                   disabled={isLoading}
                   slotProps={{ inputLabel: { shrink: true } }}
-                  sx={loginFieldSx}
+                  sx={authFieldSx}
                 />
               ) : null}
               {errorMsg ? (

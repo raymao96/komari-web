@@ -69,6 +69,7 @@ import {
   MouseSensor,
   KeyboardSensor,
 } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
   useSortable,
@@ -152,6 +153,26 @@ const NodeDetailsPage = () => {
 
 const PREVIOUS_PAGE_DROP_ID = "admin-node-previous-page";
 const NEXT_PAGE_DROP_ID = "admin-node-next-page";
+const NODE_LIST_DND_MODIFIERS = [restrictToVerticalAxis];
+const NODE_LIST_AUTO_SCROLL = {
+  layoutShiftCompensation: false,
+  acceleration: 6,
+  threshold: { x: 0.2, y: 0.18 },
+  canScroll: (element: Element) =>
+    element instanceof HTMLElement &&
+    element.hasAttribute("data-admin-scroll-container"),
+};
+
+function nodeListSortableStyle(
+  transform: Parameters<typeof CSS.Transform.toString>[0],
+  transition: string | undefined,
+  isDragging: boolean,
+) {
+  return {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? undefined : transition,
+  };
+}
 
 function nodeSearchHaystack(node: NodeDetail) {
   return [
@@ -531,13 +552,16 @@ const SortableRow = React.memo(({
   online: boolean | null;
   reorderEnabled: boolean;
 }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: node.uuid, disabled: !reorderEnabled });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: node.uuid,
+      disabled: !reorderEnabled,
+      animateLayoutChanges: () => false,
+    });
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    ...nodeListSortableStyle(transform, transition, isDragging),
     borderColor: "var(--gray-a5)",
   };
   async function copy(text: string) {
@@ -585,7 +609,7 @@ const SortableRow = React.memo(({
         </div>
       </TableCell>
       <TableCell
-        className="overflow-hidden !align-middle"
+        className="admin-node-name-cell overflow-hidden !align-middle"
         data-label={t("admin.nodeTable.name")}
         title={node.name}
       >
@@ -683,8 +707,12 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
   online: boolean | null;
   reorderEnabled: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: node.uuid, disabled: !reorderEnabled });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: node.uuid,
+      disabled: !reorderEnabled,
+      animateLayoutChanges: () => false,
+    });
   const { t } = useTranslation();
   const networkAddresses = nodeNetworkAddresses(node);
   const deploymentStatusPresentation = nodeDeploymentStatusPresentation(
@@ -778,8 +806,7 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
     <AdminMobileListCard
       ref={setNodeRef}
       sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        ...nodeListSortableStyle(transform, transition, isDragging),
       }}
       title={<NodeNameLink node={node} online={online} />}
       headerExtra={
@@ -960,6 +987,8 @@ const NodeTable = ({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        autoScroll={NODE_LIST_AUTO_SCROLL}
+        modifiers={NODE_LIST_DND_MODIFIERS}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={() => setIsDragging(false)}
@@ -3378,24 +3407,51 @@ function EditButton({ node }: { node: NodeDetail }) {
   );
 }
 
+function hasVisibleTextSelection() {
+  const selection = window.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim());
+}
+
 function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | null }) {
   const { t } = useTranslation();
   const pending = online === null;
   const statusLabel = online
     ? t("nodeCard.online", "在线")
     : t("nodeCard.offline", "离线");
+  const pointerStart = React.useRef<{ x: number; y: number } | null>(null);
+
+  const onPointerDownCapture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const onNameClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start || !hasVisibleTextSelection()) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (dx * dx + dy * dy > 16) event.preventDefault();
+  };
 
   return (
-    <Link
-      to={`/admin/servers/${node.uuid}`}
-      className="flex w-full min-w-0 items-center gap-2 text-left"
+    <div
+      className="admin-node-name-select flex w-full min-w-0 items-center gap-2 text-left"
+      onPointerDownCapture={onPointerDownCapture}
     >
       <span className="admin-node-country-flag">
         <Flag flag={node.region} compact />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="block max-w-full truncate text-[15px] font-semibold leading-6 hover:underline">
-          {node.name}
+        <span className="block max-w-full truncate">
+          <Link
+            to={`/admin/servers/${node.uuid}`}
+            className="admin-node-name-link text-[15px] font-semibold leading-6 hover:underline"
+            title={node.name}
+            onClick={onNameClick}
+          >
+            {node.name}
+          </Link>
         </span>
         <span
           className="flex h-[18px] items-center gap-1.5 text-[13.5px] text-muted-foreground"
@@ -3409,7 +3465,7 @@ function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | nu
           {statusLabel}
         </span>
       </span>
-    </Link>
+    </div>
   );
 }
 

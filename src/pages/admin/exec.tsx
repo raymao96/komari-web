@@ -26,7 +26,8 @@ import {
     clearStoredRemoteGrant,
     isRemoteGrantLive,
 } from "@/utils/remoteSession";
-import { localizeExecResult, isExecTimeoutResult } from "@/utils/execResult";
+import { createRandomId } from "@/utils/randomId";
+import { isExecTimeoutResult, localizeExecResult } from "@/utils/execResult";
 import { useAccount } from "@/contexts/AccountContext";
 import {
     AdminPagination,
@@ -129,6 +130,7 @@ const ExecContent = () => {
     const twoFaEnabled = Boolean(account?.["2fa_enabled"]);
     const grantRef = useRef("");
     const grantExpiresAtRef = useRef(0);
+    const pageIDRef = useRef(loadStoredRemoteGrant("exec")?.pageID || createRandomId());
     const [hasGrant, setHasGrant] = useState(() => Boolean(loadStoredRemoteGrant("exec")));
     const {
         page: resultPage,
@@ -157,6 +159,7 @@ const ExecContent = () => {
         if (!stored) return;
         grantRef.current = stored.grant;
         grantExpiresAtRef.current = stored.expiresAt;
+        if (stored.pageID) pageIDRef.current = stored.pageID;
         setHasGrant(true);
     }, []);
 
@@ -364,6 +367,7 @@ const ExecContent = () => {
                     credentials: "same-origin",
                     body: JSON.stringify({
                         scope: "exec",
+                        page_id: pageIDRef.current,
                         password: twoFaEnabled ? undefined : password || undefined,
                         otp: twoFaEnabled ? otp : undefined,
                     }),
@@ -384,7 +388,7 @@ const ExecContent = () => {
                 grantRef.current = nextGrant;
                 const expiresAt = Date.parse(String(authorizePayload?.data?.expires_at ?? ""));
                 grantExpiresAtRef.current = Number.isFinite(expiresAt) ? expiresAt : 0;
-                saveStoredRemoteGrant("exec", nextGrant, grantExpiresAtRef.current);
+                saveStoredRemoteGrant("exec", nextGrant, grantExpiresAtRef.current, pageIDRef.current);
                 setHasGrant(true);
             }
             const usedGrant = grantRef.current;
@@ -398,6 +402,7 @@ const ExecContent = () => {
                     command,
                     clients: selectedNodes,
                     grant: usedGrant,
+                    page_id: pageIDRef.current,
                 }),
             });
 
@@ -420,7 +425,7 @@ const ExecContent = () => {
                 if (Number.isFinite(expiresAt)) {
                     grantExpiresAtRef.current = expiresAt;
                 }
-                saveStoredRemoteGrant("exec", rotatedGrant, grantExpiresAtRef.current);
+                saveStoredRemoteGrant("exec", rotatedGrant, grantExpiresAtRef.current, pageIDRef.current);
                 setHasGrant(true);
             }
 

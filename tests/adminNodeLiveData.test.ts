@@ -352,6 +352,22 @@ test("desktop node table keeps readable name and network columns while resizing"
   assert.match(pageSource, /text-sm hover:bg-\[var\(--accent-a2\)\][^\n]*\[&>td\]:py-2\.5/);
   assert.match(pageSource, /text-sm leading-\[1\.125rem\]/);
   assert.match(pageSource, /data-label=\{t\("admin\.nodeTable\.name"\)\}[\s\S]{0,80}title=\{node\.name\}/);
+  assert.match(pageSource, /admin-node-name-cell/);
+  assert.match(pageSource, /admin-node-name-select/);
+  assert.match(pageSource, /admin-node-name-link/);
+  assert.match(pageSource, /onNameClick/);
+  assert.doesNotMatch(pageSource, /suppressLinkClickAfterSelection/);
+  assert.doesNotMatch(
+    pageSource,
+    /admin-node-name-link block max-w-full truncate/,
+  );
+  assert.match(pageSource, /NODE_LIST_AUTO_SCROLL/);
+  assert.match(pageSource, /layoutShiftCompensation: false/);
+  assert.match(pageSource, /data-admin-scroll-container/);
+  assert.match(pageSource, /animateLayoutChanges: \(\) => false/);
+  assert.doesNotMatch(pageSource, /autoScroll=\{false\}/);
+  assert.match(pageSource, /restrictToVerticalAxis/);
+  assert.doesNotMatch(pageSource, /restrictToFirstScrollableAncestor/);
   assert.match(pageSource, /\["IPv4", node\.ipv4\?\.trim\(\)\][\s\S]{0,80}\["IPv6", node\.ipv6\?\.trim\(\)\]/);
   assert.match(pageSource, /networkAddresses\.length > 0 \? networkAddresses\.map/);
   assert.doesNotMatch(pageSource, /IPv[46] \{node\.ipv[46] \|\| "--"\}/);

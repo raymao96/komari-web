@@ -1,27 +1,44 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import { Terminal } from "@xterm/xterm";
 import type { ITerminalOptions } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
+import BottomNavigation from "@mui/material/BottomNavigation";
+import BottomNavigationAction from "@mui/material/BottomNavigationAction";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import {
-  Button,
-  Dialog,
-  IconButton,
-  TextArea,
-} from "@radix-ui/themes";
-import {
+  ArrowDown,
+  ArrowUp,
   ClipboardCopy,
   ClipboardList,
   ClipboardPaste,
   Copy,
   CornerDownLeft,
+  Cpu,
   Files,
-  PanelRightClose,
+  HardDrive,
+  MemoryStick,
+  MoreHorizontal,
   RotateCw,
+  Terminal as TerminalIcon,
   TextSelect,
+  PanelRightClose,
 } from "@/components/admin/muiIcons";
 import { toast } from "sonner";
 import type { Record as LiveRecord } from "@/types/LiveData";
@@ -39,7 +56,13 @@ import {
 } from "@/hooks/useXtermjsSettings";
 import CommandClipboardPanel from "./CommandClipboard";
 import FileManager, { type FileManagerHandle } from "./FileManager";
+import { attachRemoteTerminalHighlight } from "./remoteTerminalHighlight";
+import Flag from "@/components/Flag";
+import { usageMetricCardSx } from "@/pages/admin/nodeDetailCardStyles";
+import { displayRemoteAddress } from "@/utils/remoteNodePicker";
+import { firstNodeTag, REMOTE_COMPACT_QUERY, UNREPORTED_ADDRESS, remoteConfirmDialogProps } from "./remoteChrome";
 import { useTranslation } from "react-i18next";
+import { getAdminMenuProps } from "@/components/admin/adminMenu";
 
 export type RemoteNode = {
   uuid: string;
@@ -50,6 +73,7 @@ export type RemoteNode = {
   tags?: string;
   region?: string;
   region_override?: string;
+  cpu_cores?: number;
   mem_total?: number;
   disk_total?: number;
   remote_protocol?: number;
@@ -57,16 +81,18 @@ export type RemoteNode = {
 };
 
 type Props = {
+  tabId: string;
   node: RemoteNode;
   live?: LiveRecord;
   online: boolean;
   active: boolean;
-  grant: string;
+  compact: boolean;
+  createSession: (uuid: string, signal?: AbortSignal) => Promise<{ session_id: string; browser_ticket: string }>;
   onDuplicate: () => void;
-  onGrantRejected?: () => void;
+  onConnectionChange?: (tabId: string, state: ConnectionState) => void;
 };
 
-type ConnectionState = "connecting" | "waiting" | "connected" | "disconnected" | "error";
+export type ConnectionState = "connecting" | "waiting" | "connected" | "disconnected" | "error";
 type SidePanel = "files" | "commands" | null;
 type ContextMenuState = { x: number; y: number } | null;
 type TerminalTouchState = {
@@ -78,13 +104,40 @@ type TerminalTouchState = {
   moved: boolean;
 };
 
-const compactTerminalQuery = "(max-width: 900px)";
-const compactTerminalFontSize = 14;
-const compactTerminalPadding = 8;
+const compactTerminalQuery = REMOTE_COMPACT_QUERY;
+const compactTerminalFontSize = 13;
+const compactTerminalPadding = 6;
 
 function percentage(used = 0, total = 0) {
   if (!total) return "0.0%";
-  return `${Math.min(100, Math.max(0, (used / total) * 100)).toFixed(1)}%`;
+  return `${usagePercent(used, total).toFixed(1)}%`;
+}
+
+function usagePercent(used = 0, total = 0) {
+  if (!total) return 0;
+  return Math.min(100, Math.max(0, (used / total) * 100));
+}
+
+function usageTone(percent: number) {
+  if (percent >= 90) return "coral";
+  if (percent >= 70) return "amber";
+  return "green";
+}
+
+function volumeDetail(used = 0, total = 0) {
+  if (!total) return null;
+  return (
+    <>
+      <span>{formatBytes(used)}</span>
+      <span className="remote-metric-slash">/ {formatBytes(total)}</span>
+    </>
+  );
+}
+
+function cpuCoreCount(cores: unknown) {
+  const value = Number(cores);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.max(1, Math.round(value));
 }
 
 async function writeClipboardText(text: string) {
@@ -137,7 +190,7 @@ function isEditableElement(element: Element | null) {
     Boolean(element?.closest('[role="dialog"]'));
 }
 
-export default function RemoteSession({ node, live, online, active, grant, onDuplicate, onGrantRejected }: Props) {
+export default function RemoteSession({ tabId, node, live, online, active, compact, createSession, onDuplicate, onConnectionChange }: Props) {
   const { t } = useTranslation();
   const { settings, loading: settingsLoading, error: settingsError } = useXtermjsSettings();
   const terminalHost = useRef<HTMLDivElement>(null);
@@ -152,7 +205,8 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
   const [terminalReady, setTerminalReady] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [connectionError, setConnectionError] = useState("");
-  const [sidePanel, setSidePanel] = useState<SidePanel>(() => window.innerWidth >= 900 ? "files" : null);
+  const [sidePanel, setSidePanel] = useState<SidePanel>(null);
+  const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null);
   const [sideWidth, setSideWidth] = useState(400);
   const [reconnectKey, setReconnectKey] = useState(0);
   const [remoteReady, setRemoteReady] = useState(false);
@@ -160,22 +214,28 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
   const [manualPasteOpen, setManualPasteOpen] = useState(false);
   const [manualPasteText, setManualPasteText] = useState("");
   const [mobileCommand, setMobileCommand] = useState("");
-  const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
   const remoteReadyRef = useRef(false);
   const dragging = useRef(false);
+  const fitTimer = useRef(0);
 
   activeRef.current = active;
 
+  useEffect(() => {
+    onConnectionChange?.(tabId, connectionState);
+  }, [connectionState, onConnectionChange, tabId]);
+
   const resizeTerminal = useCallback(() => {
     if (!activeRef.current) return;
-    window.requestAnimationFrame(() => {
+    const compactLayout = window.matchMedia(compactTerminalQuery).matches;
+    window.clearTimeout(fitTimer.current);
+    fitTimer.current = window.setTimeout(() => {
       fitAddon.current?.fit();
       const term = terminal.current;
       const ws = socket.current;
       if (term && ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
       }
-    });
+    }, compactLayout ? 220 : 0);
   }, []);
 
   const copyTerminalSelection = useCallback(async () => {
@@ -218,10 +278,18 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
 
   const submitMobileCommand = useCallback(() => {
     if (mobileComposing.current || !mobileCommand) return;
-    if (sendTerminalText(`${mobileCommand}\r`)) {
-      setMobileCommand("");
-      window.requestAnimationFrame(() => mobileCommandInput.current?.focus({ preventScroll: true }));
-    }
+    if (!sendTerminalText(`${mobileCommand}\r`)) return;
+    setMobileCommand("");
+    const dismissKeyboard = () => {
+      mobileCommandInput.current?.blur();
+      terminalHost.current?.querySelector<HTMLTextAreaElement>("textarea.xterm-helper-textarea")?.blur();
+    };
+    dismissKeyboard();
+    window.requestAnimationFrame(dismissKeyboard);
+    window.setTimeout(() => {
+      dismissKeyboard();
+      window.scrollTo(0, 0);
+    }, 80);
   }, [mobileCommand, sendTerminalText]);
 
   useEffect(() => {
@@ -237,6 +305,7 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
       ? Math.min(configuredPadding, compactTerminalPadding)
       : configuredPadding;
     const options: Partial<ITerminalOptions> = {
+      allowProposedApi: true,
       cursorBlink: resolved.terminalOptions.cursorBlink,
       convertEol: resolved.terminalOptions.convertEol,
       fontFamily: resolved.terminalOptions.fontFamily,
@@ -254,8 +323,14 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
     instance.loadAddon(new WebLinksAddon());
     instance.open(terminalHost.current);
     terminal.current = instance;
+    const detachHighlight = attachRemoteTerminalHighlight(instance);
     fitAddon.current = fit;
     terminalHost.current.style.setProperty("--xterm-padding", `${terminalPadding()}px`);
+    const helper = terminalHost.current.querySelector<HTMLTextAreaElement>("textarea.xterm-helper-textarea");
+    if (helper) {
+      helper.tabIndex = -1;
+      helper.setAttribute("aria-hidden", "true");
+    }
 
     const updateTerminalDensity = () => {
       instance.options.fontSize = terminalFontSize();
@@ -379,6 +454,7 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
       host.removeEventListener("touchmove", touchMove, true);
       host.removeEventListener("touchend", touchEnd, true);
       host.removeEventListener("touchcancel", touchCancel, true);
+      detachHighlight();
       instance.dispose();
       style.remove();
       terminal.current = null;
@@ -387,28 +463,14 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
   }, [copyTerminalSelection, node.uuid, resizeTerminal, sendTerminalText, settings, settingsError, settingsLoading]);
 
   useEffect(() => {
-    const viewport = window.visualViewport;
-    const update = () => {
-      const compactLayout = window.matchMedia(compactTerminalQuery).matches;
-      const pageZoomed = viewport
-        ? Math.abs(viewport.scale - 1) > 0.01
-        : false;
-      const keyboardInset = viewport
-        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-        : 0;
-      setMobileKeyboardInset(compactLayout && !pageZoomed ? keyboardInset : 0);
-      resizeTerminal();
-    };
+    const update = () => resizeTerminal();
     update();
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
-    viewport?.addEventListener("resize", update);
-    viewport?.addEventListener("scroll", update);
     return () => {
+      window.clearTimeout(fitTimer.current);
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
-      viewport?.removeEventListener("resize", update);
-      viewport?.removeEventListener("scroll", update);
     };
   }, [resizeTerminal]);
 
@@ -457,40 +519,20 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
       remoteReadyRef.current = false;
       setRemoteReady(false);
       try {
-        if (!grant) {
-          throw new Error(t("terminal.session.errors.grant_required"));
-        }
         if (node.remote_protocol !== 2) {
           throw new Error(t("terminal.session.errors.agent_too_old"));
         }
         if (node.remote_control_enabled === false) {
           throw new Error(t("terminal.session.errors.agent_disabled"));
         }
-        const response = await fetch("/api/admin/client/remote/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ uuid: node.uuid, grant }),
-          signal: abortController.signal,
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error(t("terminal.session.session_full"));
-          }
-          const message = String(payload?.message ?? "");
-          if (/grant/i.test(message)) {
-            onGrantRejected?.();
-          }
-          throw new Error(localizeRemoteError(payload?.message, t));
-        }
-        sessionLease = createRemoteSessionLease(payload.data.session_id);
+        const payload = await createSession(node.uuid, abortController.signal);
+        sessionLease = createRemoteSessionLease(payload.session_id);
         if (disposed) {
           sessionLease.release();
           return;
         }
         const sessionID = sessionLease.sessionID;
-        const browserTicket = payload.data.browser_ticket;
+        const browserTicket = payload.browser_ticket;
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         ws = new WebSocket(`${protocol}//${window.location.host}/api/admin/client/remote`);
         ws.binaryType = "arraybuffer";
@@ -590,7 +632,7 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
       sessionLease?.release();
       if (socket.current === ws) socket.current = null;
     };
-  }, [grant, node.remote_control_enabled, node.remote_protocol, node.uuid, onGrantRejected, reconnectKey, resizeTerminal, t, terminalReady]);
+  }, [createSession, node.remote_control_enabled, node.remote_protocol, node.uuid, reconnectKey, resizeTerminal, t, terminalReady]);
 
   useEffect(() => {
     if (!active) return;
@@ -637,115 +679,303 @@ export default function RemoteSession({ node, live, online, active, grant, onDup
     terminal.current?.reset();
     setReconnectKey((value) => value + 1);
   };
-  const togglePanel = (panel: Exclude<SidePanel, null>) => {
-    setSidePanel((current) => current === panel ? null : panel);
-  };
+  const flag = node.region_override?.trim() || node.region?.trim() || "UN";
+  const address = displayRemoteAddress(node.ipv4) || displayRemoteAddress(node.ipv6) || UNREPORTED_ADDRESS;
+  const tag = firstNodeTag(node.tags);
+  const cpuUsed = live?.cpu.usage || 0;
+  const ramUsed = usagePercent(live?.ram.used, node.mem_total);
+  const diskUsed = usagePercent(live?.disk.used, node.disk_total);
+  const cores = cpuCoreCount(node.cpu_cores);
+  const metrics = [
+    {
+      key: "cpu",
+      label: "CPU",
+      icon: <Cpu size={14} />,
+      value: `${cpuUsed.toFixed(1)}%`,
+      detail: cores ? t("terminal.session.cpu_cores", { count: cores }) : "",
+      percent: cpuUsed,
+    },
+    {
+      key: "ram",
+      label: t("nodeCard.ram"),
+      icon: <MemoryStick size={14} />,
+      value: percentage(live?.ram.used, node.mem_total),
+      detail: volumeDetail(live?.ram.used, node.mem_total),
+      percent: ramUsed,
+    },
+    {
+      key: "disk",
+      label: t("nodeCard.disk"),
+      icon: <HardDrive size={14} />,
+      value: percentage(live?.disk.used, node.disk_total),
+      detail: volumeDetail(live?.disk.used, node.disk_total),
+      percent: diskUsed,
+    },
+    { key: "up", label: t("terminal.session.net_up"), icon: <ArrowUp size={14} />, value: `${formatBytes(live?.network.up || 0)}/s`, tone: "is-up" },
+    { key: "down", label: t("terminal.session.net_down"), icon: <ArrowDown size={14} />, value: `${formatBytes(live?.network.down || 0)}/s`, tone: "is-down" },
+  ];
+  const visibleMetrics = compact ? metrics.slice(0, 3) : metrics;
+  const mobilePanel = compact && Boolean(sidePanel);
 
   return (
     <TerminalContext.Provider value={contextValue}>
-      <div className="remote-session" style={{ display: active ? "flex" : "none" }}>
-        <header className="remote-session-header">
-          <div className="remote-node-heading">
-            <strong>{node.name}</strong>
-            <span className={`remote-status is-${connectionState}`}><i />{stateLabel(connectionState, t)}</span>
+      <div className={`remote-session${mobilePanel ? " has-mobile-panel" : ""}`} style={{ display: active ? "flex" : "none" }}>
+        {!mobilePanel ? (
+        <>
+        <Box className="remote-identity">
+          <Box className="remote-identity-flag">
+            <Flag flag={flag} width={40} height={30} />
+          </Box>
+          <Box className="remote-identity-copy">
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+              <Typography component="h1" variant="h5" noWrap title={node.name} sx={{ m: 0, fontSize: "inherit", fontWeight: 700, lineHeight: 1.25 }}>
+                {node.name}
+              </Typography>
+              {tag ? <Chip size="small" label={tag} sx={{ height: 20, fontSize: 10, flex: "0 0 auto" }} /> : null}
+            </Stack>
+            <Box className="remote-identity-meta">
+              <span className={`remote-identity-address${address === UNREPORTED_ADDRESS ? "" : " is-ip"}`}>{address}</span>
+              <span className={`remote-status is-${connectionState}`}><i />{stateLabel(connectionState, t)}</span>
+            </Box>
+          </Box>
+          <Box className="remote-session-actions">
+            {compact ? (
+              <>
+                <IconButton
+                  aria-label={t("terminal.session.more")}
+                  onClick={(event) => setMoreAnchor(event.currentTarget)}
+                >
+                  <MoreHorizontal size={18} />
+                </IconButton>
+                <Menu
+                  anchorEl={moreAnchor}
+                  open={Boolean(moreAnchor)}
+                  onClose={() => setMoreAnchor(null)}
+                  {...getAdminMenuProps()}
+                >
+                  <MenuItem onClick={() => { setMoreAnchor(null); void copyTerminalSelection(); }}>{t("terminal.session.copy_selection")}</MenuItem>
+                  <MenuItem disabled={!remoteReady} onClick={() => { setMoreAnchor(null); void pasteTerminalClipboard(); }}>{t("terminal.session.paste")}</MenuItem>
+                  <MenuItem onClick={() => { setMoreAnchor(null); onDuplicate(); }}>{t("terminal.session.duplicate_session")}</MenuItem>
+                  <MenuItem onClick={() => { setMoreAnchor(null); reconnect(); }}>{t("terminal.session.reconnect")}</MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <>
+                <Button size="small" onClick={onDuplicate} sx={{ gap: 0.75 }}>
+                  <Copy size={15} />
+                  {t("terminal.session.duplicate_session")}
+                </Button>
+                <Button size="small" variant="outlined" onClick={reconnect} sx={{ gap: 0.75 }}>
+                  <RotateCw size={15} />
+                  {t("terminal.session.reconnect")}
+                </Button>
+                {!sidePanel ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setSidePanel("files")}
+                    sx={{ gap: 0.75 }}
+                  >
+                    <PanelRightClose size={15} />
+                    {t("terminal.session.open_sidebar")}
+                  </Button>
+                ) : null}
+              </>
+            )}
+          </Box>
+        </Box>
+
+        <Box className="remote-metrics">
+          {visibleMetrics.map((metric) => (
+            <Paper key={metric.key} className={`remote-metric ${metric.tone || ""}${metric.percent != null ? " has-usage" : ""}`} variant="outlined" sx={usageMetricCardSx}>
+              <small>{metric.icon}{metric.label}</small>
+              <div className="remote-metric-row">
+                <strong>{metric.value}</strong>
+                {metric.detail ? <span className="remote-metric-detail">{metric.detail}</span> : null}
+              </div>
+              {metric.percent != null ? (
+                <div className={`remote-metric-bar is-${usageTone(metric.percent)}`}>
+                  <i style={{ width: `${Math.min(100, Math.max(0, metric.percent))}%` }} />
+                </div>
+              ) : null}
+            </Paper>
+          ))}
+        </Box>
+        {compact ? (
+          <div className="remote-network">
+            <span className="is-up"><ArrowUp size={12} />{t("terminal.session.net_up_short")} <strong>{formatBytes(live?.network.up || 0)}/s</strong></span>
+            <span className="remote-network-rule" />
+            <span className="is-down"><ArrowDown size={12} />{t("terminal.session.net_down_short")} <strong>{formatBytes(live?.network.down || 0)}/s</strong></span>
           </div>
-          <div className="remote-metrics">
-            <span><small>CPU</small>{(live?.cpu.usage || 0).toFixed(1)}%</span>
-            <span><small>{t("nodeCard.ram")}</small>{percentage(live?.ram.used, node.mem_total)}</span>
-            <span><small>{t("nodeCard.disk")}</small>{percentage(live?.disk.used, node.disk_total)}</span>
-            <span className="is-up"><small>{t("terminal.session.net_up")}</small>{formatBytes(live?.network.up || 0)}/s</span>
-            <span className="is-down"><small>{t("terminal.session.net_down")}</small>{formatBytes(live?.network.down || 0)}/s</span>
-          </div>
-          <div className="remote-session-actions">
-            <IconButton size="2" variant="ghost" title={t("terminal.session.copy_selection")} aria-label={t("terminal.session.copy_selection")} onClick={() => void copyTerminalSelection()}><ClipboardCopy size={16} /></IconButton>
-            <IconButton size="2" variant="ghost" title={t("terminal.session.paste")} aria-label={t("terminal.session.paste")} disabled={!remoteReady} onClick={() => void pasteTerminalClipboard()}><ClipboardPaste size={16} /></IconButton>
-            <IconButton size="2" variant="ghost" title={t("terminal.session.copy_tab")} aria-label={t("terminal.session.copy_tab")} onClick={onDuplicate}><Copy size={16} /></IconButton>
-            <IconButton size="2" variant="ghost" title={t("terminal.session.reconnect")} onClick={reconnect}><RotateCw size={16} /></IconButton>
-            <Button size="1" variant={sidePanel === "files" ? "solid" : "soft"} onClick={() => togglePanel("files")}><Files size={15} />{t("terminal.session.files")}</Button>
-            <Button size="1" variant={sidePanel === "commands" ? "solid" : "soft"} onClick={() => togglePanel("commands")}><ClipboardList size={15} />{t("terminal.session.commands")}</Button>
-            {sidePanel && <IconButton size="2" variant="ghost" title={t("terminal.session.close_sidebar")} onClick={() => setSidePanel(null)}><PanelRightClose size={16} /></IconButton>}
-          </div>
-        </header>
+        ) : null}
+        </>
+        ) : null}
 
         <main className="remote-session-body">
-          <div
-            className="remote-terminal-pane"
-            style={{ "--mobile-keyboard-inset": `${mobileKeyboardInset}px` } as CSSProperties}
-          >
+          <div className="remote-terminal-pane">
+            <div className="remote-terminal-head">
+              <span className="remote-terminal-head-title">
+                <TerminalIcon size={16} />
+                {t("terminal.session.terminal")}
+                {tag ? <Chip size="small" label={tag} sx={{ height: 18, fontSize: 10, bgcolor: "rgba(34,197,94,.16)", color: "#86efac" }} /> : null}
+              </span>
+              <span className="remote-terminal-head-actions">
+                <IconButton size="small" aria-label={t("terminal.session.copy_selection")} onClick={() => void copyTerminalSelection()}>
+                  <ClipboardCopy size={15} />
+                </IconButton>
+                <IconButton size="small" aria-label={t("terminal.session.paste")} disabled={!remoteReady} onClick={() => void pasteTerminalClipboard()}>
+                  <ClipboardPaste size={15} />
+                </IconButton>
+                {!sidePanel ? (
+                  <IconButton size="small" aria-label={t("terminal.session.open_sidebar")} title={t("terminal.session.open_sidebar")} onClick={() => setSidePanel("files")}>
+                    <PanelRightClose size={15} />
+                  </IconButton>
+                ) : null}
+              </span>
+            </div>
             <div
               ref={terminalHost}
               className="terminal-page terminal-xterm-host"
-              style={{ "--xterm-padding": "16px" } as CSSProperties}
+              style={{ flex: 1, minHeight: 0 }}
             />
+            {compact ? (
+              <div className="remote-terminal-tools">
+                <button type="button" onClick={() => void copyTerminalSelection()}>
+                  <ClipboardCopy size={13} />
+                  {t("common.copy")}
+                </button>
+                <button type="button" disabled={!remoteReady} onClick={() => void pasteTerminalClipboard()}>
+                  <ClipboardPaste size={13} />
+                  {t("terminal.session.paste")}
+                </button>
+              </div>
+            ) : null}
             <form
               className="remote-mobile-command"
+              style={compact && sidePanel ? { display: "none" } : undefined}
               onSubmit={(event) => {
                 event.preventDefault();
+                event.stopPropagation();
                 submitMobileCommand();
               }}
             >
-              <input
-                ref={mobileCommandInput}
-                type="text"
-                value={mobileCommand}
-                placeholder={t("terminal.session.input_command")}
-                aria-label={t("terminal.session.input_command_aria")}
-                inputMode="text"
-                enterKeyHint="send"
-                autoCapitalize="none"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
-                disabled={!remoteReady}
-                onChange={(event) => setMobileCommand(event.target.value)}
-                onFocus={resizeTerminal}
-                onBlur={resizeTerminal}
-                onCompositionStart={() => { mobileComposing.current = true; }}
-                onCompositionEnd={() => { mobileComposing.current = false; }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.nativeEvent.isComposing || mobileComposing.current || event.keyCode === 229)) {
-                    event.stopPropagation();
-                  }
-                }}
-              />
-              <IconButton type="submit" size="2" aria-label={t("terminal.session.send_command")} disabled={!remoteReady || !mobileCommand}>
-                <CornerDownLeft size={16} />
-              </IconButton>
+              <label className="remote-mobile-input">
+                <span aria-hidden="true">›</span>
+                <input
+                  ref={mobileCommandInput}
+                  type="text"
+                  value={mobileCommand}
+                  placeholder={t("terminal.session.input_command")}
+                  aria-label={t("terminal.session.input_command_aria")}
+                  inputMode="text"
+                  enterKeyHint="send"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={!remoteReady}
+                  onChange={(event) => setMobileCommand(event.target.value)}
+                  onCompositionStart={() => { mobileComposing.current = true; }}
+                  onCompositionEnd={() => { mobileComposing.current = false; }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && (event.nativeEvent.isComposing || mobileComposing.current || event.keyCode === 229)) {
+                      event.stopPropagation();
+                    }
+                  }}
+                />
+              </label>
+              <button
+                type="submit"
+                className="remote-mobile-send"
+                aria-label={t("terminal.session.send_command")}
+                disabled={!remoteReady || !mobileCommand}
+              >
+                <CornerDownLeft size={18} />
+              </button>
             </form>
             {(connectionState === "error" || connectionState === "disconnected") && (
               <div className="remote-reconnect">
                 <span>{connectionError || t("terminal.disconnect")}</span>
                 {!isPermanentRemoteError(connectionError, t) && (
-                  <Button size="1" onClick={reconnect}><RotateCw size={14} />{t("terminal.session.reconnect")}</Button>
+                  <Button size="small" variant="contained" onClick={reconnect} sx={{ gap: 0.75 }}>
+                    <RotateCw size={14} />
+                    {t("terminal.session.reconnect")}
+                  </Button>
                 )}
               </div>
             )}
           </div>
-          {sidePanel && <div className="remote-divider" onPointerDown={() => { dragging.current = true; }} />}
-          <aside className="remote-side-panel" style={{ width: sidePanel ? sideWidth : 0, display: sidePanel ? "block" : "none" }}>
-            <div style={{ display: sidePanel === "files" ? "block" : "none", height: "100%" }}>
+          {sidePanel && !compact ? <div className="remote-divider" onPointerDown={() => { dragging.current = true; }} /> : null}
+          <aside className="remote-side-panel" style={{ width: sidePanel ? (compact ? undefined : sideWidth) : 0, display: sidePanel ? "flex" : "none", flexDirection: "column" }}>
+            <Box className="remote-side-tabs">
+              <Tabs
+                value={sidePanel || "files"}
+                onChange={(_event, value) => setSidePanel(value)}
+                variant="standard"
+                sx={{ minHeight: 43, minWidth: 0, "& .MuiTab-root": { minHeight: 43, minWidth: 0, px: 1.5, textTransform: "none", fontSize: 12, gap: "7px" } }}
+              >
+                <Tab value="files" icon={<Files size={16} />} iconPosition="start" label={t("terminal.session.files")} />
+                <Tab value="commands" icon={<ClipboardList size={16} />} iconPosition="start" label={t("terminal.session.commands")} />
+              </Tabs>
+              {!compact ? (
+                <IconButton size="small" aria-label={t("terminal.session.close_sidebar")} onClick={() => setSidePanel(null)}>
+                  <PanelRightClose size={16} />
+                </IconButton>
+              ) : null}
+            </Box>
+            <Box sx={{ display: sidePanel === "files" ? "block" : "none", minHeight: 0, flex: 1, height: "100%" }}>
               <FileManager ref={fileManager} send={send} connected={remoteReady} />
-            </div>
-            {sidePanel === "commands" && <div className="remote-command-panel"><CommandClipboardPanel className="h-full w-full" /></div>}
+            </Box>
+            <Box sx={{ display: sidePanel === "commands" ? "block" : "none", minHeight: 0, flex: 1, height: "100%" }}>
+              <div className="remote-command-panel"><CommandClipboardPanel className="h-full w-full" /></div>
+            </Box>
           </aside>
         </main>
 
-        <Dialog.Root open={manualPasteOpen} onOpenChange={setManualPasteOpen}>
-          <AppDialogContent maxWidth="440px">
-            <Dialog.Title>{t("terminal.session.paste_to_terminal")}</Dialog.Title>
-            <TextArea autoFocus value={manualPasteText} onChange={(event) => setManualPasteText(event.target.value)} rows={7} />
-            <div className="remote-dialog-actions">
-              <Button variant="soft" onClick={() => setManualPasteOpen(false)}>{t("common.cancel")}</Button>
-              <Button disabled={!manualPasteText} onClick={() => {
+        {compact ? (
+          <BottomNavigation
+            className="remote-bottom-nav"
+            showLabels
+            value={sidePanel || "terminal"}
+            onChange={(_event, value) => {
+              setSidePanel(value === "terminal" ? null : value);
+            }}
+          >
+            <BottomNavigationAction value="terminal" label={t("terminal.session.terminal")} icon={<TerminalIcon size={18} />} />
+            <BottomNavigationAction value="files" label={t("terminal.session.files")} icon={<Files size={18} />} />
+            <BottomNavigationAction value="commands" label={t("terminal.session.commands")} icon={<ClipboardList size={18} />} />
+          </BottomNavigation>
+        ) : null}
+
+        <Dialog {...remoteConfirmDialogProps} open={manualPasteOpen} onClose={() => setManualPasteOpen(false)} maxWidth="sm">
+          <DialogTitle>{t("terminal.session.paste_to_terminal")}</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              multiline
+              minRows={7}
+              value={manualPasteText}
+              onChange={(event) => setManualPasteText(event.target.value)}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setManualPasteOpen(false)}>{t("common.cancel")}</Button>
+            <Button
+              variant="contained"
+              disabled={!manualPasteText}
+              onClick={() => {
                 if (sendTerminalText(manualPasteText)) {
                   setManualPasteOpen(false);
                   setManualPasteText("");
                   terminal.current?.focus();
                 }
-              }}>{t("terminal.session.insert")}</Button>
-            </div>
-          </AppDialogContent>
-        </Dialog.Root>
+              }}
+            >
+              {t("terminal.session.insert")}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {contextMenu && (
           <div

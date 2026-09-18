@@ -43,6 +43,8 @@ test("exec page displays localized canned results", () => {
     new URL("../src/pages/admin/exec.tsx", import.meta.url),
     "utf8",
   );
+  assert.match(source, /from "@\/utils\/execResult"/);
+  assert.match(source, /from "@\/utils\/randomId"/);
   assert.match(source, /localizeExecResult\(result\.result, t\)/);
   assert.doesNotMatch(source, /<pre className="whitespace-pre-wrap">\{result\.result\}<\/pre>/);
 });

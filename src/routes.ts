@@ -49,6 +49,7 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin/return-route": loadAdminReturnRoute,
   "/admin/logs": () => import("./pages/admin/log"),
   "/admin/exec": () => import("./pages/admin/exec"),
+  "/admin/remote-management/mcp": () => import("./pages/admin/remote-management/mcp"),
   "/admin/theme_managed": () => import("./pages/admin/theme_managed.tsx"),
   "/admin/theme_raw": () => import("./pages/admin/theme_raw.tsx"),
   "/admin/market/themes": () => import("./pages/admin/market/themes"),
@@ -265,6 +266,13 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: "mcp",
+            element: React.createElement(Navigate, {
+              replace: true,
+              to: "/admin/remote-management/mcp",
+            }),
+          },
+          {
             path: "reverse-proxy",
             element: React.createElement(
               lazy(() => import("./pages/admin/settings/reverse-proxy"))
@@ -334,6 +342,12 @@ export const routes: RouteObject[] = [
       {
         path: "exec",
         element: React.createElement(lazy(() => import("./pages/admin/exec"))),
+      },
+      {
+        path: "remote-management/mcp",
+        element: React.createElement(
+          lazy(() => import("./pages/admin/remote-management/mcp")),
+        ),
       }
     ],
   },

@@ -19,7 +19,12 @@ const normalizeSearchValue = (value: string | undefined) =>
   value?.trim().toLocaleLowerCase() ?? "";
 
 export function remoteNodeSearchText(node: RemoteNodePickerItem): string {
-  return [node.name, node.ipv4, node.ipv6, node.group, node.tags]
+  const tagText = (node.tags || "")
+    .split(";")
+    .map((tag) => tag.replace(/<\w+>$/, "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return [node.name, node.ipv4, node.ipv6, node.group, node.tags, tagText]
     .map(normalizeSearchValue)
     .filter(Boolean)
     .join("\n");

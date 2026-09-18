@@ -100,7 +100,7 @@ export function isReleaseNewer(
   );
 }
 
-export const DESKTOP_SIDEBAR_WIDTH = 220;
+export const DESKTOP_SIDEBAR_WIDTH = 256;
 export const DESKTOP_MINI_SIDEBAR_WIDTH = 88;
 export const MOBILE_SIDEBAR_WIDTH = 280;
 export const NAV_MINI_STORAGE_KEY = "lite-admin-nav-rail";

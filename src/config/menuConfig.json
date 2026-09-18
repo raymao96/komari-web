@@ -43,6 +43,11 @@
           "icon": "Code"
         },
         {
+          "labelKey": "mcp.title",
+          "path": "/admin/remote-management/mcp",
+          "icon": "Hub"
+        },
+        {
           "labelKey": "navigation.terminal_settings",
           "path": "/admin/settings/xtermjs",
           "icon": "Terminal"
