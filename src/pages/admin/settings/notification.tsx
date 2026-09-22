@@ -28,9 +28,11 @@ const NotificationSettings = () => {
   // 拉取所有 message sender 及字段定义
   React.useEffect(() => {
     if (loading) return;
+    let cancelled = false;
     fetch("/api/admin/settings/message-sender")
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.status === "success" && data.data) {
           setMessageDefs(data.data);
           const senders = Object.keys(data.data);
@@ -47,17 +49,23 @@ const NotificationSettings = () => {
         }
       })
       .catch(() => {
+        if (cancelled) return;
         setMessageError(t("settings.notification.provider_fetch_failed"));
         setHydrated(true);
       });
-  }, [loading, settings.notification_method, t]);
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, settings.notification_method]);
 
   // 拉取当前 message sender 的设置
   React.useEffect(() => {
     if (!currentMessageSender) return;
+    let cancelled = false;
     fetch(`/api/admin/settings/message-sender?provider=${currentMessageSender}`)
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.status === "success" && data.data) {
           try {
             setMessageValues(JSON.parse(data.data.addition || "{}"));
@@ -68,9 +76,16 @@ const NotificationSettings = () => {
           setMessageError(data.message || t("settings.notification.provider_settings_fetch_failed"));
         }
       })
-      .catch(() => setMessageError(t("settings.notification.provider_settings_fetch_failed")))
-      .finally(() => setHydrated(true));
-  }, [currentMessageSender, t]);
+      .catch(() => {
+        if (!cancelled) setMessageError(t("settings.notification.provider_settings_fetch_failed"));
+      })
+      .finally(() => {
+        if (!cancelled) setHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentMessageSender]);
 
   // 处理保存
   const handleMessageSave = async (values: any) => {

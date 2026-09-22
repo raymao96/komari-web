@@ -3,7 +3,7 @@ import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import ChevronLeft from "@mui/icons-material/ChevronLeft";
 import ChevronRight from "@mui/icons-material/ChevronRight";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -41,6 +41,46 @@ export default function AdminShell({ content }: AdminShellProps) {
   const navWidth = isMobile
     ? "min(280px, calc(100vw - 48px))"
     : desktopNavWidth(mini);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-admin-shell-active", "true");
+    return () => {
+      document.documentElement.removeAttribute("data-admin-shell-active");
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const syncToastTop = () => {
+      if (window.innerWidth >= 1024) {
+        document.documentElement.style.setProperty(
+          "--admin-toast-top",
+          "calc(12px + var(--safe-area-top))",
+        );
+        return;
+      }
+      const bar = document.querySelector<HTMLElement>("[data-admin-shell] .MuiAppBar-root");
+      const banner = document.querySelector<HTMLElement>("[data-admin-top-banner]");
+      const barBottom = bar?.getBoundingClientRect().bottom ?? 56;
+      if (!banner) {
+        document.documentElement.style.setProperty(
+          "--admin-toast-top",
+          `${Math.round(barBottom + 12)}px`,
+        );
+        return;
+      }
+      const contentPad = window.innerWidth >= 900 ? 24 : 16;
+      document.documentElement.style.setProperty(
+        "--admin-toast-top",
+        `${Math.round(barBottom + contentPad + banner.offsetHeight + 8)}px`,
+      );
+    };
+    syncToastTop();
+    window.addEventListener("resize", syncToastTop);
+    return () => {
+      window.removeEventListener("resize", syncToastTop);
+      document.documentElement.style.removeProperty("--admin-toast-top");
+    };
+  }, [location.pathname]);
 
   useEffect(() => {
     setSidebarOpen(!isMobile);
@@ -228,7 +268,7 @@ export default function AdminShell({ content }: AdminShellProps) {
         sx={{
           width: navWidth,
           flexShrink: 0,
-          whiteSpace: "nowrap",
+          whiteSpace: mini ? "nowrap" : "normal",
           transition: (theme) =>
             theme.transitions.create("width", navMotion),
           "& .MuiBackdrop-root": {
@@ -239,6 +279,7 @@ export default function AdminShell({ content }: AdminShellProps) {
             boxSizing: "border-box",
             overflowX: "hidden",
             overflowY: "hidden",
+            whiteSpace: mini ? "nowrap" : "normal",
             zIndex: isMobile ? 50 : 12,
             pt: isMobile ? "var(--safe-area-top)" : 0,
             pb: isMobile ? "var(--safe-area-bottom)" : 0,
@@ -327,6 +368,7 @@ export default function AdminShell({ content }: AdminShellProps) {
         >
           {!ishttps ? (
             <Alert
+              data-admin-top-banner=""
               severity="warning"
               sx={{
                 mb: 2.5,

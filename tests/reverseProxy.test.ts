@@ -162,6 +162,18 @@ test("Cloudflare token guidance keeps readable vertical rhythm", () => {
   assert.match(page, /token_guide[\s\S]*ExternalLink/);
 });
 
+test("install hint does not say Docker ships cloudflared", () => {
+  assert.match(page, /LITE_CLOUDFLARED_BIN/);
+  assert.doesNotMatch(page, /non-Docker/);
+  for (const filename of localeFiles) {
+    const locale = JSON.parse(readFileSync(`src/i18n/locales/${filename}`, "utf8"));
+    const hint = locale.settings.reverse_proxy.install_hint;
+    assert.equal(typeof hint, "string", filename);
+    assert.match(hint, /LITE_CLOUDFLARED_BIN/);
+    assert.doesNotMatch(hint, /非 Docker|non-Docker|Docker 以外/);
+  }
+});
+
 test("hover preload fills reverse-proxy data before the page mounts", () => {
   const routes = readFileSync("src/routes.ts", "utf8");
   const cloudflared = readFileSync("src/lib/cloudflared.ts", "utf8");

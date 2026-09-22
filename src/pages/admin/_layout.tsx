@@ -134,17 +134,15 @@ const AdminAuthenticatedContent = () => {
         aria-hidden={firstRouteReady ? undefined : true}
         sx={{ visibility: firstRouteReady ? "visible" : "hidden" }}
       >
-        <RemoteManagementGateProvider>
-          <AdminShell
-            content={
-              <AdminRouteViewport
-                fallback={<AdminRouteLoading />}
-                outlet={outlet}
-                onFirstReady={() => setFirstRouteReady(true)}
-              />
-            }
-          />
-        </RemoteManagementGateProvider>
+        <AdminShell
+          content={
+            <AdminRouteViewport
+              fallback={<AdminRouteLoading />}
+              outlet={outlet}
+              onFirstReady={() => setFirstRouteReady(true)}
+            />
+          }
+        />
       </Box>
     </>
   );
@@ -177,7 +175,9 @@ const AdminGuard = () => {
         ) : view === "login" ? (
           <AdminLoginPage />
         ) : (
-          <AdminAuthenticatedLayout />
+          <RemoteManagementGateProvider>
+            <AdminAuthenticatedLayout />
+          </RemoteManagementGateProvider>
         )}
       </NodeDetailsProvider>
     </SettingsProvider>

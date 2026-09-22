@@ -1,5 +1,7 @@
 import { Callout, Skeleton } from "@/components/admin/ui";
 import Box from "@mui/material/Box";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
 import { alpha } from "@mui/material/styles";
 import {
   Activity,
@@ -15,13 +17,12 @@ import {
   Route,
   Timer,
   WifiOff,
+  X,
 } from "@/components/admin/muiIcons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -30,6 +31,10 @@ import {
   YAxis,
 } from "recharts";
 
+import {
+  AdminPagination,
+  useAdminPagination,
+} from "@/components/admin/AdminPagination";
 import { ChartContainer } from "@/components/ui/chart";
 import {
   type DashboardAlertKind,
@@ -47,13 +52,24 @@ import {
   formatBillingAlertStatus,
 } from "@/utils/adminAlertFilters";
 import { formatBytes } from "@/utils/unitHelper";
+import {
+  DASHBOARD_RANKING_ALL,
+  useDashboardRankingExpand,
+} from "@/utils/dashboardRankingExpand";
+import {
+  getDashboardChartsSnapshot,
+  getDashboardSnapshot,
+  requestDashboard,
+  requestDashboardCharts,
+} from "@/utils/dashboardApi";
 
 export {
   getDashboardChartsSnapshot,
   getDashboardSnapshot,
   requestDashboard,
   requestDashboardCharts,
-} from "@/utils/dashboardApi";
+};
+export { BillingTrendPanel } from "@/components/admin/DashboardTraffic30d";
 
 export function SummaryCardSkeleton() {
   return (
@@ -67,7 +83,7 @@ export function SummaryCardSkeleton() {
 
 export function OverviewSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[0, 1, 2, 3].map((item) => (
         <SummaryCardSkeleton key={item} />
       ))}
@@ -200,14 +216,135 @@ export function useSyncedSummaryFooters(
 function DashboardChip({
   children,
   tone = "accent",
+  onExpand,
+  onPrefetch,
 }: {
   children: React.ReactNode;
   tone?: "accent" | "orange" | "red";
+  onExpand?: () => void;
+  onPrefetch?: () => void;
 }) {
+  const className = `km-dashboard-chip km-dashboard-chip--${tone}`;
+  if (!onExpand) {
+    return <span className={className}>{children}</span>;
+  }
   return (
-    <span className={`km-dashboard-chip km-dashboard-chip--${tone}`}>
+    <button
+      type="button"
+      className={className}
+      onClick={onExpand}
+      onMouseEnter={onPrefetch}
+      onFocus={onPrefetch}
+      aria-haspopup="dialog"
+    >
       {children}
-    </span>
+    </button>
+  );
+}
+
+function DashboardRankingDialog({
+  open,
+  onClose,
+  title,
+  description,
+  trailing,
+  loading,
+  footer,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  trailing?: React.ReactNode;
+  loading?: boolean;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth={false}
+      fullWidth
+      scroll="paper"
+      slotProps={{
+        paper: {
+          sx: {
+            width: "calc(100% - 32px)",
+            maxWidth: 960,
+            m: 2,
+            maxHeight: "88vh",
+            borderRadius: "8px",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          },
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          px: { xs: 2, md: 2.5 },
+          pt: 2,
+          pb: 1,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+          <h2 className="min-w-0 text-base font-semibold text-foreground">{title}</h2>
+          <div className="flex shrink-0 items-center gap-2">
+            {trailing}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t("common.close")}
+              className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-[var(--gray-a3)]"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </Box>
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+      </Box>
+      <DialogContent sx={{ px: 0, pb: 0, pt: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ px: { xs: 2, md: 2.5 }, pb: footer ? 1 : 2.5, minHeight: 0, overflow: "auto", flex: 1 }}>
+          {loading ? <Skeleton className="h-[220px] w-full" /> : children}
+        </Box>
+        {footer}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DashboardRankingPager({
+  page,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  if (total === 0) return null;
+  return (
+    <Box sx={{ flexShrink: 0, borderTop: "1px solid var(--gray-a5)" }}>
+      <AdminPagination
+        page={page}
+        total={total}
+        onPageChange={onPageChange}
+        pageSize={pageSize}
+        onPageSizeChange={onPageSizeChange}
+        showSummary={false}
+      />
+    </Box>
   );
 }
 
@@ -246,14 +383,20 @@ function DashboardRankingItemLink({ href, children }: { href?: string; children:
   );
 }
 
-function DashboardRankingGrid({ limit, children }: { limit: number; children: React.ReactNode }) {
+function DashboardRankingGrid({ children }: { children: React.ReactNode }) {
+  const items = React.Children.toArray(children);
+  const count = items.length;
+  const twoCol = count >= 11;
+  const rows = count <= 20 ? 10 : Math.ceil(count / 2);
   return (
     <div className="@container">
-      <div className={limit >= 15
-        ? "grid grid-cols-1 gap-y-2 @min-[34rem]:grid-cols-2 @min-[34rem]:gap-x-5"
-        : "grid grid-cols-1 gap-y-2"}
+      <div
+        className={twoCol
+          ? "grid grid-cols-1 gap-y-2 @min-[34rem]:grid-cols-2 @min-[34rem]:gap-x-5 @min-[34rem]:[grid-auto-flow:column]"
+          : "grid grid-cols-1 gap-y-2"}
+        style={twoCol ? { gridTemplateRows: `repeat(${rows}, auto)` } : undefined}
       >
-        {children}
+        {items}
       </div>
     </div>
   );
@@ -694,15 +837,88 @@ export function StoragePanel({ data, locale }: { data: DashboardData; locale: st
   );
 }
 
-export function ResourceRankingPanel({ data, limit }: { data: DashboardData; limit: number }) {
+export function ResourceRankingPanel({
+  data,
+  limit,
+  accountKey = "authenticated",
+  allowPrefetch = true,
+}: {
+  data: DashboardData;
+  limit: number;
+  accountKey?: string;
+  allowPrefetch?: boolean;
+}) {
   const { t } = useTranslation();
-  const groups: Array<{
-    key: "cpu" | "memory" | "disk";
-    label: string;
-    icon: React.ReactNode;
-    items: DashboardResourceRankItem[];
-    color: string;
-  }> = [
+  const loadAll = React.useCallback(
+    () => requestDashboard(["resources"], DASHBOARD_RANKING_ALL, accountKey),
+    [accountKey],
+  );
+  const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
+  const groups = resourceRankingGroups(t, data);
+  const allGroups = expand.data ? resourceRankingGroups(t, expand.data) : groups;
+  const rankCount = Math.max(0, ...allGroups.map((group) => group.items.length));
+  const rankSlots = React.useMemo(
+    () => Array.from({ length: rankCount }, (_, index) => index),
+    [rankCount],
+  );
+  const paging = useAdminPagination(rankSlots);
+  const dialogGroups = allGroups.map((group) => ({
+    ...group,
+    items: group.items.slice(paging.pageStart, paging.pageStart + paging.pageSize),
+  }));
+
+  return (
+    <section className="km-admin-surface p-3">
+      <PanelHeader
+        title={t("admin_dashboard.resource_ranking")}
+        description={t("admin_dashboard.resource_ranking_hint")}
+        trailing={(
+          <DashboardChip onExpand={expand.openDialog} onPrefetch={expand.prefetch}>
+            Top {limit}
+          </DashboardChip>
+        )}
+      />
+      <ResourceRankingBody groups={groups} />
+      <DashboardRankingDialog
+        open={expand.open}
+        onClose={expand.closeDialog}
+        title={t("admin_dashboard.resource_ranking")}
+        description={t("admin_dashboard.resource_ranking_hint")}
+        trailing={<DashboardChip>{t("admin_dashboard.ranking_all")}</DashboardChip>}
+        loading={expand.loading && !expand.data}
+        footer={(
+          <DashboardRankingPager
+            page={paging.page}
+            total={rankCount}
+            pageSize={paging.pageSize}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
+        )}
+      >
+        {expand.error ? (
+          <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
+            {t("admin_dashboard.data_unavailable")}
+          </div>
+        ) : (
+          <ResourceRankingBody groups={dialogGroups} indexOffset={paging.pageStart} />
+        )}
+      </DashboardRankingDialog>
+    </section>
+  );
+}
+
+function resourceRankingGroups(
+  t: (key: string) => string,
+  data: DashboardData,
+): Array<{
+  key: "cpu" | "memory" | "disk";
+  label: string;
+  icon: React.ReactNode;
+  items: DashboardResourceRankItem[];
+  color: string;
+}> {
+  return [
     {
       key: "cpu",
       label: t("admin_dashboard.top_cpu"),
@@ -725,55 +941,55 @@ export function ResourceRankingPanel({ data, limit }: { data: DashboardData; lim
       color: "bg-[var(--orange-9)]",
     },
   ];
+}
 
+function ResourceRankingBody({
+  groups,
+  indexOffset = 0,
+}: {
+  groups: ReturnType<typeof resourceRankingGroups>;
+  indexOffset?: number;
+}) {
+  const { t } = useTranslation();
   return (
-    <section className="km-admin-surface p-3">
-      <PanelHeader
-        title={t("admin_dashboard.resource_ranking")}
-        description={t("admin_dashboard.resource_ranking_hint")}
-        trailing={(
-          <DashboardChip>Top {limit}</DashboardChip>
-        )}
-      />
-      <div
-        className="grid gap-5"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))" }}
-      >
-        {groups.map((group) => (
-          <div key={group.key} className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <span className="text-[var(--accent-11)]">{group.icon}</span>
-              {group.label}
-            </div>
-            {group.items.length === 0 ? (
-              <div className="flex min-h-28 items-center justify-center text-xs text-muted-foreground">
-                {t("admin_dashboard.no_live_resource_data")}
-              </div>
-            ) : (
-              <div className={limit >= 15 ? "space-y-2" : "space-y-2.5"}>
-                {group.items.map((item, index) => {
-                  const value = Math.max(0, Math.min(100, item[group.key]));
-                  return (
-                    <DashboardRankingItemLink key={item.uuid} href={item.detail_url}>
-                      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                        <span className="min-w-0 truncate text-foreground">
-                          <span className="mr-1 text-muted-foreground">{index + 1}.</span>
-                          {item.name}
-                        </span>
-                        <strong className="shrink-0 font-semibold tabular-nums">{value.toFixed(1)}%</strong>
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--gray-a4)]">
-                        <div className={`h-full rounded-full ${group.color}`} style={{ width: `${value}%` }} />
-                      </div>
-                    </DashboardRankingItemLink>
-                  );
-                })}
-              </div>
-            )}
+    <div
+      className="grid gap-5"
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))" }}
+    >
+      {groups.map((group) => (
+        <div key={group.key} className="min-w-0">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <span className="text-[var(--accent-11)]">{group.icon}</span>
+            {group.label}
           </div>
-        ))}
-      </div>
-    </section>
+          {group.items.length === 0 ? (
+            <div className="flex min-h-28 items-center justify-center text-xs text-muted-foreground">
+              {t("admin_dashboard.no_live_resource_data")}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {group.items.map((item, index) => {
+                const value = Math.max(0, Math.min(100, item[group.key]));
+                return (
+                  <DashboardRankingItemLink key={item.uuid} href={item.detail_url}>
+                    <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate text-foreground">
+                        <span className="mr-1 text-muted-foreground">{indexOffset + index + 1}.</span>
+                        {item.name}
+                      </span>
+                      <strong className="shrink-0 font-semibold tabular-nums">{value.toFixed(1)}%</strong>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--gray-a4)]">
+                      <div className={`h-full rounded-full ${group.color}`} style={{ width: `${value}%` }} />
+                    </div>
+                  </DashboardRankingItemLink>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -834,130 +1050,140 @@ export function TrafficTrendPanel({
   );
 }
 
-export function BillingTrendPanel({
-  charts,
-  error,
-  data,
-  axisWidth,
-}: {
-  charts: DashboardChartsData | null;
-  error: string | null;
-  data: Array<DashboardChartsData["traffic"]["daily"][number] & { label: string }>;
-  axisWidth: number;
-}) {
-  const { t } = useTranslation();
-  return (
-    <section className="@container flex h-full min-w-0 flex-col km-admin-surface p-3">
-      <PanelHeader
-        title={t("admin_dashboard.daily_billable")}
-        description={t("admin_dashboard.daily_billable_hint")}
-        responsive
-        trailing={<DashboardChip>{t("admin_dashboard.recent_month")}</DashboardChip>}
-      />
-      {charts && !charts.traffic.error && !charts.traffic.history_ready ? (
-        <p className="mb-2 text-xs text-muted-foreground">{t("admin_dashboard.history_preparing")}</p>
-      ) : null}
-      {error || charts?.traffic.error ? (
-        <div className="flex min-h-[220px] flex-1 items-center justify-center text-sm text-[var(--red-11)]">
-          {t("admin_dashboard.data_unavailable")}
-        </div>
-      ) : charts ? (
-        <ChartContainer config={{ billable: { label: t("admin_dashboard.billable"), color: "var(--accent-9)" } }} className="min-h-[220px] w-full flex-1 aspect-auto">
-          <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis tickLine={false} axisLine={false} width={axisWidth} tickFormatter={(value) => formatBytes(Number(value)).replace(" ", "")} />
-            <Tooltip
-              cursor={{ fill: "var(--accent-a3)" }}
-              content={({ active, payload, label }) => active && payload?.length ? (
-                <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
-                  <div className="mb-1 text-muted-foreground">{label}</div>
-                  <div className="font-medium">{t("admin_dashboard.billable")}: {formatBytes(Number(payload[0]?.value ?? 0))}</div>
-                </div>
-              ) : null}
-            />
-            <Bar dataKey="billable" fill="var(--color-billable)" radius={[2, 2, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-          </BarChart>
-        </ChartContainer>
-      ) : <Skeleton className="min-h-[220px] w-full flex-1" />}
-    </section>
-  );
-}
-
 export function DailyTrafficRankingPanel({
   charts,
   error,
   limit,
+  accountKey = "authenticated",
+  allowPrefetch = true,
 }: {
   charts: DashboardChartsData | null;
   error: string | null;
   limit: number;
+  accountKey?: string;
+  allowPrefetch?: boolean;
 }) {
   const { t } = useTranslation();
+  const loadAll = React.useCallback(
+    () => requestDashboardCharts(["traffic"], DASHBOARD_RANKING_ALL, accountKey),
+    [accountKey],
+  );
+  const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
   const items = charts?.traffic.ranking ?? [];
-  const maximum = items[0]?.billable ?? 0;
+  const allItems = expand.data?.traffic.ranking ?? items;
+  const paging = useAdminPagination(allItems);
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
         title={t("admin_dashboard.daily_traffic_ranking")}
         description={t("admin_dashboard.daily_traffic_ranking_hint")}
         trailing={(
-          <DashboardChip>
+          <DashboardChip onExpand={expand.openDialog} onPrefetch={expand.prefetch}>
             <ArrowUpDown size={13} /> Top {limit}
           </DashboardChip>
         )}
       />
-      {error || charts?.traffic.error ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
-          {t("admin_dashboard.data_unavailable")}
-        </div>
-      ) : !charts ? (
-        <Skeleton className="h-[220px] w-full" />
-      ) : items.length === 0 ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-muted-foreground">
-          {t("admin_dashboard.no_daily_traffic_data")}
-        </div>
-      ) : (
-        <DashboardRankingGrid limit={limit}>
-          {items.map((item, index) => (
-            <DashboardRankingItemLink key={item.uuid} href={item.detail_url}>
-              <DashboardRankingItem
-                index={index}
-                name={item.name}
-                value={formatBytes(item.billable)}
-                progress={(
-                  <div
-                    className="flex h-full overflow-hidden rounded-full"
-                    style={{ width: `${maximum > 0 ? (item.billable / maximum) * 100 : 0}%` }}
-                  >
-                    <span
-                      className="h-full bg-[var(--orange-9)]"
-                      style={{ width: `${item.up + item.down > 0 ? (item.up / (item.up + item.down)) * 100 : 0}%` }}
-                    />
-                    <span
-                      className="h-full bg-[var(--blue-9)]"
-                      style={{ width: `${item.up + item.down > 0 ? (item.down / (item.up + item.down)) * 100 : 0}%` }}
-                    />
-                  </div>
-                )}
-                detail={(
-                  <div className="flex min-w-0 flex-wrap items-center justify-end gap-y-1">
-                    <span className="inline-flex items-center gap-1.5 pr-2">
-                      <span className="size-1.5 rounded-full bg-[var(--orange-9)]" />
-                      {t("admin_dashboard.upload")} {formatBytes(item.up)}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 border-l border-[var(--gray-a6)] pl-2">
-                      <span className="size-1.5 rounded-full bg-[var(--blue-9)]" />
-                      {t("admin_dashboard.download")} {formatBytes(item.down)}
-                    </span>
-                  </div>
-                )}
-              />
-            </DashboardRankingItemLink>
-          ))}
-        </DashboardRankingGrid>
-      )}
+      <DailyTrafficRankingBody charts={charts} error={error} items={items} />
+      <DashboardRankingDialog
+        open={expand.open}
+        onClose={expand.closeDialog}
+        title={t("admin_dashboard.daily_traffic_ranking")}
+        description={t("admin_dashboard.daily_traffic_ranking_hint")}
+        trailing={<DashboardChip><ArrowUpDown size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        loading={expand.loading && !expand.data}
+        footer={(
+          <DashboardRankingPager
+            page={paging.page}
+            total={allItems.length}
+            pageSize={paging.pageSize}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
+        )}
+      >
+        <DailyTrafficRankingBody
+          charts={expand.data}
+          error={expand.error}
+          items={paging.pageItems}
+          indexOffset={paging.pageStart}
+          peak={allItems[0]?.billable}
+        />
+      </DashboardRankingDialog>
     </section>
+  );
+}
+
+function DailyTrafficRankingBody({
+  charts,
+  error,
+  items,
+  indexOffset = 0,
+  peak,
+}: {
+  charts: DashboardChartsData | null;
+  error: string | null;
+  items: NonNullable<DashboardChartsData["traffic"]["ranking"]>;
+  indexOffset?: number;
+  peak?: number;
+}) {
+  const { t } = useTranslation();
+  const maximum = peak ?? items[0]?.billable ?? 0;
+  if (error || charts?.traffic.error) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
+        {t("admin_dashboard.data_unavailable")}
+      </div>
+    );
+  }
+  if (!charts) {
+    return <Skeleton className="h-[220px] w-full" />;
+  }
+  if (items.length === 0) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-muted-foreground">
+        {t("admin_dashboard.no_daily_traffic_data")}
+      </div>
+    );
+  }
+  return (
+    <DashboardRankingGrid>
+      {items.map((item, index) => (
+        <DashboardRankingItemLink key={item.uuid} href={item.detail_url}>
+          <DashboardRankingItem
+            index={indexOffset + index}
+            name={item.name}
+            value={formatBytes(item.billable)}
+            progress={(
+              <div
+                className="flex h-full overflow-hidden rounded-full"
+                style={{ width: `${maximum > 0 ? (item.billable / maximum) * 100 : 0}%` }}
+              >
+                <span
+                  className="h-full bg-[var(--orange-9)]"
+                  style={{ width: `${item.up + item.down > 0 ? (item.up / (item.up + item.down)) * 100 : 0}%` }}
+                />
+                <span
+                  className="h-full bg-[var(--blue-9)]"
+                  style={{ width: `${item.up + item.down > 0 ? (item.down / (item.up + item.down)) * 100 : 0}%` }}
+                />
+              </div>
+            )}
+            detail={(
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-y-1">
+                <span className="inline-flex items-center gap-1.5 pr-2">
+                  <span className="size-1.5 rounded-full bg-[var(--orange-9)]" />
+                  {t("admin_dashboard.upload")} {formatBytes(item.up)}
+                </span>
+                <span className="inline-flex items-center gap-1.5 border-l border-[var(--gray-a6)] pl-2">
+                  <span className="size-1.5 rounded-full bg-[var(--blue-9)]" />
+                  {t("admin_dashboard.download")} {formatBytes(item.down)}
+                </span>
+              </div>
+            )}
+          />
+        </DashboardRankingItemLink>
+      ))}
+    </DashboardRankingGrid>
   );
 }
 
@@ -965,55 +1191,120 @@ export function LatencyRankingPanel({
   charts,
   error,
   limit,
+  accountKey = "authenticated",
+  allowPrefetch = true,
 }: {
   charts: DashboardChartsData | null;
   error: string | null;
   limit: number;
+  accountKey?: string;
+  allowPrefetch?: boolean;
 }) {
   const { t } = useTranslation();
+  const loadAll = React.useCallback(
+    () => requestDashboardCharts(["latency"], DASHBOARD_RANKING_ALL, accountKey),
+    [accountKey],
+  );
+  const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
   const items = charts?.latency.ranking ?? [];
-  const maximum = items[0]?.average ?? 0;
+  const allItems = expand.data?.latency.ranking ?? items;
+  const paging = useAdminPagination(allItems);
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
         title={t("admin_dashboard.latency_ranking")}
         description={t("admin_dashboard.latency_ranking_hint")}
         trailing={(
-          <DashboardChip tone="orange">
+          <DashboardChip tone="orange" onExpand={expand.openDialog} onPrefetch={expand.prefetch}>
             <Timer size={13} /> Top {limit}
           </DashboardChip>
         )}
       />
-      {error || charts?.latency.error ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
-          {t("admin_dashboard.data_unavailable")}
-        </div>
-      ) : !charts ? (
-        <Skeleton className="h-[220px] w-full" />
-      ) : items.length === 0 ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-muted-foreground">
-          {t("admin_dashboard.no_latency_ranking_data")}
-        </div>
-      ) : (
-        <DashboardRankingGrid limit={limit}>
-          {items.map((item, index) => (
-            <DashboardRankingItemLink key={item.uuid} href={item.detail_url}>
-              <DashboardRankingItem
-                index={index}
-                name={item.name}
-                value={`${item.average.toFixed(1)} ms`}
-                progress={(
-                <div
-                  className="h-full rounded-full bg-[var(--orange-9)]"
-                  style={{ width: `${maximum > 0 ? (item.average / maximum) * 100 : 0}%` }}
-                />
-                )}
-              />
-            </DashboardRankingItemLink>
-          ))}
-        </DashboardRankingGrid>
-      )}
+      <LatencyRankingBody charts={charts} error={error} items={items} />
+      <DashboardRankingDialog
+        open={expand.open}
+        onClose={expand.closeDialog}
+        title={t("admin_dashboard.latency_ranking")}
+        description={t("admin_dashboard.latency_ranking_hint")}
+        trailing={<DashboardChip tone="orange"><Timer size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        loading={expand.loading && !expand.data}
+        footer={(
+          <DashboardRankingPager
+            page={paging.page}
+            total={allItems.length}
+            pageSize={paging.pageSize}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
+        )}
+      >
+        <LatencyRankingBody
+          charts={expand.data}
+          error={expand.error || expand.data?.latency.error || null}
+          items={paging.pageItems}
+          indexOffset={paging.pageStart}
+          peak={allItems[0]?.average}
+        />
+      </DashboardRankingDialog>
     </section>
+  );
+}
+
+function LatencyRankingBody({
+  charts,
+  error,
+  items,
+  indexOffset = 0,
+  peak,
+}: {
+  charts: DashboardChartsData | null;
+  error: string | null;
+  items: NonNullable<DashboardChartsData["latency"]["ranking"]>;
+  indexOffset?: number;
+  peak?: number;
+}) {
+  const { t } = useTranslation();
+  const maximum = peak ?? items[0]?.average ?? 0;
+  if (error || charts?.latency.error) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
+        {t("admin_dashboard.data_unavailable")}
+      </div>
+    );
+  }
+  if (!charts) {
+    return <Skeleton className="h-[220px] w-full" />;
+  }
+  if (items.length === 0) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-muted-foreground">
+        {t("admin_dashboard.no_latency_ranking_data")}
+      </div>
+    );
+  }
+  return (
+    <DashboardRankingGrid>
+      {items.map((item, index) => (
+        <DashboardRankingItemLink key={`${item.uuid}:${item.task_id ?? 0}`} href={item.detail_url}>
+          <DashboardRankingItem
+            index={indexOffset + index}
+            name={item.name}
+            value={`${item.average.toFixed(1)} ms`}
+            progress={(
+              <div
+                className="h-full rounded-full bg-[var(--orange-9)]"
+                style={{ width: `${maximum > 0 ? (item.average / maximum) * 100 : 0}%` }}
+              />
+            )}
+            detail={(
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                <span className="min-w-0 truncate">{item.task_name}</span>
+              </div>
+            )}
+          />
+        </DashboardRankingItemLink>
+      ))}
+    </DashboardRankingGrid>
   );
 }
 
@@ -1021,69 +1312,133 @@ export function LatencyJitterRankingPanel({
   charts,
   error,
   limit,
+  accountKey = "authenticated",
+  allowPrefetch = true,
 }: {
   charts: DashboardChartsData | null;
   error: string | null;
   limit: number;
+  accountKey?: string;
+  allowPrefetch?: boolean;
 }) {
   const { t } = useTranslation();
+  const loadAll = React.useCallback(
+    () => requestDashboardCharts(["latency_jitter"], DASHBOARD_RANKING_ALL, accountKey),
+    [accountKey],
+  );
+  const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
   const items = charts?.latency.jitter_ranking ?? [];
-  const maximum = Math.max(0, ...items.map((item) => Math.abs(item.delta)));
+  const allItems = expand.data?.latency.jitter_ranking ?? items;
+  const paging = useAdminPagination(allItems);
+  const jitterPeak = Math.max(0, ...allItems.map((item) => Math.abs(item.delta)));
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
         title={t("admin_dashboard.latency_jitter_ranking")}
         description={t("admin_dashboard.latency_jitter_ranking_hint")}
         trailing={(
-          <DashboardChip tone="orange">
+          <DashboardChip tone="orange" onExpand={expand.openDialog} onPrefetch={expand.prefetch}>
             <Activity size={13} /> Top {limit}
           </DashboardChip>
         )}
       />
-      {error || charts?.latency.jitter_error ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
-          {t("admin_dashboard.data_unavailable")}
-        </div>
-      ) : !charts ? (
-        <Skeleton className="h-[220px] w-full" />
-      ) : items.length === 0 ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-muted-foreground">
-          {t("admin_dashboard.no_latency_jitter_data")}
-        </div>
-      ) : (
-        <DashboardRankingGrid limit={limit}>
-          {items.map((item, index) => {
-            const increased = item.delta > 0;
-            return (
-              <DashboardRankingItemLink
-                key={item.uuid}
-                href={item.detail_url}
-              >
-                <DashboardRankingItem
-                  index={index}
-                  name={item.name}
-                  value={`${item.delta > 0 ? "+" : ""}${item.delta.toFixed(1)} ms`}
-                  valueClassName={increased ? "text-[var(--orange-11)]" : item.delta < 0 ? "text-[var(--green-11)]" : ""}
-                  progress={(
-                    <div
-                      className={`h-full rounded-full ${increased ? "bg-[var(--orange-9)]" : "bg-[var(--green-9)]"}`}
-                      style={{ width: `${maximum > 0 ? (Math.abs(item.delta) / maximum) * 100 : 0}%` }}
-                    />
-                  )}
-                  detail={(
-                    <div className="flex items-center justify-end gap-1 tabular-nums">
-                      <span>{t("admin_dashboard.previous_minute")} {item.previous.toFixed(1)} ms</span>
-                      <ArrowRight size={11} aria-hidden="true" />
-                      <span>{t("admin_dashboard.current_minute")} {item.current.toFixed(1)} ms</span>
-                    </div>
-                  )}
-                />
-              </DashboardRankingItemLink>
-            );
-          })}
-        </DashboardRankingGrid>
-      )}
+      <LatencyJitterRankingBody charts={charts} error={error} items={items} />
+      <DashboardRankingDialog
+        open={expand.open}
+        onClose={expand.closeDialog}
+        title={t("admin_dashboard.latency_jitter_ranking")}
+        description={t("admin_dashboard.latency_jitter_ranking_hint")}
+        trailing={<DashboardChip tone="orange"><Activity size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        loading={expand.loading && !expand.data}
+        footer={(
+          <DashboardRankingPager
+            page={paging.page}
+            total={allItems.length}
+            pageSize={paging.pageSize}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
+        )}
+      >
+        <LatencyJitterRankingBody
+          charts={expand.data}
+          error={expand.error || expand.data?.latency.jitter_error || null}
+          items={paging.pageItems}
+          indexOffset={paging.pageStart}
+          peak={jitterPeak}
+        />
+      </DashboardRankingDialog>
     </section>
+  );
+}
+
+function LatencyJitterRankingBody({
+  charts,
+  error,
+  items,
+  indexOffset = 0,
+  peak,
+}: {
+  charts: DashboardChartsData | null;
+  error: string | null;
+  items: NonNullable<DashboardChartsData["latency"]["jitter_ranking"]>;
+  indexOffset?: number;
+  peak?: number;
+}) {
+  const { t } = useTranslation();
+  const maximum = peak ?? Math.max(0, ...items.map((item) => Math.abs(item.delta)));
+  if (error || charts?.latency.jitter_error) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
+        {t("admin_dashboard.data_unavailable")}
+      </div>
+    );
+  }
+  if (!charts) {
+    return <Skeleton className="h-[220px] w-full" />;
+  }
+  if (items.length === 0) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-muted-foreground">
+        {t("admin_dashboard.no_latency_jitter_data")}
+      </div>
+    );
+  }
+  return (
+    <DashboardRankingGrid>
+      {items.map((item, index) => {
+        const increased = item.delta > 0;
+        return (
+          <DashboardRankingItemLink
+            key={`${item.uuid}:${item.task_id ?? 0}`}
+            href={item.detail_url}
+          >
+            <DashboardRankingItem
+              index={indexOffset + index}
+              name={item.name}
+              value={`${item.delta > 0 ? "+" : ""}${item.delta.toFixed(1)} ms`}
+              valueClassName={increased ? "text-[var(--orange-11)]" : item.delta < 0 ? "text-[var(--green-11)]" : ""}
+              progress={(
+                <div
+                  className={`h-full rounded-full ${increased ? "bg-[var(--orange-9)]" : "bg-[var(--green-9)]"}`}
+                  style={{ width: `${maximum > 0 ? (Math.abs(item.delta) / maximum) * 100 : 0}%` }}
+                />
+              )}
+              detail={(
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="min-w-0 truncate">{item.task_name}</span>
+                  <span className="flex shrink-0 items-center justify-end gap-1 tabular-nums">
+                    <span>{t("admin_dashboard.previous_minute")} {item.previous.toFixed(1)} ms</span>
+                    <ArrowRight size={11} aria-hidden="true" />
+                    <span>{t("admin_dashboard.current_minute")} {item.current.toFixed(1)} ms</span>
+                  </span>
+                </div>
+              )}
+            />
+          </DashboardRankingItemLink>
+        );
+      })}
+    </DashboardRankingGrid>
   );
 }
 
@@ -1091,77 +1446,137 @@ export function PacketLossRankingPanel({
   charts,
   error,
   limit,
+  accountKey = "authenticated",
+  allowPrefetch = true,
 }: {
   charts: DashboardChartsData | null;
   error: string | null;
   limit: number;
+  accountKey?: string;
+  allowPrefetch?: boolean;
 }) {
   const { t } = useTranslation();
+  const loadAll = React.useCallback(
+    () => requestDashboardCharts(["packet_loss"], DASHBOARD_RANKING_ALL, accountKey),
+    [accountKey],
+  );
+  const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
   const items = charts?.packet_loss?.ranking ?? [];
-  const maximum = items[0]?.loss_rate ?? 0;
+  const allItems = expand.data?.packet_loss?.ranking ?? items;
+  const paging = useAdminPagination(allItems);
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
         title={t("admin_dashboard.packet_loss_ranking")}
         description={t("admin_dashboard.packet_loss_ranking_hint")}
         trailing={(
-          <DashboardChip tone="red">
+          <DashboardChip tone="red" onExpand={expand.openDialog} onPrefetch={expand.prefetch}>
             <WifiOff size={13} /> Top {limit}
           </DashboardChip>
         )}
       />
-      {error || charts?.packet_loss?.error ? (
-        <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
-          {t("admin_dashboard.data_unavailable")}
-        </div>
-      ) : !charts ? (
-        <Skeleton className="h-[220px] w-full" />
-      ) : items.length === 0 ? (
-        <div className="flex min-h-44 items-center justify-center gap-2 text-sm font-medium text-[var(--green-11)]">
-          <CheckCircle2 className="shrink-0" size={18} aria-hidden="true" />
-          {t("admin_dashboard.packet_loss_all_normal")}
-        </div>
-      ) : (
-        <DashboardRankingGrid limit={limit}>
-          {items.map((item, index) => {
-            const tone = item.loss_rate >= 50
-              ? "bg-[var(--red-9)]"
-              : item.loss_rate >= 10
-                ? "bg-[var(--orange-9)]"
-                : "bg-[var(--accent-9)]";
-            const textTone = item.loss_rate >= 50
-              ? "text-[var(--red-11)]"
-              : item.loss_rate >= 10
-                ? "text-[var(--orange-11)]"
-                : "text-[var(--accent-11)]";
-            return (
-              <DashboardRankingItemLink key={`${item.uuid}:${item.task_id}`} href={item.detail_url}>
-                <DashboardRankingItem
-                  index={index}
-                  name={item.name}
-                  value={`${item.loss_rate.toFixed(1)}%`}
-                  valueClassName={textTone}
-                  progress={(
-                    <div
-                      className={`h-full rounded-full ${tone}`}
-                      style={{ width: `${maximum > 0 ? (item.loss_rate / maximum) * 100 : 0}%` }}
-                    />
-                  )}
-                  detail={(
-                    <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                      <span className="min-w-0 truncate">{item.task_name}</span>
-                      <span className="shrink-0 tabular-nums">
-                        {t("admin_dashboard.packet_loss_samples", { lost: item.lost, total: item.total })}
-                      </span>
-                    </div>
-                  )}
-                />
-              </DashboardRankingItemLink>
-            );
-          })}
-        </DashboardRankingGrid>
-      )}
+      <PacketLossRankingBody charts={charts} error={error} items={items} />
+      <DashboardRankingDialog
+        open={expand.open}
+        onClose={expand.closeDialog}
+        title={t("admin_dashboard.packet_loss_ranking")}
+        description={t("admin_dashboard.packet_loss_ranking_hint")}
+        trailing={<DashboardChip tone="red"><WifiOff size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        loading={expand.loading && !expand.data}
+        footer={(
+          <DashboardRankingPager
+            page={paging.page}
+            total={allItems.length}
+            pageSize={paging.pageSize}
+            onPageChange={paging.setPage}
+            onPageSizeChange={paging.setPageSize}
+          />
+        )}
+      >
+        <PacketLossRankingBody
+          charts={expand.data}
+          error={expand.error || expand.data?.packet_loss?.error || null}
+          items={paging.pageItems}
+          indexOffset={paging.pageStart}
+          peak={allItems[0]?.loss_rate}
+        />
+      </DashboardRankingDialog>
     </section>
+  );
+}
+
+function PacketLossRankingBody({
+  charts,
+  error,
+  items,
+  indexOffset = 0,
+  peak,
+}: {
+  charts: DashboardChartsData | null;
+  error: string | null;
+  items: NonNullable<NonNullable<DashboardChartsData["packet_loss"]>["ranking"]>;
+  indexOffset?: number;
+  peak?: number;
+}) {
+  const { t } = useTranslation();
+  const maximum = peak ?? items[0]?.loss_rate ?? 0;
+  if (error || charts?.packet_loss?.error) {
+    return (
+      <div className="flex min-h-44 items-center justify-center text-sm text-[var(--red-11)]">
+        {t("admin_dashboard.data_unavailable")}
+      </div>
+    );
+  }
+  if (!charts) {
+    return <Skeleton className="h-[220px] w-full" />;
+  }
+  if (items.length === 0) {
+    return (
+      <div className="flex min-h-44 items-center justify-center gap-2 text-sm font-medium text-[var(--green-11)]">
+        <CheckCircle2 className="shrink-0" size={18} aria-hidden="true" />
+        {t("admin_dashboard.packet_loss_all_normal")}
+      </div>
+    );
+  }
+  return (
+    <DashboardRankingGrid>
+      {items.map((item, index) => {
+        const tone = item.loss_rate >= 50
+          ? "bg-[var(--red-9)]"
+          : item.loss_rate >= 10
+            ? "bg-[var(--orange-9)]"
+            : "bg-[var(--accent-9)]";
+        const textTone = item.loss_rate >= 50
+          ? "text-[var(--red-11)]"
+          : item.loss_rate >= 10
+            ? "text-[var(--orange-11)]"
+            : "text-[var(--accent-11)]";
+        return (
+          <DashboardRankingItemLink key={`${item.uuid}:${item.task_id}`} href={item.detail_url}>
+            <DashboardRankingItem
+              index={indexOffset + index}
+              name={item.name}
+              value={`${item.loss_rate.toFixed(1)}%`}
+              valueClassName={textTone}
+              progress={(
+                <div
+                  className={`h-full rounded-full ${tone}`}
+                  style={{ width: `${maximum > 0 ? (item.loss_rate / maximum) * 100 : 0}%` }}
+                />
+              )}
+              detail={(
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="min-w-0 truncate">{item.task_name}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {t("admin_dashboard.packet_loss_samples", { lost: item.lost, total: item.total })}
+                  </span>
+                </div>
+              )}
+            />
+          </DashboardRankingItemLink>
+        );
+      })}
+    </DashboardRankingGrid>
   );
 }
 

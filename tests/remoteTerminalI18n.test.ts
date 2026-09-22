@@ -24,7 +24,9 @@ test("remote terminal copy uses shared locale keys instead of hardcoded Chinese"
   assert.match(workspace, /login\.two_factor/);
   assert.match(workspace, /account\.2fa_otp_input_prompt/);
   assert.match(session, /terminal\.session\.reconnect/);
-  assert.match(workspace, /terminal\.session\.brand/);
+  assert.match(workspace, /beforeunload/);
+  assert.match(workspace, /terminal\.session\.close_with_sessions/);
+  assert.match(workspace, /terminal\.session\.document_title_connected/);
   assert.match(files, /terminal\.files\.title/);
   assert.match(files, /common\.cancel/);
 });

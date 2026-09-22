@@ -38,6 +38,7 @@ import {
   HardDrive,
   Info,
   MemoryStick,
+  Network,
   RefreshCw,
   Server,
   Settings,
@@ -75,7 +76,7 @@ import {
   metricCardSx,
 } from "@/pages/admin/nodeDetailCardStyles";
 
-const BILLING_CURRENCY_OPTIONS = ["¥", "$", "€", "£", "₽", "₣", "₹", "₫", "฿", "C$"];
+const BILLING_CURRENCY_OPTIONS = ["¥", "$", "€", "£", "C$", "HK$"];
 
 const DETAIL_TABS = ["overview", "billing", "metrics"] as const;
 
@@ -516,7 +517,7 @@ export default function NodeDetailPage() {
 function NodeDetailPageBody() {
   const { uuid = "" } = useParams();
   const { t } = useTranslation();
-  const { ensureEnabled } = useRemoteManagementGate();
+  const { ensureEnabled, ensureMCPEnabled } = useRemoteManagementGate();
   const { nodeDetail, isLoading, refresh } = useNodeDetails();
   const { liveData, available } = useAdminNodeLiveData();
   const [tab, setTab] = useAdminTabParam(DETAIL_TABS, "overview");
@@ -662,7 +663,7 @@ function NodeDetailPageBody() {
               </Box>
             ) : null}
           </Box>
-          <Box sx={{ width: { xs: "100%", sm: 104 }, flexShrink: 0 }}>
+          <Stack spacing={1} sx={{ width: { xs: "100%", sm: 128 }, flexShrink: 0 }}>
             <Button
               className="km-admin-terminal-button"
               variant="contained"
@@ -673,7 +674,21 @@ function NodeDetailPageBody() {
             >
               {t("terminal.title", "终端")}
             </Button>
-          </Box>
+            <Button
+              className="km-admin-mcp-button"
+              component={Link}
+              to={`/admin/remote-management/mcp?uuid=${encodeURIComponent(node.uuid)}&authorize=new`}
+              variant="contained"
+              fullWidth
+              startIcon={<Network size={16} />}
+              onClick={(event) => {
+                if (!ensureEnabled() || !ensureMCPEnabled()) event.preventDefault();
+              }}
+              sx={solidButtonSx}
+            >
+              {t("mcp.authorize_ai")}
+            </Button>
+          </Stack>
         </Stack>
       </Surface>
 
@@ -835,7 +850,7 @@ function NodeDetailPageBody() {
               />
               <Stack spacing={1.25} sx={{ p: 2, flex: 1, minHeight: 0 }}>
                 <CopyRow
-                  label={t("admin.nodeTable.region", "国家\\地区")}
+                  label={t("admin.nodeTable.region", "国家/地区")}
                   value={location}
                   leading={countryFlag}
                 />

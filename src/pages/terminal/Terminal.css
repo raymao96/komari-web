@@ -1,3 +1,61 @@
+html.remote-terminal-open {
+  --remote-accent: #078dee;
+  --remote-online: #22c55e;
+  --remote-offline: #ff5630;
+  --remote-header-h: 56px;
+  --remote-status-h: 32px;
+  --remote-rail-w: 280px;
+  --remote-nav-h: 64px;
+  --remote-keyboard-inset: 0px;
+  --gray-12: var(--remote-text);
+  --gray-a5: var(--remote-border);
+  --accent-a2: var(--remote-hover);
+  --accent-a3: var(--remote-selected);
+  --color-panel-solid: transparent;
+}
+
+html.remote-terminal-open:not(.dark) {
+  --remote-bg: #f4f6f8;
+  --remote-chrome: #ffffff;
+  --remote-paper: #ffffff;
+  --remote-text: #1c252e;
+  --remote-muted: #637381;
+  --remote-border: rgba(145, 158, 171, 0.24);
+  --remote-rail: #fafbfc;
+  --remote-hover: rgba(145, 158, 171, 0.08);
+  --remote-selected: rgba(7, 141, 238, 0.1);
+  --remote-files-head: #f4f6f8;
+  --remote-files-row-hover: rgba(145, 158, 171, 0.08);
+  --remote-files-selected: rgba(7, 141, 238, 0.12);
+  --remote-menu: #ffffff;
+  --remote-menu-border: rgba(145, 158, 171, 0.24);
+  --remote-danger: #ff5630;
+  --remote-reconnect-fg: #d6dfe7;
+}
+
+html.remote-terminal-open.dark {
+  --remote-bg: #161c24;
+  --remote-chrome: #161c24;
+  --remote-paper: #212b36;
+  --remote-text: #ffffff;
+  --remote-muted: #919eab;
+  --remote-border: rgba(145, 158, 171, 0.24);
+  --remote-rail: #1a232d;
+  --remote-hover: rgba(145, 158, 171, 0.08);
+  --remote-selected: rgba(7, 141, 238, 0.16);
+  --remote-files-head: #1c2128;
+  --remote-files-row-hover: #171c22;
+  --remote-files-selected: #173239;
+  --remote-menu: #212b36;
+  --remote-menu-border: #3b424b;
+  --remote-danger: #ff8f8f;
+  --remote-reconnect-fg: #d6dfe7;
+}
+
+html.remote-terminal-open .MuiButton-root svg {
+  display: block;
+}
+
 .remote-workspace {
   display: flex;
   height: 100vh;
@@ -5,114 +63,253 @@
   min-width: 320px;
   flex-direction: column;
   overflow: hidden;
-  background: #0a0c0f;
-  color: #f1f3f5;
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: var(--remote-bg);
+  color: var(--remote-text);
+  font-family: "Public Sans Variable", "Public Sans", Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
-.remote-tabbar {
+.remote-chrome {
+  z-index: 1200;
   display: flex;
-  height: 46px;
-  flex: 0 0 46px;
-  align-items: stretch;
-  gap: 6px;
-  border-bottom: 1px solid #292d33;
-  background: #15181d;
-  padding: 0 8px;
+  height: var(--remote-header-h);
+  flex: 0 0 var(--remote-header-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--remote-border);
+  background: var(--remote-chrome);
+  padding: 0 22px;
 }
 
-.remote-brand {
+.remote-chrome-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.remote-chrome-caption {
+  margin-left: 4px;
+  border-left: 1px solid var(--remote-border);
+  padding-left: 16px;
+  color: var(--remote-muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.remote-chrome-location {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--remote-muted);
+  font-size: 14px;
+}
+
+.remote-chrome-location strong {
+  color: var(--remote-text);
+  font-weight: 600;
+}
+
+.remote-chrome-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  padding: 0 10px 0 4px;
-  color: #f8f9fa;
-  font-size: 13px;
-  font-weight: 650;
+}
+
+.remote-chrome-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--remote-border);
+}
+
+.remote-connected-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--remote-muted);
+  font-size: 11px;
   white-space: nowrap;
 }
 
-.remote-brand svg {
-  color: #4fd1c5;
+.remote-connected-count > i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #626971;
 }
 
-.remote-tabs {
+.remote-connected-count.is-connected {
+  color: var(--remote-online);
+}
+
+.remote-connected-count.is-connected > i {
+  background: var(--remote-online);
+}
+
+.remote-theme-control {
   display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: flex-end;
-  gap: 2px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-}
-
-.remote-add-tab.rt-IconButton {
-  box-sizing: border-box;
-  width: 190px;
-  height: 36px;
-  min-width: 132px;
-  max-width: 220px;
-  flex: 0 1 190px;
-  align-self: flex-end;
-  margin: 0;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 5px 5px 0 0;
-  background: #20242a;
-  padding: 0;
-  color: #aeb6bf;
-}
-
-.remote-add-tab.rt-IconButton:hover {
-  border-color: #363c44;
-  background: #2a3038;
-  color: #ffffff;
-}
-
-.remote-tab {
-  display: flex;
-  height: 36px;
-  min-width: 132px;
-  max-width: 220px;
-  flex: 0 1 190px;
   align-items: center;
-  gap: 7px;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 5px 5px 0 0;
+  gap: 9px;
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+
+.remote-theme-label {
+  margin: 0;
+  border: 0;
+  padding: 0;
   background: transparent;
-  padding: 0 6px 0 10px;
-  color: #9da4ad;
+  color: var(--remote-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.remote-theme-segment {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--remote-border);
+  border-radius: 7px;
+  background: var(--remote-bg);
+  padding: 3px;
+}
+
+.remote-theme-segment button {
+  display: inline-flex;
+  width: 29px;
+  height: 24px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 0;
+  color: var(--remote-muted);
+  cursor: pointer;
+}
+
+.remote-theme-segment button.is-active {
+  background: var(--remote-selected);
+  color: var(--remote-accent);
+}
+
+.remote-theme-segment svg {
+  width: 15px;
+  height: 15px;
+}
+
+.remote-body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.remote-session-rail {
+  display: flex;
+  width: var(--remote-rail-w);
+  flex: 0 0 var(--remote-rail-w);
+  flex-direction: column;
+  gap: 6px;
+  border-right: 1px solid var(--remote-border);
+  background: var(--remote-rail);
+  padding: 20px 12px 12px;
+}
+
+.remote-rail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 9px;
+  margin-bottom: 8px;
+  color: var(--remote-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.remote-rail-sessions {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+
+.remote-rail-open {
+  width: calc(100% - 16px);
+  margin: 12px 8px 0;
+}
+
+.remote-rail-session {
+  display: flex;
+  min-height: 55px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  padding: 8px 9px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   text-align: left;
 }
 
-.remote-tab:hover {
-  background: #20242a;
-  color: #e9ecef;
+.remote-rail-session:hover {
+  background: var(--remote-hover);
 }
 
-.remote-tab.is-dragging {
+.remote-rail-session.is-active {
+  border-color: rgb(7 141 238 / 35%);
+  background: var(--remote-selected);
+}
+
+.remote-rail-session.is-dragging {
   z-index: 3;
-  border-color: #4b555f;
-  background: #242a31;
   cursor: grabbing;
   opacity: 0.82;
 }
 
-.remote-tab.is-active {
-  border-color: #30353d;
-  background: #0a0c0f;
-  color: #ffffff;
+.remote-rail-session-copy {
+  min-width: 0;
+  flex: 1;
 }
 
-.remote-tab > i,
+.remote-rail-session-copy strong,
+.remote-tab > span:not([role="button"]) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-rail-session-copy small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--remote-muted);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.remote-rail-session-copy small > i,
 .remote-status > i {
   width: 7px;
   height: 7px;
@@ -121,18 +318,9 @@
   background: #626971;
 }
 
-.remote-tab > i.is-online,
+.remote-rail-session-copy small > i.is-connected,
 .remote-status.is-connected > i {
-  background: #42c67a;
-  box-shadow: 0 0 0 2px rgb(66 198 122 / 14%);
-}
-
-.remote-tab > span:not([role="button"]) {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: var(--remote-online);
 }
 
 .remote-content,
@@ -145,57 +333,99 @@
 
 .remote-content {
   position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
   flex: 1;
+  flex-direction: column;
   overflow: hidden;
 }
 
 .remote-session {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
+  padding: 16px 20px 14px;
 }
 
-.remote-session-header {
+.remote-identity {
   display: flex;
-  min-height: 58px;
+  min-height: 48px;
   flex: 0 0 auto;
   align-items: center;
-  gap: 18px;
-  border-bottom: 1px solid #24282e;
-  background: #101318;
-  padding: 8px 12px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.remote-node-heading {
+.remote-identity-flag {
   display: flex;
-  min-width: 140px;
-  max-width: 260px;
-  flex: 0 1 auto;
-  flex-direction: column;
-  gap: 3px;
+  width: 44px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
 }
 
-.remote-node-heading strong {
+.remote-identity-flag .admin-node-country-flag > span,
+.remote-identity-flag span {
+  width: 40px !important;
+  height: 30px !important;
+  margin: 0 !important;
+}
+
+.remote-identity-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.remote-identity-copy h1 {
+  margin: 0;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.remote-status {
+.remote-identity-meta {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-top: 6px;
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+
+.remote-identity-address {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-identity-address.is-ip {
+  color: #ff9f43;
+  font-family: Consolas, ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.remote-status {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #858c95;
+  color: var(--remote-muted);
   font-size: 11px;
 }
 
 .remote-status.is-connected {
-  color: #6dd797;
+  color: var(--remote-online);
 }
 
 .remote-status.is-error {
-  color: #ff7b72;
+  color: var(--remote-offline);
 }
 
 .remote-status.is-waiting,
@@ -204,59 +434,197 @@
 }
 
 .remote-metrics {
+  display: grid;
+  min-width: 0;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.remote-metric {
   display: flex;
   min-width: 0;
-  flex: 1;
-  align-items: center;
-  gap: 18px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.remote-metrics > span {
-  display: flex;
-  flex: 0 0 auto;
   flex-direction: column;
-  gap: 2px;
-  color: #d8dce1;
-  font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 12px;
+  border: 1px solid var(--remote-border);
+  border-radius: 8px;
+  padding: 11px 15px;
+  background-image: none !important;
+}
+
+.remote-metric small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+
+.remote-metric strong {
+  display: block;
+  margin-top: 7px;
+  color: var(--remote-text);
+  font-size: 21px;
   font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 25px;
 }
 
-.remote-metrics small {
-  color: #777f89;
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+.remote-metric.has-usage {
+  background-image: none !important;
+}
+
+.remote-metric-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.remote-metric-row strong {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.remote-metric-detail {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  column-gap: 0.35em;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--remote-muted);
   font-size: 10px;
+  line-height: 1.25;
+  text-align: right;
 }
 
-.remote-metrics .is-up {
-  color: #69dba1;
+.remote-metric-detail > span {
+  white-space: nowrap;
 }
 
-.remote-metrics .is-down {
-  color: #68b5ff;
+.remote-metric-slash {
+  flex: 0 0 auto;
+}
+
+.remote-metric-bar {
+  height: 6px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #e8edf0;
+}
+
+html.remote-terminal-open.dark .remote-metric-bar {
+  background: #2b3740;
+}
+
+.remote-metric-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.remote-metric-bar.is-green > i {
+  background: #22b573;
+}
+
+.remote-metric-bar.is-amber > i {
+  background: #f0a632;
+}
+
+.remote-metric-bar.is-coral > i {
+  background: #ff6b5e;
+}
+
+.remote-metric.is-up .remote-metric-row,
+.remote-metric.is-down .remote-metric-row {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.remote-metric.is-up strong {
+  color: #22c55e;
+  font-size: 24px;
+  line-height: 28px;
+}
+
+.remote-metric.is-down strong {
+  color: #078dee;
+  font-size: 24px;
+  line-height: 28px;
 }
 
 .remote-session-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+}
+
+.remote-network {
+  display: none;
 }
 
 .remote-session-body {
   position: relative;
   display: flex;
+  min-height: 0;
   flex: 1;
+  gap: 12px;
   overflow: hidden;
+  background: transparent;
 }
 
 .remote-terminal-pane {
   position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
   flex: 1;
+  flex-direction: column;
   overflow: hidden;
-  background: var(--xterm-container-bg, #000000);
+  border-radius: 12px;
+  background: var(--xterm-container-bg, #0b1220);
+}
+
+.remote-terminal-head {
+  display: flex;
+  height: 42px;
+  flex: 0 0 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: #c7ccd2;
+  background: transparent;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.remote-terminal-head-title {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.remote-terminal-head-actions {
+  display: flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.remote-terminal-head .MuiIconButton-root {
+  color: #c7ccd2;
+}
+
+.remote-terminal-tools {
+  display: none;
 }
 
 .remote-mobile-command {
@@ -267,6 +635,7 @@
   box-sizing: border-box;
   width: 100%;
   height: 100%;
+  --xterm-padding: 16px;
   background: var(--xterm-container-bg, #000000);
 }
 
@@ -292,26 +661,31 @@
 .remote-reconnect {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   background: rgb(0 0 0 / 76%);
-  color: #c7ccd2;
+  color: #d6dfe7;
   font-size: 13px;
 }
 
+.remote-reconnect > span {
+  color: #d6dfe7;
+}
+
 .remote-divider {
-  width: 5px;
-  flex: 0 0 5px;
-  border-left: 1px solid #2b3037;
-  background: #161a1f;
+  width: 6px;
+  flex: 0 0 6px;
+  margin: 0 -3px;
+  background: transparent;
   cursor: col-resize;
   touch-action: none;
 }
 
 .remote-divider:hover {
-  background: #2b7275;
+  background: rgb(7 141 238 / 18%);
 }
 
 .remote-side-panel {
@@ -319,8 +693,19 @@
   max-width: min(620px, 55vw);
   flex: 0 0 auto;
   overflow: hidden;
-  border-left: 1px solid #24292f;
-  background: #101318;
+  border: 1px solid var(--remote-border);
+  border-radius: 8px;
+  background: var(--remote-paper);
+}
+
+.remote-side-tabs {
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--remote-border);
+  padding: 0 16px;
 }
 
 .remote-command-panel {
@@ -330,23 +715,28 @@
   padding: 10px;
 }
 
+.remote-command-card {
+  flex: 0 0 auto;
+}
+
 .remote-files {
+  --remote-files-inline: 16px;
+  --remote-file-control-h: 32px;
   display: flex;
   position: relative;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  color: #d8dce1;
+  color: var(--remote-text);
 }
 
 .remote-files.is-drop-active {
-  outline: 1px solid #4fd1c5;
+  outline: 1px solid var(--remote-accent);
   outline-offset: -1px;
 }
 
 .remote-files-title,
-.remote-file-path,
 .remote-file-toolbar,
 .remote-file-options {
   display: flex;
@@ -354,75 +744,203 @@
 }
 
 .remote-files-title {
-  min-height: 50px;
+  min-height: 0;
   justify-content: space-between;
-  border-bottom: 1px solid #24292f;
-  padding: 0 12px;
+  padding: 15px var(--remote-files-inline) 11px;
 }
 
 .remote-files-title > div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .remote-files-title strong {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.remote-files-title span {
-  color: #7e8791;
+.remote-files-title .remote-status {
   font-size: 10px;
 }
 
-.remote-file-path {
-  gap: 6px;
-  border-bottom: 1px solid #24292f;
-  padding: 8px;
+.remote-file-location {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0;
+  padding: 0 var(--remote-files-inline) 10px;
 }
 
-.remote-file-path select {
-  height: 26px;
-  max-width: 82px;
-  border: 1px solid #363c45;
-  border-radius: 4px;
-  background: #1b1f25;
-  color: #d8dce1;
-  font-size: 11px;
+.remote-file-up {
+  box-sizing: border-box !important;
+  flex: 0 0 var(--remote-file-control-h);
+  min-width: var(--remote-file-control-h) !important;
+  width: var(--remote-file-control-h) !important;
+  height: var(--remote-file-control-h) !important;
+  min-height: var(--remote-file-control-h) !important;
+  max-height: var(--remote-file-control-h) !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
 }
 
-.remote-file-path .rt-TextFieldRoot {
+.remote-file-up svg {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.remote-file-pathbox {
+  display: flex;
+  box-sizing: border-box;
   min-width: 0;
+  height: var(--remote-file-control-h);
+  min-height: var(--remote-file-control-h);
+  max-height: var(--remote-file-control-h);
   flex: 1;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  border: 1px solid var(--remote-border);
+  border-radius: 6px;
+  background: var(--remote-bg);
+  padding: 0 9px;
+}
+
+.remote-file-pathbox select {
+  max-width: 120px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--remote-muted);
+  font-size: 12px;
+}
+
+.remote-file-path-sep {
+  color: var(--remote-border);
+}
+
+.remote-file-pathbox .MuiInputBase-root {
+  min-width: 0;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.remote-file-pathbox .MuiInputBase-input {
+  height: 100% !important;
+  padding: 0 !important;
+  box-sizing: border-box;
 }
 
 .remote-file-toolbar {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0 var(--remote-files-inline) 10px;
+  overflow-x: auto;
+}
+
+.remote-file-toolbar .MuiButton-root {
+  box-sizing: border-box;
+  min-height: 29px !important;
+  height: 29px;
+  padding: 0 8px;
+  font-size: 11px;
   gap: 5px;
-  padding: 8px;
+}
+
+.remote-file-toolbar .MuiButton-root svg {
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 14px;
+}
+
+.remote-file-upload.MuiButton-contained:not(.Mui-disabled) {
+  background: rgba(7, 141, 238, 0.12);
+  color: #078dee;
+  box-shadow: none;
+}
+
+.remote-file-upload.MuiButton-contained:not(.Mui-disabled):hover {
+  background: rgba(7, 141, 238, 0.2);
+}
+
+.remote-file-toolbar .MuiIconButton-root {
+  width: 28px;
+  height: 28px;
+}
+
+.remote-file-toolbar-spacer {
+  flex: 1;
+}
+
+.remote-files .MuiMenuItem-root {
+  gap: 8px;
 }
 
 .remote-file-options {
-  gap: 14px;
-  border-bottom: 1px solid #24292f;
-  padding: 0 9px 8px;
-  color: #949ba4;
-  font-size: 10px;
+  gap: 16px;
+  margin: 0;
+  padding: 0 var(--remote-files-inline) 12px;
+  color: var(--remote-muted);
+  font-size: 11px;
+  flex-wrap: nowrap;
 }
 
 .remote-file-options label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
   white-space: nowrap;
 }
 
+.remote-file-options .MuiCheckbox-root {
+  width: 18px !important;
+  height: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.remote-file-options .MuiCheckbox-root .MuiSvgIcon-root {
+  font-size: 18px !important;
+}
+
 .remote-transfer-status {
-  border-bottom: 1px solid #24292f;
-  background: #172428;
-  padding: 6px 10px;
-  color: #7bded5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--remote-border);
+  background: var(--remote-selected);
+  padding: 4px 8px 4px 10px;
+  color: var(--remote-accent);
   font-size: 11px;
+}
+
+.remote-transfer-status > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-transfer-cancel {
+  width: 24px !important;
+  height: 24px !important;
+  margin-left: auto;
+  padding: 0 !important;
+  color: var(--remote-muted) !important;
+}
+
+.remote-transfer-cancel svg {
+  width: 14px;
+  height: 14px;
 }
 
 .remote-file-drop-overlay {
@@ -434,10 +952,10 @@
   justify-content: center;
   flex-direction: column;
   gap: 8px;
-  border: 1px dashed #57d6cb;
+  border: 1px dashed var(--remote-accent);
   border-radius: 5px;
-  background: rgb(10 17 20 / 94%);
-  color: #dffdfa;
+  background: color-mix(in srgb, var(--remote-paper) 94%, transparent);
+  color: var(--remote-text);
   pointer-events: none;
 }
 
@@ -460,8 +978,8 @@
 .remote-file-selection-box {
   position: absolute;
   z-index: 4;
-  border: 1px solid #56bfc0;
-  background: rgb(79 209 197 / 16%);
+  border: 1px solid var(--remote-accent);
+  background: rgb(7 141 238 / 16%);
   pointer-events: none;
 }
 
@@ -474,7 +992,7 @@
 }
 
 .remote-file-table tbody tr.is-directory:focus-visible {
-  outline: 1px solid #4fd1c5;
+  outline: 1px solid var(--remote-accent);
   outline-offset: -1px;
 }
 
@@ -487,12 +1005,18 @@
   table-layout: fixed;
 }
 
+.remote-file-table tbody tr,
+.remote-file-table thead tr {
+  border: 0 !important;
+}
+
 .remote-file-table th,
 .remote-file-table td {
+  display: table-cell;
   box-sizing: border-box;
-  height: 36px;
-  border-bottom: 1px solid #1e2228;
-  padding: 0 8px !important;
+  height: 47px;
+  border-bottom: 1px solid var(--remote-border);
+  padding: 0 7px !important;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
@@ -502,17 +1026,17 @@
 .remote-workspace .remote-file-table .admin-table-header,
 .remote-workspace .remote-file-table .admin-table-header tr,
 .remote-workspace .remote-file-table .admin-table-header tr:hover {
-  background: #1c2128 !important;
+  background: var(--remote-files-head) !important;
 }
 
 .remote-file-table th {
   position: sticky;
   top: 0;
   z-index: 1;
-  height: 40px !important;
-  background: #1c2128 !important;
-  color: #919eab;
-  font-size: 13px;
+  height: 30px !important;
+  background: var(--remote-files-head) !important;
+  color: var(--remote-muted);
+  font-size: 10px;
   font-weight: 600;
   user-select: none;
   -webkit-user-select: none;
@@ -523,81 +1047,112 @@
   width: 48px;
   min-width: 48px;
   max-width: 48px;
-  padding-left: 0 !important;
+  padding-left: var(--remote-files-inline) !important;
   padding-right: 0 !important;
-  text-align: center;
+  text-align: left;
+}
+
+.remote-file-table th:last-child,
+.remote-file-table td:last-child {
+  padding-right: var(--remote-files-inline) !important;
 }
 
 .remote-file-select {
   display: flex;
-  width: 48px;
+  width: 32px;
   height: 100%;
-  min-height: 32px;
+  min-height: 18px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .remote-file-table th:nth-child(3),
 .remote-file-table td:nth-child(3) {
-  width: 72px;
+  width: 80px;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: clip;
 }
 
 .remote-file-table th:nth-child(4),
 .remote-file-table td:nth-child(4) {
-  width: 126px;
+  width: 128px;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: clip;
 }
 
 .remote-file-table tbody tr:hover {
-  background: #171c22 !important;
+  background: var(--remote-files-row-hover) !important;
 }
 
 .remote-file-table tbody tr.is-selected {
-  background: #173239 !important;
-  box-shadow: inset 2px 0 #4fd1c5;
+  background: var(--remote-files-selected) !important;
+  box-shadow: inset 2px 0 var(--remote-accent);
 }
 
 .remote-file-table tbody tr.is-selected:hover {
-  background: #1b3b43 !important;
+  background: var(--remote-files-selected) !important;
 }
 
-.remote-file-table td:nth-child(2) {
+.remote-file-name {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 7px;
 }
 
-.remote-file-table td:nth-child(2) svg {
+.remote-file-name svg {
   flex: 0 0 auto;
-  color: #71aef5;
+  color: var(--remote-accent);
 }
 
-.remote-file-table td:nth-child(2) span {
+.remote-file-name span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .remote-file-table tr.is-protected {
-  color: #737b84;
+  color: var(--remote-muted);
 }
 
-.remote-file-table tr.is-protected td:nth-child(2) svg {
+.remote-file-table tr.is-protected td .remote-file-name svg {
   color: #d69b55;
 }
 
 .remote-file-empty {
   height: 90px !important;
-  color: #717983;
+  color: var(--remote-muted);
   text-align: center !important;
 }
 
 .remote-empty-workspace {
   display: flex;
+  width: 100%;
   height: 100%;
+  min-height: 0;
+  flex: 1;
   align-items: center;
   justify-content: center;
+  padding: 24px;
+  color: var(--remote-muted);
+}
+
+.remote-empty-card {
+  display: flex;
+  width: min(360px, 100%);
   flex-direction: column;
+  align-items: center;
   gap: 12px;
-  color: #848c96;
+  padding: 28px 24px;
+  text-align: center;
+  background: var(--remote-paper);
+}
+
+.remote-empty-card strong {
+  color: var(--remote-text);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .remote-dialog-actions {
@@ -607,98 +1162,267 @@
   margin-top: 18px;
 }
 
-.remote-server-picker-dialog.rt-DialogContent {
+.remote-confirm-backdrop {
+  background: rgb(22 28 36 / 62%) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.remote-confirm-paper {
+  margin: 16px;
+  overflow: hidden;
+  border: 1px solid var(--remote-border);
+  border-radius: 12px;
+  background: var(--remote-paper) !important;
+  background-image: none !important;
+  color: var(--remote-text);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 32%);
+}
+
+.remote-confirm-paper .MuiDialogTitle-root {
+  padding: 18px 20px 6px;
+  color: var(--remote-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.remote-confirm-paper .MuiDialogContent-root {
+  padding: 6px 20px 8px;
+}
+
+.remote-confirm-paper .MuiDialogContentText-root {
+  color: var(--remote-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.remote-confirm-paper .MuiDialogActions-root {
+  padding: 8px 16px 16px;
+  gap: 8px;
+}
+
+.remote-confirm-paper .MuiFormLabel-root {
+  color: var(--remote-muted);
+}
+
+.remote-confirm-paper .MuiInputBase-root {
+  color: var(--remote-text);
+}
+
+.remote-confirm-paper .MuiOutlinedInput-notchedOutline {
+  border-color: var(--remote-border);
+}
+
+.remote-picker-sheet {
   display: flex;
-  width: min(94vw, 1040px);
-  max-height: calc(100dvh - 24px);
+  height: auto;
+  max-height: 100%;
+  min-height: 0;
+  flex: 0 1 auto;
+  flex-direction: column;
+}
+
+.remote-picker-paper.is-compact .remote-picker-sheet {
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+.remote-picker-paper {
+  display: flex;
+  width: min(864px, calc(100vw - 48px));
+  height: auto;
+  max-height: calc(100dvh - var(--remote-header-h) - var(--remote-status-h));
   flex-direction: column;
   overflow: hidden;
+  background: var(--remote-paper);
+  color: var(--remote-text);
 }
 
-.remote-server-picker-dialog .rt-DialogTitle,
-.remote-server-picker-dialog .rt-DialogDescription {
+.remote-picker-paper.is-right {
+  border-radius: 12px 0 0 12px;
+}
+
+.remote-picker-paper.is-left {
+  border-radius: 0 12px 12px 0;
+}
+
+.remote-picker-paper.is-center {
+  width: min(864px, calc(100vw - 48px));
+  margin: 24px;
+  border-radius: 12px;
+  transform-origin: center center;
+  animation: remote-picker-center-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  max-height: min(calc(100dvh - 48px), calc(100dvh - var(--remote-header-h) - var(--remote-status-h)));
+}
+
+.MuiModal-root[aria-hidden="true"] .remote-picker-paper.is-center {
+  animation: remote-picker-center-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes remote-picker-center-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes remote-picker-center-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.remote-picker-paper.is-compact {
+  width: 100%;
+  height: min(92dvh, 100%);
+  max-height: min(92dvh, 100%);
+}
+
+.remote-picker-header,
+.remote-picker-footer {
+  display: flex;
   flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px 0;
 }
 
-.remote-server-picker-dialog .remote-node-picker {
+.remote-picker-footer {
+  align-items: center;
+  border-top: 1px solid var(--remote-border);
+  padding: 12px 22px 16px;
+}
+
+.remote-picker-body {
   display: flex;
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
   flex-direction: column;
-  margin-top: 18px;
+  overflow: hidden;
+  padding: 12px 22px 0;
+}
+
+.remote-picker-paper .remote-node-picker {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.remote-server-picker-dialog .remote-node-picker-controls {
+.remote-node-picker-controls {
   flex: 0 0 auto;
 }
 
-.remote-server-picker-dialog .remote-node-picker-controls .MuiFormControl-root {
+.remote-node-picker-controls .MuiFormControl-root {
   flex-grow: 0;
 }
 
-.remote-server-picker-dialog .remote-node-picker-results {
+.remote-node-picker-results {
   min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-  padding: 2px;
+  flex: 1 1 auto;
+  overflow: hidden;
+  padding: 2px 2px 12px;
 }
 
-.remote-server-picker-dialog .remote-node-picker-grid {
+.remote-node-picker-grid {
+  align-content: start;
+  grid-auto-rows: max-content;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.remote-server-picker-dialog .remote-node-picker-card {
-  min-height: 204px;
+.remote-picker-paper.is-left .remote-node-picker-grid {
+  align-content: end;
 }
 
-.remote-server-picker-dialog .remote-dialog-actions {
+.remote-node-picker-card {
+  min-height: 0;
+}
+
+.remote-picker-paper .remote-dialog-actions {
   flex: 0 0 auto;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
-@media (max-width: 760px) {
-  .remote-server-picker-dialog.rt-DialogContent {
-    width: min(calc(100vw - 16px), 560px);
-    max-height: calc(100dvh - 12px);
-    padding-bottom: max(12px, var(--safe-area-bottom));
-  }
+.remote-picker-paper [data-testid="node-status-summary"],
+.remote-picker-paper [data-testid="node-status-summary"] > button {
+  height: 30px;
+}
 
-  .remote-server-picker-dialog .remote-node-picker {
-    margin-top: 12px;
-  }
+.remote-picker-paper [data-testid="node-status-summary"] > button {
+  min-width: 0;
+  padding-inline: 10px;
+}
 
-  .remote-server-picker-dialog .remote-node-picker-controls {
-    gap: 8px !important;
-    margin-bottom: 10px;
-  }
+.remote-node-picker-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 
-  .remote-server-picker-dialog .remote-node-picker-controls > * + * {
-    margin-top: 0 !important;
-  }
+.remote-node-picker-card-copy {
+  min-width: 0;
+  flex: 1;
+}
 
-  .remote-server-picker-dialog .remote-node-picker-controls .MuiFormControl-root {
-    flex: 0 0 auto;
-    width: 100%;
-    max-width: none;
-  }
+.remote-node-picker-ips {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  color: var(--remote-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
 
-  .remote-server-picker-dialog .remote-node-picker-grid {
-    grid-template-columns: 1fr;
-  }
+.remote-node-picker-ip-row {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
 
-  .remote-server-picker-dialog .remote-node-picker-card {
-    min-height: 0;
-  }
+.remote-node-picker-ip-row span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-  .remote-server-picker-dialog .remote-dialog-actions {
-    margin-top: 10px;
-  }
+.remote-node-picker-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--remote-border);
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+
+.remote-picker-paper.is-compact .remote-node-picker-meta {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  justify-content: flex-start;
+  align-items: flex-end;
 }
 
 .remote-dialog-error {
   margin: 8px 0 0;
-  color: #ff8f8f;
+  color: var(--remote-danger);
   font-size: 12px;
 }
 
@@ -714,10 +1438,10 @@
   position: fixed;
   z-index: 1000;
   width: 168px;
-  border: 1px solid #3b424b;
+  border: 1px solid var(--remote-menu-border);
   border-radius: 4px;
-  background: #1b1f24;
-  box-shadow: 0 12px 30px rgb(0 0 0 / 42%);
+  background: var(--remote-menu);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 18%);
   padding: 4px;
 }
 
@@ -732,7 +1456,7 @@
   border-radius: 3px;
   background: transparent;
   padding: 0 9px;
-  color: #e4e7eb;
+  color: var(--remote-text);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -741,23 +1465,42 @@
 
 .remote-terminal-context-menu button:hover:not(:disabled),
 .remote-file-context-menu button:hover:not(:disabled) {
-  background: #2b333b;
+  background: var(--remote-hover);
 }
 
 .remote-terminal-context-menu button:disabled,
 .remote-file-context-menu button:disabled {
-  color: #68717b;
+  color: var(--remote-muted);
   cursor: default;
 }
 
 .remote-file-context-menu button.is-danger:not(:disabled) {
-  color: #ff8f8f;
+  color: var(--remote-danger);
 }
 
 .remote-file-context-separator {
   height: 1px;
   margin: 4px 5px;
-  background: #343b43;
+  background: var(--remote-border);
+}
+
+.remote-statusbar {
+  z-index: 1200;
+  display: flex;
+  height: var(--remote-status-h);
+  flex: 0 0 var(--remote-status-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--remote-border);
+  background: var(--remote-chrome);
+  padding: 0 22px 0 calc(var(--remote-rail-w) + 22px);
+  color: var(--remote-muted);
+  font-size: 11px;
+}
+
+.remote-bottom-nav {
+  display: none;
 }
 
 .remote-spin {
@@ -784,53 +1527,197 @@
   .remote-workspace {
     position: fixed;
     inset: 0;
-    width: 100%;
+    width: auto;
     height: auto;
     min-width: 0;
+    box-sizing: border-box;
+    padding-bottom: var(--remote-keyboard-inset, 0px);
     overscroll-behavior: none;
   }
 
-  .remote-terminal-pane,
-  .terminal-page.terminal-xterm-host {
+  .remote-chrome {
+    padding: 0 12px;
+  }
+
+  .remote-chrome-caption,
+  .remote-chrome-location,
+  .remote-connected-count,
+  .remote-chrome-divider,
+  .remote-theme-control,
+  .remote-statusbar,
+  .remote-session-rail {
+    display: none;
+  }
+
+  .remote-session,
+  .remote-session.has-mobile-panel {
+    padding: 0;
+  }
+
+  .remote-session.has-mobile-panel .remote-session-body {
+    flex: 1;
+  }
+
+  .remote-session.has-mobile-panel .remote-side-tabs {
+    display: none;
+  }
+
+  .remote-session-body {
+    gap: 0;
+  }
+
+  .remote-identity {
+    min-width: 0;
+    min-height: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 10px 4px;
+  }
+
+  .remote-identity-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .remote-identity-copy h1 {
+    font-size: 16px;
+    line-height: 20px;
+  }
+
+  .remote-identity-meta {
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin-top: 2px;
+    gap: 8px;
+  }
+
+  .remote-status {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .remote-session-actions {
+    width: auto;
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .remote-identity-flag {
+    width: 32px;
+    height: 36px;
+    align-self: center;
+  }
+
+  .remote-identity-flag .admin-node-country-flag > span,
+  .remote-identity-flag span {
+    width: 30px !important;
+    height: 20px !important;
+  }
+
+  .remote-network {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 4px 12px 6px;
+    color: var(--remote-muted);
+    font-size: 10px;
+  }
+
+  .remote-network svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .remote-network strong {
+    font-family: Consolas, ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .remote-network .is-up,
+  .remote-network .is-down {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+
+  .remote-network .is-up,
+  .remote-network .is-up strong {
+    color: var(--remote-online);
+  }
+
+  .remote-network .is-down,
+  .remote-network .is-down strong {
+    color: var(--remote-accent);
+  }
+
+  .remote-network-rule {
+    width: 1px;
+    height: 11px;
+    margin: 0 5px;
+    background: var(--remote-border);
+  }
+
+  .remote-terminal-head {
+    display: none;
+  }
+
+  .remote-terminal-pane {
+    margin: 0 8px 6px;
+    overflow: hidden;
+    border: 1px solid #293749;
+    border-radius: 10px;
     overscroll-behavior: none;
     touch-action: none;
   }
 
-  .remote-brand span {
-    display: none;
-  }
-
-  .remote-brand {
-    padding-right: 2px;
-  }
-
-  .remote-session-header {
-    min-height: 86px;
-    flex-wrap: wrap;
-    gap: 6px 12px;
-    padding: 7px 9px;
-  }
-
-  .remote-node-heading {
-    min-width: 0;
-    max-width: none;
-    flex: 1;
-  }
-
-  .remote-session-actions {
-    order: 2;
+  .remote-side-panel {
+    border-radius: 0;
+    border: 0;
   }
 
   .remote-metrics {
-    order: 3;
-    width: 100%;
-    flex-basis: 100%;
-    gap: 16px;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin: 0 8px;
+    align-items: stretch;
   }
 
-  .remote-metrics > span {
-    flex-direction: row;
-    gap: 5px;
+  .remote-metric {
+    padding: 6px 8px 7px;
+    height: 100%;
+  }
+
+  .remote-metric.has-usage .remote-metric-row {
+    align-items: flex-end;
+  }
+
+  .remote-metric.has-usage .remote-metric-detail {
+    overflow: visible;
+  }
+
+  .remote-metric strong {
+    font-size: 16px;
+    line-height: 20px;
+  }
+
+  .remote-metric-detail {
+    font-size: 9px;
+  }
+
+  .remote-metric.has-usage .remote-metric-bar {
+    flex: 0 0 auto;
+    height: 5px;
+    margin-top: auto;
+  }
+
+  .terminal-page.terminal-xterm-host {
+    --xterm-padding: 6px;
+    overscroll-behavior: none;
+    touch-action: none;
   }
 
   .remote-side-panel {
@@ -839,58 +1726,159 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(88vw, 440px) !important;
+    width: 100% !important;
     max-width: none;
-    box-shadow: -12px 0 28px rgb(0 0 0 / 38%);
+    border-left: 0;
   }
 
   .remote-divider {
     display: none;
   }
 
+  .remote-bottom-nav {
+    display: flex;
+    width: 100%;
+    flex: 0 0 auto;
+    margin: 0;
+    border-top: 1px solid var(--remote-border);
+    background: var(--remote-chrome);
+    padding-bottom: var(--safe-area-bottom);
+  }
+
   .remote-mobile-command {
-    position: absolute;
-    z-index: 4;
-    right: 8px;
-    bottom: calc(var(--mobile-keyboard-inset, 0px) + max(8px, var(--safe-area-bottom)));
-    left: 8px;
+    position: relative;
+    z-index: 1;
+    right: auto;
+    bottom: auto;
+    left: auto;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px;
-    border: 1px solid #3b424b;
-    border-radius: 5px;
-    background: #171b20;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 42%);
+    gap: 8px;
+    margin: 0 8px 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .remote-mobile-input {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    height: 38px;
+    border: 1px solid #35465a;
+    border-radius: 8px;
+    background: #1a2735;
+    padding: 0 11px;
+    color: #8498af;
+  }
+
+  .remote-mobile-input span {
+    flex: 0 0 auto;
+    color: #078dee;
+    font-family: Consolas, ui-monospace, monospace;
+    font-size: 15px;
+    line-height: 1;
   }
 
   .remote-mobile-command input {
     box-sizing: border-box;
     min-width: 0;
-    height: 34px;
+    height: 38px;
     flex: 1;
-    border: 1px solid #3a424c;
-    border-radius: 4px;
+    border: 0;
+    border-radius: 0;
     outline: none;
-    background: #0d1014;
-    padding: 0 10px;
-    color: #f1f3f5;
+    background: transparent;
+    padding: 0;
+    color: #d6dfe7;
     font: 16px/1.2 Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
 
-  .remote-mobile-command input:focus {
-    border-color: #4fd1c5;
+  .remote-mobile-command input::placeholder {
+    color: #8498af;
   }
 
-  .terminal-page .xterm {
-    max-width: 100%;
-    padding-bottom: calc(var(--xterm-padding, 16px) + var(--mobile-keyboard-inset, 0px) + max(60px, var(--safe-area-bottom)));
+  .remote-mobile-command input:focus {
+    border-color: transparent;
+  }
+
+  .remote-mobile-send {
+    display: inline-flex;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: var(--remote-accent);
+    padding: 0;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .remote-mobile-send:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .remote-terminal-tools {
+    display: flex;
+    height: 32px;
+    flex: 0 0 32px;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid #2a3848;
+    padding: 0 8px;
+    color: #acbbca;
+  }
+
+  .remote-terminal-tools button {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    background: transparent;
+    padding: 0 8px;
+    color: #acbbca;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+  }
+
+  .remote-terminal-tools button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .remote-terminal-tools svg {
+    width: 13px;
+    height: 13px;
   }
 
   .terminal-page .xterm-helper-textarea {
     font-size: 16px !important;
+  }
+
+  .remote-node-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .remote-picker-paper {
+    width: 100%;
+    height: min(92dvh, 100%);
+    max-height: min(92dvh, 100%);
+  }
+
+  .remote-node-picker-results {
+    overflow-y: auto;
   }
 }
 
@@ -898,38 +1886,6 @@
   .remote-session-header {
     min-height: 0;
     align-content: flex-start;
-  }
-
-  .remote-node-heading {
-    width: 100%;
-    flex-basis: 100%;
-  }
-
-  .remote-session-actions {
-    width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .remote-session-actions::-webkit-scrollbar {
-    display: none;
-  }
-
-  .remote-tab {
-    min-width: 112px;
-    max-width: 164px;
-  }
-
-  .remote-session-actions .rt-Button {
-    width: 30px;
-    padding: 0;
-    font-size: 0;
-  }
-
-  .remote-session-actions .rt-Button svg {
-    width: 15px;
-    height: 15px;
   }
 
   .remote-file-table th:nth-child(4),

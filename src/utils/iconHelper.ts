@@ -13,6 +13,7 @@ import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import DnsOutlined from "@mui/icons-material/DnsOutlined";
 import GroupOutlined from "@mui/icons-material/GroupOutlined";
 import HomeOutlined from "@mui/icons-material/HomeOutlined";
+import HubOutlined from "@mui/icons-material/HubOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
 import MoreHoriz from "@mui/icons-material/MoreHoriz";
 import NotificationsOutlined from "@mui/icons-material/NotificationsOutlined";
@@ -73,6 +74,7 @@ export const iconMap: Record<string, ReturnType<typeof wrapMuiIcon>> = {
   Code: wrapMuiIcon(CodeOutlined),
   Globe: wrapMuiIcon(PublicOutlined),
   Terminal: wrapMuiIcon(TerminalOutlined),
+  Hub: wrapMuiIcon(HubOutlined),
   Database: wrapMuiIcon(StorageOutlined),
   WifiOff: wrapMuiIcon(WifiOffOutlined),
   Store: wrapMuiIcon(StorefrontOutlined),

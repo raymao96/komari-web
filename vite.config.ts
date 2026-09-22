@@ -12,6 +12,17 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
+function sonnerExitHold(): Plugin {
+  return {
+    name: "sonner-exit-hold",
+    transform(code, id) {
+      const normalized = id.replace(/\\/g, "/");
+      if (!normalized.includes("/sonner/dist/index.")) return;
+      return code.replace("TIME_BEFORE_UNMOUNT = 200", "TIME_BEFORE_UNMOUNT = 360");
+    },
+  };
+}
+
 function keepOnViteDevServer(pathname: string): boolean {
   return (
     pathname.startsWith("/admin") ||
@@ -27,7 +38,7 @@ function keepOnViteDevServer(pathname: string): boolean {
     pathname.startsWith("/assets/logo") ||
     pathname.startsWith("/assets/pwa-icon") ||
     pathname.startsWith("/assets/lite-card-background-v4") ||
-    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/favicon.png") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/themes")
   );
@@ -83,7 +94,11 @@ export default defineConfig(({ mode }) => {
       : "/";
   const baseConfig: UserConfig = {
     base: base,
+    optimizeDeps: {
+      exclude: ["sonner"],
+    },
     plugins: [
+      sonnerExitHold(),
       react(),
       tailwindcss(),
       ...(systemUiBuild ? [] : [VitePWA({
@@ -206,6 +221,15 @@ export default defineConfig(({ mode }) => {
       "/server": {
         target: apiTarget,
         changeOrigin: true,
+      },
+      "/mcp": {
+        target: apiTarget,
+      },
+      "/oauth": {
+        target: apiTarget,
+      },
+      "/.well-known": {
+        target: apiTarget,
       },
     };
     baseConfig.plugins = [

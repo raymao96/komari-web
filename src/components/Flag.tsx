@@ -6,6 +6,8 @@ interface FlagProps {
   flag?: string | null; // 地区代码 (例如 "SG", "US") 或旗帜 emoji (例如 "🇸🇬", "🇺🇳")
   size?: string; // 可选的尺寸 prop，用于未来扩展
   compact?: boolean;
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -46,22 +48,25 @@ const getCountryCodeFromFlagEmoji = (emoji?: string | null): string | null => {
   return null;
 };
 
-const Flag = React.memo(({ flag, size, compact = false }: FlagProps) => {
+const Flag = React.memo(({ flag, size, compact = false, width, height }: FlagProps) => {
   const resolvedFlagFileName = getCountryCodeFromFlagEmoji(flag) ?? getRegionCode(flag);
   const imgSrc = getAppAssetUrl(`assets/flags/${resolvedFlagFileName}.svg`);
   const altText = `地区旗帜: ${resolvedFlagFileName}`;
+  const frameWidth = width ?? (compact ? 20 : undefined);
+  const frameHeight = height ?? (compact ? 15 : undefined);
+  const framed = Boolean(frameWidth && frameHeight);
 
   return (
     <span
       className={
-        compact
+        framed || compact
           ? "shrink-0 self-center"
           : `m-2 self-center ${size ? `w-${size} h-${size}` : "w-6 h-6"}`
       }
       style={{
         display: "inline-flex",
         alignItems: "center",
-        ...(compact ? { width: 20, height: 15 } : {}),
+        ...(framed ? { width: frameWidth, height: frameHeight } : {}),
       }}
       aria-label={altText}
     >

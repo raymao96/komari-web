@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Callout, Box } from "@/components/admin/ui";
 import Loading from "@/components/loading";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
@@ -7,6 +7,11 @@ import {
   type ThemeConfiguration,
 } from "@/utils/themeConfiguration";
 import { fetchThemeManifest } from "@/utils/themeManifest";
+import {
+  THEME_RAW_MESSAGE_TYPE,
+  THEME_RAW_SANDBOX,
+  themeRawLoaderSrcDoc,
+} from "@/utils/themeRawFrame";
 
 interface ThemeConfigResponse {
   configuration?: ThemeConfiguration;
@@ -18,6 +23,8 @@ const ThemeRaw = () => {
   const [html, setHtml] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const loaderSrcDoc = themeRawLoaderSrcDoc(window.location.origin);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +68,24 @@ const ThemeRaw = () => {
     };
   }, [theme]);
 
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || !html) return;
+
+    const send = () => {
+      frame.contentWindow?.postMessage(
+        { type: THEME_RAW_MESSAGE_TYPE, html },
+        "*",
+      );
+    };
+
+    frame.addEventListener("load", send);
+    send();
+    return () => {
+      frame.removeEventListener("load", send);
+    };
+  }, [html, loaderSrcDoc]);
+
   if (loading) return <Loading />;
 
   if (error) {
@@ -74,9 +99,10 @@ const ThemeRaw = () => {
   return (
     <Box className="h-full min-h-[calc(100vh-96px)]">
       <iframe
-        title="Theme raw content"
-        srcDoc={html}
-        sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
+        ref={frameRef}
+        title="Theme raw sandbox"
+        srcDoc={loaderSrcDoc}
+        sandbox={THEME_RAW_SANDBOX}
         className="h-full min-h-[calc(100vh-96px)] w-full border-0"
       />
     </Box>

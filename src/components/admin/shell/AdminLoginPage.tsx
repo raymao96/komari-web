@@ -8,7 +8,6 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import type { Theme } from "@mui/material/styles";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
 import { useEffect, useRef, useState } from "react";
@@ -22,38 +21,17 @@ import {
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import { localizeLoginError, submitPasswordLogin } from "@/utils/adminAuth";
 import { sameOriginApiPath } from "@/utils/security";
-import AuthStandAlonePage, { authPrimaryButtonSx } from "./AuthStandAlonePage";
-
-const loginFieldSx = (theme: Theme) => {
-  const fill = theme.palette.background.paper;
-  const text = theme.palette.text.primary;
-  return {
-    "& .MuiOutlinedInput-root": {
-      minHeight: 60,
-      bgcolor: fill,
-      "& input": {
-        px: 2,
-        py: 1.75,
-      },
-      "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
-        {
-          WebkitTextFillColor: text,
-          caretColor: text,
-          borderRadius: "inherit",
-          WebkitBoxShadow: `0 0 0 100px ${fill} inset`,
-          transition: "background-color 99999s ease-out 0s",
-        },
-    },
-    "& .MuiInputLabel-root": {
-      fontWeight: 600,
-    },
-  };
-};
+import {
+  decodePublicKeyRequestOptions,
+  passkeyUnavailableMessage,
+  serializeCredential,
+} from "@/utils/webauthn";
+import AuthStandAlonePage, { authFieldSx, authPrimaryButtonSx } from "./AuthStandAlonePage";
 
 function AdminLoginForm() {
   const { account, loading, error, refresh } = useAccount();
   const { t } = useTranslation();
-  const { publicInfo } = usePublicInfo();
+  const { publicInfo, refresh: refreshPublicInfo } = usePublicInfo();
   const compact = useMediaQuery("(max-width:599.95px)");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -68,6 +46,12 @@ function AdminLoginForm() {
   const oauthEnabled = Boolean(publicInfo?.oauth_enable);
   const isFormValid =
     passwordLoginEnabled && username.trim() !== "" && password.trim() !== "";
+
+  useEffect(() => {
+    refreshPublicInfo();
+    // Login needs a fresh passkey_login flag after keys were added in this session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is not stable
+  }, []);
 
   useEffect(() => {
     if (!needTwoFactor) return;
@@ -87,6 +71,56 @@ function AdminLoginForm() {
     if (needTwoFactor) {
       setNeedTwoFactor(false);
       setTwoFac("");
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    setErrorMsg("");
+    setIsLoading(true);
+    try {
+      if (!window.PublicKeyCredential) {
+        setErrorMsg(t("account.passkey_unavailable", "当前环境不支持通行密钥。"));
+        return;
+      }
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(window.location.hostname) || window.location.hostname.includes(":")) {
+        setErrorMsg(t("account.passkey_ip_host"));
+        return;
+      }
+      const optionsRes = await fetch(sameOriginApiPath("/api/passkeys/login/options"), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      });
+      const optionsBody = await optionsRes.json();
+      if (!optionsRes.ok) {
+        setErrorMsg(optionsBody.message || t("login.passkey_failed", "通行密钥登录失败"));
+        return;
+      }
+      const assertion = (await navigator.credentials.get({
+        publicKey: decodePublicKeyRequestOptions(optionsBody.data?.publicKey || optionsBody.publicKey),
+      })) as PublicKeyCredential;
+      const verifyRes = await fetch(sameOriginApiPath("/api/passkeys/login/verify"), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ceremony_id: optionsBody.data?.ceremony_id || optionsBody.ceremony_id,
+          credential: serializeCredential(assertion),
+        }),
+      });
+      const verifyBody = await verifyRes.json();
+      if (!verifyRes.ok) {
+        setErrorMsg(verifyBody.message || t("login.passkey_failed", "通行密钥登录失败"));
+        return;
+      }
+      await refresh();
+    } catch (reason) {
+      const code = passkeyUnavailableMessage(reason, "failed");
+      setErrorMsg(
+        t(`account.passkey_${code}`, t("login.passkey_failed", "通行密钥登录失败")),
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -177,7 +211,7 @@ function AdminLoginForm() {
                 autoComplete="username"
                 autoFocus={!compact}
                 slotProps={{ inputLabel: { shrink: true } }}
-                sx={loginFieldSx}
+                sx={authFieldSx}
               />
               <TextField
                 id="admin-login-password"
@@ -206,7 +240,7 @@ function AdminLoginForm() {
                     ),
                   },
                 }}
-                sx={loginFieldSx}
+                sx={authFieldSx}
               />
               {needTwoFactor ? (
                 <TextField
@@ -223,13 +257,8 @@ function AdminLoginForm() {
                   placeholder="000000"
                   disabled={isLoading}
                   slotProps={{ inputLabel: { shrink: true } }}
-                  sx={loginFieldSx}
+                  sx={authFieldSx}
                 />
-              ) : null}
-              {errorMsg ? (
-                <Typography variant="body2" color="error">
-                  {errorMsg}
-                </Typography>
               ) : null}
               <Button
                 type="submit"
@@ -242,6 +271,28 @@ function AdminLoginForm() {
                 {isLoading ? t("login.logging_in") : t("login.title")}
               </Button>
             </>
+          ) : null}
+          {errorMsg ? (
+            <Typography variant="body2" color="error">
+              {errorMsg}
+            </Typography>
+          ) : null}
+          {publicInfo?.passkey_login ? (
+          <Button
+            type="button"
+            variant={passwordLoginEnabled ? "outlined" : "contained"}
+            size="large"
+            fullWidth
+            disabled={isLoading}
+            onClick={() => void handlePasskeyLogin()}
+            sx={
+              passwordLoginEnabled
+                ? { minHeight: 52, color: "text.primary", borderColor: "divider" }
+                : authPrimaryButtonSx
+            }
+          >
+            {t("login.passkey", "使用通行密钥")}
+          </Button>
           ) : null}
           {oauthEnabled ? (
             <Stack spacing={2}>

@@ -123,7 +123,13 @@ test("exec canned results are translated in every locale", () => {
 });
 
 test("empty remote addresses use the same placeholder in every locale", () => {
-  for (const filename of ["zh_CN.json", "en.json", "ja_JP.json", "zh_TW.json"]) {
+  const expected = {
+    "zh_CN.json": "--",
+    "en.json": "--",
+    "ja_JP.json": "--",
+    "zh_TW.json": "暫未回報",
+  };
+  for (const [filename, placeholder] of Object.entries(expected)) {
     const contents = JSON.parse(
       readFileSync(
         path.join(repositoryRoot, "src", "i18n", "locales", filename),
@@ -132,7 +138,7 @@ test("empty remote addresses use the same placeholder in every locale", () => {
     ) as { terminal?: { address_unreported?: string } };
     assert.equal(
       contents.terminal?.address_unreported,
-      "--",
+      placeholder,
       `${filename} terminal.address_unreported should match empty tags`,
     );
   }

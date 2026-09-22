@@ -36,6 +36,10 @@ const dashboardPanelsSource = readFileSync(
   new URL("../src/components/admin/DashboardPanels.tsx", import.meta.url),
   "utf8",
 );
+const dashboardTraffic30dSource = readFileSync(
+  new URL("../src/components/admin/DashboardTraffic30d.tsx", import.meta.url),
+  "utf8",
+);
 const globalCssSource = readFileSync(
   new URL("../src/global.css", import.meta.url),
   "utf8",
@@ -61,6 +65,7 @@ test("overview preset exactly matches the default dashboard modules", () => {
   assert.equal(settings.refresh_seconds, 30);
   assert.equal(settings.chart_refresh_seconds, 30);
   assert.equal(settings.modules.find((module) => module.id === "storage_detail")?.enabled, false);
+  assert.equal(settings.modules.find((module) => module.id === "traffic_30d_summary")?.enabled, false);
 });
 
 test("dashboard preview stacks on phones and restores the desktop grid", () => {
@@ -75,6 +80,16 @@ test("formal dashboard stretches paired cards to equal row height", () => {
     adminDashboardSource,
     /\["return_route", "alerts"\][\s\S]+?className="min-w-0 \[&>\*\]:h-full"/,
   );
+  assert.match(adminDashboardSource, /xl:grid-cols-4/);
+  assert.match(adminDashboardSource, /\["traffic_trend", "billing_trend"\]/);
+  assert.match(dashboardSettingsSource, /sm:grid-cols-4/);
+});
+
+test("dashboard settings keep billable trend and 30-day overview as separate modules", () => {
+  const zhCN = readFileSync(new URL("../src/i18n/locales/zh_CN.json", import.meta.url), "utf8");
+  assert.match(zhCN, /"module_billing_trend": "计费流量趋势"/);
+  assert.match(zhCN, /"module_traffic_30d_summary": "近30天流量概览"/);
+  assert.doesNotMatch(zhCN, /"module_billing_trend": "近30天流量概览"/);
 });
 
 test("alert overview columns follow the configured card span", () => {
@@ -86,16 +101,40 @@ test("alert overview columns follow the configured card span", () => {
 });
 
 test("traffic charts fill tall narrow grid cards without shrinking text", () => {
+  const chartSources = `${dashboardPanelsSource}\n${dashboardTraffic30dSource}`;
   assert.equal(
-    dashboardPanelsSource.match(/@container flex h-full min-w-0 flex-col km-admin-surface/g)?.length,
+    chartSources.match(/@container flex h-full min-w-0 flex-col km-admin-surface/g)?.length,
     2,
   );
   assert.equal(
-    dashboardPanelsSource.match(/className="min-h-\[220px\] w-full flex-1 aspect-auto"/g)?.length,
+    chartSources.match(/className="min-h-\[220px\] w-full flex-1 aspect-auto"/g)?.length,
     2,
   );
-  assert.equal(dashboardPanelsSource.match(/<PanelHeader[\s\S]+?responsive/g)?.length >= 2, true);
-  assert.match(dashboardPanelsSource, /@max-\[28rem\]:flex-col/);
+  assert.equal(dashboardPanelsSource.match(/<PanelHeader[\s\S]+?responsive/g)?.length >= 1, true);
+  assert.match(chartSources, /@max-\[28rem\]:flex-col/);
+});
+
+test("daily billable chart inspects a day in a dialog instead of expanding the card", () => {
+  assert.match(dashboardTraffic30dSource, /<Dialog\.Root/);
+  assert.match(dashboardTraffic30dSource, /AppDialogContent maxWidth="960px"/);
+  assert.match(dashboardTraffic30dSource, /AdminListFiltersBar/);
+  assert.match(dashboardTraffic30dSource, /AdminListSearch/);
+  assert.match(dashboardTraffic30dSource, /text-center tabular-nums/);
+  assert.match(dashboardTraffic30dSource, /km-dashboard-chip km-dashboard-chip--accent/);
+  assert.match(dashboardTraffic30dSource, /requestDashboardTrafficDay/);
+  assert.doesNotMatch(adminDashboardSource, /prefetchDashboardTrafficDay/);
+  assert.match(dashboardTraffic30dSource, /prefetchDashboardTrafficDay/);
+  assert.match(dashboardTraffic30dSource, /getCachedDashboardTrafficDay/);
+  assert.match(dashboardTraffic30dSource, /onMouseMove/);
+  assert.match(dashboardTraffic30dSource, /min-h-\[min\(56vh,32rem\)\]/);
+  assert.doesNotMatch(dashboardTraffic30dSource, /h-\[180px\]/);
+  assert.match(dashboardTraffic30dSource, /AdminMobileListCard/);
+  assert.match(dashboardTraffic30dSource, /toggleSort/);
+  assert.match(dashboardTraffic30dSource, /max-h-\[min\(56vh,32rem\)\]/);
+  assert.doesNotMatch(
+    dashboardTraffic30dSource,
+    /\{selectedDay \? \(\s*<div className="mt-4/,
+  );
 });
 
 test("clickable route card fills its dashboard grid row", () => {
@@ -155,6 +194,7 @@ test("summary cards default to quarter width so four fit on one row", () => {
   const spans = dashboardModuleSpans(settings);
   assert.equal(spans.server_status, 3);
   assert.equal(spans.traffic_summary, 3);
+  assert.equal(spans.traffic_30d_summary, 3);
   assert.equal(spans.storage_summary, 3);
   assert.equal(spans.cost_center, 3);
   assert.deepEqual(
@@ -244,6 +284,54 @@ test("packet loss ranking requests only its fifteen-minute chart section", () =>
   assert.deepEqual(dashboardSummarySections(settings), []);
 });
 
+test("packet loss ranking lists every task instead of one row per server", () => {
+  const zhCN = JSON.parse(readFileSync("src/i18n/locales/zh_CN.json", "utf8"));
+  const en = JSON.parse(readFileSync("src/i18n/locales/en.json", "utf8"));
+  const zhTW = JSON.parse(readFileSync("src/i18n/locales/zh_TW.json", "utf8"));
+  const ja = JSON.parse(readFileSync("src/i18n/locales/ja_JP.json", "utf8"));
+  for (const pack of [zhCN, en, zhTW, ja]) {
+    assert.match(pack.admin_dashboard.packet_loss_ranking_hint, /./);
+    assert.match(pack.admin_dashboard.ranking_all, /./);
+    assert.doesNotMatch(pack.admin_dashboard.packet_loss_ranking_hint, /每台服务器取丢包率最高|Worst task per online server|每台伺服器取其掉包率最高|サーバーごとに損失率が最も高い/);
+  }
+});
+
+test("latency ranking lists every task instead of one row per server", () => {
+  const zhCN = JSON.parse(readFileSync("src/i18n/locales/zh_CN.json", "utf8"));
+  const en = JSON.parse(readFileSync("src/i18n/locales/en.json", "utf8"));
+  const zhTW = JSON.parse(readFileSync("src/i18n/locales/zh_TW.json", "utf8"));
+  const ja = JSON.parse(readFileSync("src/i18n/locales/ja_JP.json", "utf8"));
+  for (const pack of [zhCN, en, zhTW, ja]) {
+    assert.match(pack.admin_dashboard.latency_ranking_hint, /探测任务|ping tasks|偵測任務|すべてのタスク/);
+  }
+  assert.match(
+    dashboardPanelsSource,
+    /function LatencyRankingBody[\s\S]+?key=\{`\$\{item\.uuid\}:\$\{item\.task_id \?\? 0\}`\}/,
+  );
+  assert.match(
+    dashboardPanelsSource,
+    /function LatencyRankingBody[\s\S]+?item\.task_name/,
+  );
+});
+
+test("latency jitter ranking lists every task instead of one row per server", () => {
+  const zhCN = JSON.parse(readFileSync("src/i18n/locales/zh_CN.json", "utf8"));
+  const en = JSON.parse(readFileSync("src/i18n/locales/en.json", "utf8"));
+  const zhTW = JSON.parse(readFileSync("src/i18n/locales/zh_TW.json", "utf8"));
+  const ja = JSON.parse(readFileSync("src/i18n/locales/ja_JP.json", "utf8"));
+  for (const pack of [zhCN, en, zhTW, ja]) {
+    assert.match(pack.admin_dashboard.latency_jitter_ranking_hint, /探测任务|ping tasks|偵測任務|すべてのタスク/);
+  }
+  assert.match(
+    dashboardPanelsSource,
+    /function LatencyJitterRankingBody[\s\S]+?key=\{`\$\{item\.uuid\}:\$\{item\.task_id \?\? 0\}`\}/,
+  );
+  assert.match(
+    dashboardPanelsSource,
+    /function LatencyJitterRankingBody[\s\S]+?item\.task_name/,
+  );
+});
+
 test("packet loss normal state keeps its green confirmation icon and label together", () => {
   assert.match(
     dashboardPanelsSource,
@@ -264,10 +352,10 @@ test("ranking navigation uses one full-row link without nested row buttons", () 
 test("all historical ranking cards share one bounded responsive list layout", () => {
   assert.match(
     dashboardPanelsSource,
-    /function DashboardRankingGrid[\s\S]+?limit >= 15[\s\S]+?@min-\[34rem\]:grid-cols-2/,
+    /function DashboardRankingGrid[\s\S]+?count >= 11[\s\S]+?@min-\[34rem\]:grid-cols-2[\s\S]+?grid-auto-flow:column/,
   );
   assert.equal(
-    dashboardPanelsSource.match(/<DashboardRankingGrid limit=\{limit\}>/g)?.length,
+    dashboardPanelsSource.match(/<DashboardRankingGrid>/g)?.length,
     4,
   );
   assert.doesNotMatch(dashboardPanelsSource, /repeat\(auto-fit, minmax\(min\(100%, 13rem\), 1fr\)\)/);
@@ -365,6 +453,7 @@ test("custom cost-center order is left where the user placed it", () => {
     "cost_center",
     "storage_summary",
   ]);
+  assert.equal(settings.modules.find((module) => module.id === "traffic_30d_summary")?.enabled, false);
 });
 
 test("legacy six-column spans migrate to the twelve-column grid", () => {

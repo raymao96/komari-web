@@ -71,5 +71,6 @@ test("tab hook skips history.replaceState when the query already matches", () =>
   const source = readFileSync(new URL("../src/hooks/useAdminTabParam.ts", import.meta.url), "utf8");
   assert.match(source, /if \(!shouldWriteAdminTabParam\(/);
   assert.match(source, /useCallback/);
+  assert.match(source, /preventScrollReset:\s*true/);
 });
 

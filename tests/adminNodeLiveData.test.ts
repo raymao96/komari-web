@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { nodeOnlineState } from "../src/utils/adminNodeOnlineState.ts";
+import {
+  nodeListInsertAfter,
+  nodeListReorderIndex,
+} from "../src/utils/nodeListReorder.ts";
 
 const hookSource = readFileSync("src/hooks/use-admin-node-live-data.ts", "utf8");
 const layoutSource = readFileSync("src/pages/admin/_layout.tsx", "utf8");
@@ -30,6 +34,18 @@ const marketSource = readFileSync("src/pages/admin/market/themes.tsx", "utf8");
 const settingCardSource = readFileSync("src/components/admin/SettingCard.tsx", "utf8");
 const mobileCardSource = readFileSync("src/components/admin/AdminMobileListCard.tsx", "utf8");
 const remoteExecSource = readFileSync("src/components/remote/RemoteExecNodeSelector.tsx", "utf8");
+
+test("node list reorder inserts above or below the hovered row", () => {
+  assert.equal(nodeListInsertAfter(10, 0, 20), false);
+  assert.equal(nodeListInsertAfter(11, 0, 20), true);
+  assert.equal(nodeListReorderIndex(4, 6, false), 5);
+  assert.equal(nodeListReorderIndex(4, 6, true), 6);
+  assert.equal(nodeListReorderIndex(4, 5, false), 4);
+  assert.equal(nodeListReorderIndex(4, 5, true), 5);
+  assert.equal(nodeListReorderIndex(8, 3, false), 3);
+  assert.equal(nodeListReorderIndex(8, 3, true), 4);
+  assert.equal(nodeListReorderIndex(2, 2, false), 2);
+});
 
 test("unknown live status is not treated as offline", () => {
   const onlineSet = new Set(["node-a"]);
@@ -90,7 +106,8 @@ test("admin node table uses the global page size and saves the complete cross-pa
   assert.match(pageSource, /pageSize=\{pageSize\}/);
   assert.match(pageSource, /onPageSizeChange=/);
   assert.match(pageSource, /destinationPage \* pageSize - 1/);
-  assert.match(pageSource, /overflow-x-auto overflow-y-hidden/);
+  assert.match(pageSource, /overflow-x-auto/);
+  assert.match(pageSource, /admin-node-list-dnd-wrap/);
 });
 
 test("mobile dialogs and settings cards stay within the viewport", () => {
@@ -182,6 +199,9 @@ test("server details open an overview billing metrics page", () => {
   assert.match(detailSource, /useAdminTabParam\(DETAIL_TABS, "overview"\)/);
   assert.match(detailSource, /currencyForStorage\(currency\)/);
   assert.match(detailSource, /BILLING_CURRENCY_OPTIONS/);
+  assert.match(detailSource, /\["¥", "\$", "€", "£", "C\$", "HK\$"\]/);
+  assert.doesNotMatch(detailSource, /"₽"|"₣"|"₹"|"₫"|"฿"/);
+  assert.match(readFileSync("src/pages/admin/index.tsx", "utf8"), /\["¥", "\$", "€", "£", "C\$", "HK\$"\]/);
   assert.match(detailSource, /rgba\(34, 197, 94, 0\.16\)/);
   assert.doesNotMatch(detailSource, /followBillingCurrency/);
   assert.doesNotMatch(detailSource, /trafficResetNotePlaceholder/);
@@ -200,7 +220,7 @@ test("server details open an overview billing metrics page", () => {
   assert.match(usageSource, /dashboardTrafficAxisWidth\(dailyTrafficAxisValues\(daily\)\)/);
   assert.doesNotMatch(usageSource, /longest \* 7/);
   assert.match(usageSource, /margin=\{\{ top: 8, right: 8, left: 0, bottom: 0 \}\}/);
-  assert.match(usageSource, /formatTrafficResetRangeLabel\(node\.traffic_reset_day\)/);
+  assert.match(usageSource, /formatTrafficResetRangeLabel\(node\.traffic_reset_day/);
   assert.match(usageSource, /data-testid="admin-node-network-range"/);
   assert.doesNotMatch(usageSource, /points\[0\]\.time/);
   assert.match(usageSource, /\/api\/records\/load/);
@@ -287,9 +307,14 @@ test("wide admin tables turn into labelled row cards on mobile", () => {
   assert.match(pageSource, /admin-responsive-table admin-node-table/);
   assert.match(pageSource, /SortableMobileCard/);
   assert.match(pageSource, /AdminMobileListCard/);
+  assert.match(mobileCardSource, /dense\?: boolean/);
+  assert.match(pageSource, /NODE_LIST_ORIGIN_STYLE/);
+  assert.match(globalCssSource, /\.admin-node-sortable-origin \{[\s\S]*opacity: 0\.4/);
+  assert.match(pageSource, /if \(node\.group\?\.trim\(\)\)/);
+  assert.match(pageSource, /if \(node\.remark\?\.trim\(\)\)/);
   assert.match(mobileCardSource, /gridTemplateColumns: "1fr 1fr"/);
   assert.doesNotMatch(pageSource, /join\(" \/ "\)/);
-  assert.match(pageSource, /<Flex gap="1" wrap="wrap">\s*<CustomTags tags=\{node\.tags \|\| ""\} \/>/);
+  assert.match(pageSource, /<Flex key="tags" gap="1" wrap="wrap">\s*<CustomTags tags=\{node\.tags \|\| ""\} \/>/);
   assert.match(pingTaskSource, /admin-responsive-table/);
   assert.match(pingServerSource, /admin-responsive-table/);
   assert.match(offlineSource, /admin-responsive-table admin-selection-table/);
@@ -352,6 +377,36 @@ test("desktop node table keeps readable name and network columns while resizing"
   assert.match(pageSource, /text-sm hover:bg-\[var\(--accent-a2\)\][^\n]*\[&>td\]:py-2\.5/);
   assert.match(pageSource, /text-sm leading-\[1\.125rem\]/);
   assert.match(pageSource, /data-label=\{t\("admin\.nodeTable\.name"\)\}[\s\S]{0,80}title=\{node\.name\}/);
+  assert.match(pageSource, /admin-node-name-cell/);
+  assert.match(pageSource, /admin-node-name-select/);
+  assert.match(pageSource, /admin-node-name-link/);
+  assert.match(pageSource, /onNameClick/);
+  assert.doesNotMatch(pageSource, /suppressLinkClickAfterSelection/);
+  assert.doesNotMatch(
+    pageSource,
+    /admin-node-name-link block max-w-full truncate/,
+  );
+  assert.match(pageSource, /NODE_LIST_AUTO_SCROLL/);
+  assert.match(pageSource, /layoutShiftCompensation: false/);
+  assert.match(pageSource, /data-admin-scroll-container/);
+  assert.match(pageSource, /animateLayoutChanges: \(\) => false/);
+  assert.match(pageSource, /DragOverlay/);
+  assert.match(pageSource, /NodeListDragPreview/);
+  assert.match(pageSource, /admin-node-dnd-dragging/);
+  assert.match(pageSource, /admin-node-sortable-origin/);
+  assert.match(pageSource, /MeasuringStrategy.WhileDragging/);
+  assert.match(pageSource, /MeasuringFrequency.Optimized/);
+  assert.match(pageSource, /NODE_LIST_SORTING_STRATEGY/);
+  assert.match(pageSource, /nodeListCollisionDetection/);
+  assert.match(pageSource, /nodeListReorderIndex/);
+  assert.match(pageSource, /arrayMove\(localNodes, oldIndex, newIndex\)/);
+  assert.match(globalCssSource, /@supports \(overflow: clip\)/);
+  assert.doesNotMatch(pageSource, /setActiveDragId/);
+  assert.doesNotMatch(pageSource, /autoScroll=\{false\}/);
+  assert.doesNotMatch(pageSource, /CSS\.Transform\.toString/);
+  assert.doesNotMatch(pageSource, /verticalListSortingStrategy/);
+  assert.match(pageSource, /restrictToVerticalAxis/);
+  assert.doesNotMatch(pageSource, /restrictToFirstScrollableAncestor/);
   assert.match(pageSource, /\["IPv4", node\.ipv4\?\.trim\(\)\][\s\S]{0,80}\["IPv6", node\.ipv6\?\.trim\(\)\]/);
   assert.match(pageSource, /networkAddresses\.length > 0 \? networkAddresses\.map/);
   assert.doesNotMatch(pageSource, /IPv[46] \{node\.ipv[46] \|\| "--"\}/);
@@ -367,8 +422,20 @@ test("admin tables align selection controls and use available text width", () =>
   assert.match(loadSource, /truncate whitespace-nowrap/);
   assert.doesNotMatch(loadSource, /whitespace-normal break-words/);
   assert.match(pingTaskSource, /admin-responsive-table admin-sortable-table table-fixed min-w-\[920px\]/);
+  assert.match(pingServerSource, /admin-responsive-table table-fixed w-full min-w-0/);
+  assert.match(pingServerSource, /TableHead className="w-\[56px\]"/);
+  assert.match(pingServerSource, /TableCell className="max-w-0 overflow-hidden"/);
+  assert.match(pingServerSource, /truncate whitespace-nowrap leading-5/);
   assert.match(pingTaskSource, /truncate whitespace-nowrap/);
   assert.match(pingTaskSource, /data-label=\{t\("ping\.target"\)\}[\s\S]{0,80}clipCell\(task\.target\)/);
+  assert.match(
+    pingTaskSource,
+    /<TableHead className="w-\[16%\]">\{t\("common\.name"\)\}<\/TableHead>\s*<TableHead className="w-\[28%\]">\{t\("ping\.target"\)\}<\/TableHead>\s*<TableHead className="w-\[26%\]">\{t\("common\.server"\)\}<\/TableHead>/,
+  );
+  assert.match(
+    pingTaskSource,
+    /data-label=\{t\("ping\.target"\)\}[\s\S]{0,120}data-label=\{t\("common\.server"\)\}/,
+  );
   assert.match(pingTaskSource, /TableHead className="w-\[72px\]"/);
   assert.match(pingTaskSource, /TableHead className="w-\[64px\]"/);
   assert.doesNotMatch(pingTaskSource, /whitespace-normal break-words/);

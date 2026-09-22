@@ -9,6 +9,7 @@ export interface PublicInfo {
   disable_password_login: boolean;
   oauth_provider: string;
   oauth_enable: boolean;
+  passkey_login?: boolean;
   metric_retention_days: number;
   sitename: string;
   private_site: boolean;

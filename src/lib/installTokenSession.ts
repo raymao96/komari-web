@@ -15,7 +15,7 @@ export type InstallTokenSnapshot = {
 
 export type InstallTokenFetcher = (
   uuid: string,
-  options?: { signal?: AbortSignal; twoFactorCode?: string },
+  options?: { signal?: AbortSignal; twoFactorCode?: string; ceremony_id?: string; credential?: unknown },
 ) => Promise<string>;
 
 const idleSnapshot = (): InstallTokenSnapshot => ({
@@ -70,12 +70,15 @@ export function createInstallTokenSession(
   const stillCurrent = (requestId: number) =>
     requestId === tokenRequestId && dialogOpen;
 
-  const requestToken = async (uuid: string, twoFactorCode?: string) => {
+  const requestToken = async (
+    uuid: string,
+    auth: { twoFactorCode?: string; ceremony_id?: string; credential?: unknown } = {},
+  ) => {
     abortCurrent();
     const controller = new AbortController();
     tokenAbortControllerRef.current = controller;
     const requestId = ++tokenRequestId;
-    const submitting = Boolean(twoFactorCode);
+    const submitting = Boolean(auth.twoFactorCode || auth.ceremony_id);
     emit({
       ...snapshot,
       token: null,
@@ -88,7 +91,7 @@ export function createInstallTokenSession(
     try {
       const token = await fetchToken(uuid, {
         signal: controller.signal,
-        twoFactorCode,
+        ...auth,
       });
       if (!stillCurrent(requestId)) return snapshot;
       emit({
@@ -125,6 +128,15 @@ export function createInstallTokenSession(
           submitting: false,
         });
         return snapshot;
+      }
+      if (submitting && snapshot.twoFactorOpen && auth.ceremony_id) {
+        emit({
+          ...snapshot,
+          loading: false,
+          submitting: false,
+          twoFactorOpen: true,
+        });
+        throw error;
       }
       emit({
         token: null,
@@ -166,7 +178,11 @@ export function createInstallTokenSession(
     openDialog: beginDeployTokenFetch,
     submitTwoFactor(uuid: string, code: string) {
       dialogOpen = true;
-      return requestToken(uuid, code);
+      return requestToken(uuid, { twoFactorCode: code });
+    },
+    submitPasskey(uuid: string, ceremony_id: string, credential: unknown) {
+      dialogOpen = true;
+      return requestToken(uuid, { ceremony_id, credential });
     },
     cancelTwoFactor() {
       invalidateLateResponses();

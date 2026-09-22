@@ -14,6 +14,20 @@ import {
 } from "@/components/admin/adminListLayout";
 import { getAdminMenuProps } from "@/components/admin/adminMenu";
 
+const ADMIN_MULTI_SELECT_SX = {
+  maxWidth: { xs: "100%", md: 184 },
+  minWidth: { xs: 0, md: 132 },
+  flex: { xs: "1 1 calc(50% - 12px)", md: "0 1 168px" },
+  "& .MuiOutlinedInput-root": {
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  "& .MuiSelect-select": {
+    minWidth: 0,
+    overflow: "hidden",
+  },
+} as const;
+
 export type AdminMultiSelectOption = {
   value: string;
   label: string;
@@ -48,8 +62,8 @@ export default function AdminMultiSelect({
 }) {
   const optionByValue = new Map(options.map((option) => [option.value, option]));
   const controlSx = sx
-    ? ([ADMIN_LIST_FIELD_SX, ...(Array.isArray(sx) ? sx : [sx])] as SxProps<Theme>)
-    : ADMIN_LIST_FIELD_SX;
+    ? ([ADMIN_LIST_FIELD_SX, ADMIN_MULTI_SELECT_SX, ...(Array.isArray(sx) ? sx : [sx])] as SxProps<Theme>)
+    : ([ADMIN_LIST_FIELD_SX, ADMIN_MULTI_SELECT_SX] as SxProps<Theme>);
 
   return (
     <AdminFilterSelectFrame
@@ -92,7 +106,13 @@ export default function AdminMultiSelect({
             return (
               <Box
                 component="span"
-                sx={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                sx={{
+                  display: "block",
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
               >
                 {selected.map((item) => optionByValue.get(item)?.label || item).join("、")}
               </Box>

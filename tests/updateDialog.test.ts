@@ -138,6 +138,7 @@ test("desktop update dialog gives release notes enough space", () => {
 test("account menu reserves the destructive treatment for logout", () => {
   assert.match(source, /data-testid="admin-user-menu-button"/);
   assert.match(source, /data-testid="admin-account-security-menu-item"/);
+  assert.match(source, /avatarUrl \|\| undefined/);
   assert.match(
     source,
     /data-testid="admin-logout-menu-item"[\s\S]*?bgcolor: "rgba\(255, 86, 48, 0\.14\)"[\s\S]*?<Logout/,

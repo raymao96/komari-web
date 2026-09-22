@@ -12,15 +12,17 @@ type AdminMobileListCardProps = {
   headerExtra?: React.ReactNode;
   cells: AdminMobileListCell[];
   actions?: React.ReactNode;
+  dense?: boolean;
   style?: React.CSSProperties;
   sx?: SxProps<Theme>;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 };
 
 export const AdminMobileListCard = React.forwardRef<
   HTMLDivElement,
   AdminMobileListCardProps
 >(function AdminMobileListCard(
-  { title, headerExtra, cells, actions, style, sx },
+  { title, headerExtra, cells, actions, dense = false, style, sx, onClick },
   ref,
 ) {
   return (
@@ -28,11 +30,13 @@ export const AdminMobileListCard = React.forwardRef<
       ref={ref}
       variant="outlined"
       style={style}
+      onClick={onClick}
       sx={[
         {
           borderRadius: "8px",
           overflow: "hidden",
           borderColor: "divider",
+          cursor: onClick ? "pointer" : undefined,
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
       ]}
@@ -40,7 +44,7 @@ export const AdminMobileListCard = React.forwardRef<
       <Stack
         direction="row"
         spacing={1.25}
-        sx={{ p: 1.5, alignItems: "center", bgcolor: "action.hover" }}
+        sx={{ p: dense ? 1.15 : 1.5, alignItems: "center", bgcolor: "action.hover" }}
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
           {typeof title === "string" ? (
@@ -71,7 +75,7 @@ export const AdminMobileListCard = React.forwardRef<
               <Box
                 key={`${label}-${index}`}
                 sx={{
-                  p: 1.35,
+                  p: dense ? 1 : 1.35,
                   borderTop: 1,
                   borderRight: index % 2 === 0 && !lastOdd ? 1 : 0,
                   borderColor: "divider",
@@ -79,7 +83,7 @@ export const AdminMobileListCard = React.forwardRef<
                   gridColumn: lastOdd ? "1 / -1" : undefined,
                 }}
               >
-                <Typography color="text.secondary" sx={{ mb: 0.4, fontSize: 11.5 }}>
+                <Typography color="text.secondary" sx={{ mb: 0.3, fontSize: dense ? 11 : 11.5 }}>
                   {label}
                 </Typography>
                 {typeof value === "string" ? (
@@ -106,7 +110,7 @@ export const AdminMobileListCard = React.forwardRef<
         </Box>
       ) : null}
       {actions ? (
-        <Box sx={{ px: 1.25, py: 1, borderTop: 1, borderColor: "divider" }}>
+        <Box sx={{ px: dense ? 1 : 1.25, py: dense ? 0.75 : 1, borderTop: 1, borderColor: "divider" }}>
           {actions}
         </Box>
       ) : null}

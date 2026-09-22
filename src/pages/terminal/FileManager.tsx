@@ -1,4 +1,3 @@
-import AppDialogContent from "@/components/AppDialogContent";
 import {
   forwardRef,
   useEffect,
@@ -16,14 +15,25 @@ import {
   FilePlus2,
   Folder,
   FolderPlus,
-  HardDrive,
   LockKeyhole,
   Pencil,
+  Plus,
   RefreshCw,
   Trash2,
   Upload,
+  MoreHorizontal,
+  X,
 } from "@/components/admin/muiIcons";
-import { Button, Dialog, IconButton, TextField } from "@radix-ui/themes";
+import Button from "@mui/material/Button";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import TextField from "@mui/material/TextField";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -38,6 +48,8 @@ import { formatBytes } from "@/utils/unitHelper";
 import { createRandomId } from "@/utils/randomId";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { getAdminMenuProps } from "@/components/admin/adminMenu";
+import { remoteConfirmDialogProps } from "./remoteChrome";
 import {
   fileRootChoices,
   selectedRootValue,
@@ -141,7 +153,15 @@ function fromBase64(value: string) {
 
 function formatDate(value: string) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function nextCopyName(entry: FileEntry, reservedNames: Set<string>, t: TFunction) {
@@ -180,10 +200,13 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   const [renameName, setRenameName] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [transferLabel, setTransferLabel] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const [pendingOverwriteFiles, setPendingOverwriteFiles] = useState<File[] | null>(null);
   const [copiedEntries, setCopiedEntries] = useState<FileEntry[]>([]);
   const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null);
+  const [newMenuAnchor, setNewMenuAnchor] = useState<HTMLElement | null>(null);
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(null);
   const [selectionBox, setSelectionBox] = useState<SelectionBoxState | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const tableWrapRef = useRef<HTMLDivElement>(null);
@@ -192,6 +215,8 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   const selectionAnchor = useRef<string | null>(null);
   const selectionDrag = useRef<SelectionDragState | null>(null);
   const suppressClick = useRef(false);
+  const uploadCancelled = useRef(false);
+  const activeUploadId = useRef("");
 
   const request = (type: string, payload: Record<string, unknown> = {}) => {
     const id = createRandomId();
@@ -328,6 +353,16 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     () => entries.filter((entry) => showHidden || !entry.hidden),
     [entries, showHidden],
   );
+  const selectableEntries = visibleEntries.filter((entry) => !entry.protected);
+  const selectedSelectableCount = selectableEntries.filter((entry) => selected.has(entry.path)).length;
+  const selectAllState =
+    selectableEntries.length === 0
+      ? false
+      : selectedSelectableCount === selectableEntries.length
+        ? true
+        : selectedSelectableCount > 0
+          ? "indeterminate"
+          : false;
   const selectedEntries = entries.filter((entry) => selected.has(entry.path));
   const actionableEntries = selectedEntries.filter((entry) => !entry.protected);
   const rootChoices = useMemo(
@@ -335,6 +370,19 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     [roots, homePath, separator, t],
   );
   const selectedRoot = selectedRootValue(currentPath, rootChoices, separator);
+
+  const toggleSelectAll = () => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (selectAllState === true) {
+        for (const entry of selectableEntries) next.delete(entry.path);
+      } else {
+        for (const entry of selectableEntries) next.add(entry.path);
+        if (selectableEntries[0]) selectionAnchor.current = selectableEntries[0].path;
+      }
+      return next;
+    });
+  };
 
   const toggleSelected = (entry: FileEntry) => {
     if (entry.protected) return;
@@ -478,22 +526,45 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     }
   };
 
+  const cancelActiveUpload = () => {
+    uploadCancelled.current = true;
+    const uploadID = activeUploadId.current;
+    if (uploadID) {
+      void request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
+    }
+  };
+
   const uploadFiles = async (files: File[], allowOverwrite: boolean) => {
     if (!files.length) return;
+    uploadCancelled.current = false;
+    setUploading(true);
     try {
       for (const file of files) {
+        if (uploadCancelled.current) break;
         setTransferLabel(t("terminal.files.upload_progress", { name: file.name, percent: 0 }));
         const start = await request("file.upload.start", {
           path: joinRemotePath(currentPath, file.name, separator),
           size: file.size,
           overwrite: allowOverwrite,
         });
+        if (uploadCancelled.current) {
+          if (start?.upload_id) {
+            await request("file.upload.cancel", { upload_id: start.upload_id }).catch(() => undefined);
+          }
+          break;
+        }
         const uploadID = start.upload_id;
+        activeUploadId.current = uploadID;
         let sent = 0;
         while (sent < file.size) {
+          if (uploadCancelled.current) {
+            await request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
+            break;
+          }
           const buffer = await file.slice(sent, sent + uploadChunkSize).arrayBuffer();
           await request("file.upload.chunk", {
             upload_id: uploadID,
+            offset: sent,
             data: toBase64(buffer),
           });
           sent += buffer.byteLength;
@@ -502,15 +573,26 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             percent: Math.round((sent / Math.max(1, file.size)) * 100),
           }));
         }
+        if (uploadCancelled.current) break;
         await request("file.upload.finish", { upload_id: uploadID });
         toast.success(t("terminal.files.upload_done", { name: file.name }));
       }
-      await load();
+      if (uploadCancelled.current) {
+        toast.info(t("terminal.files.upload_cancelled"));
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("terminal.files.upload_failed"));
+      if (uploadCancelled.current) {
+        toast.info(t("terminal.files.upload_cancelled"));
+      } else {
+        toast.error(error instanceof Error ? error.message : t("terminal.files.upload_failed"));
+      }
     } finally {
+      activeUploadId.current = "";
+      uploadCancelled.current = false;
+      setUploading(false);
       setTransferLabel("");
       if (inputRef.current) inputRef.current.value = "";
+      void load();
     }
   };
 
@@ -576,7 +658,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
 
   const beginSelectionDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "mouse" || event.button !== 0 ||
-      (event.target as HTMLElement).closest("input, button, select, textarea, .remote-file-context-menu")) return;
+      (event.target as HTMLElement).closest("input, button, select, textarea, .remote-file-context-menu, [data-slot=\"checkbox\"]")) return;
     const wrap = tableWrapRef.current;
     if (!wrap) return;
     const rect = wrap.getBoundingClientRect();
@@ -658,56 +740,109 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
       <div className="remote-files-title">
         <div>
           <strong>{t("terminal.files.title")}</strong>
-          <span>{connected ? t("terminal.files.connected") : t("terminal.files.not_connected")}</span>
+          <span className={`remote-status ${connected ? "is-connected" : ""}`}>
+            <i />
+            {connected ? t("terminal.files.connected") : t("terminal.files.not_connected")}
+          </span>
         </div>
-        <IconButton size="1" variant="ghost" title={t("terminal.files.refresh")} onClick={() => void load()} disabled={!connected || loading}>
+        <IconButton size="small" title={t("terminal.files.refresh")} onClick={() => void load()} disabled={!connected || loading}>
           <RefreshCw size={15} className={loading ? "remote-spin" : ""} />
         </IconButton>
       </div>
 
-      <div className="remote-file-path">
-        <IconButton size="1" variant="soft" title={t("terminal.files.parent")} disabled={!parentPath} onClick={() => void load(parentPath)}>
-          <ArrowUp size={15} />
-        </IconButton>
-        <select
-          disabled={!connected}
-          value={selectedRoot}
-          onChange={(event) => {
-            if (event.target.value) void load(event.target.value);
-          }}
-          title={t("terminal.files.roots")}
+      <div className="remote-file-location">
+        <Button
+          variant="outlined"
+          className="remote-file-up"
+          title={t("terminal.files.parent")}
+          aria-label={t("terminal.files.parent")}
+          disabled={!parentPath}
+          onClick={() => void load(parentPath)}
         >
-          {selectedRoot === "" && (
-            <option value="" disabled>
-              {t("terminal.files.roots")}
-            </option>
-          )}
-          {rootChoices.map((choice) => (
-            <option key={choice.value} value={choice.value}>{choice.label}</option>
-          ))}
-        </select>
-        <TextField.Root
-          size="1"
-          disabled={!connected}
-          value={pathInput}
-          onChange={(event) => setPathInput(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && void load(pathInput)}
-        />
+          <ArrowUp size={16} />
+        </Button>
+        <div className="remote-file-pathbox">
+          <select
+            disabled={!connected}
+            value={selectedRoot}
+            onChange={(event) => {
+              if (event.target.value) void load(event.target.value);
+            }}
+            title={t("terminal.files.roots")}
+          >
+            {selectedRoot === "" && (
+              <option value="" disabled>
+                {t("terminal.files.root")}
+              </option>
+            )}
+            {rootChoices.map((choice) => (
+              <option key={choice.value} value={choice.value}>{choice.label}</option>
+            ))}
+          </select>
+          <span className="remote-file-path-sep">/</span>
+          <TextField
+            variant="standard"
+            disabled={!connected}
+            value={pathInput}
+            onChange={(event) => setPathInput(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && void load(pathInput)}
+            slotProps={{ input: { disableUnderline: true } }}
+            sx={{ minWidth: 0, flex: 1, "& .MuiInputBase-input": { py: 0, fontSize: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" } }}
+          />
+        </div>
       </div>
 
       <div className="remote-file-toolbar">
         <input ref={inputRef} type="file" multiple hidden onChange={(event) => queueUpload(Array.from(event.target.files || []))} />
-        <Button size="1" variant="soft" onClick={() => inputRef.current?.click()} disabled={!connected}>
-          <Upload size={14} /> {t("terminal.files.upload")}
+        <Button
+          className="remote-file-upload"
+          variant="contained"
+          disableElevation
+          disabled={!connected}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload size={14} />
+          {t("terminal.files.upload")}
         </Button>
-        <IconButton size="1" variant="soft" title={t("terminal.files.new_file")} disabled={!connected} onClick={() => setCreateKind("file")}><FilePlus2 size={14} /></IconButton>
-        <IconButton size="1" variant="soft" title={t("terminal.files.new_folder")} disabled={!connected} onClick={() => setCreateKind("folder")}><FolderPlus size={14} /></IconButton>
-        <IconButton size="1" variant="soft" title={t("terminal.files.download")} disabled={!actionableEntries.some((entry) => !entry.directory && !entry.symlink)} onClick={downloadSelected}><Download size={14} /></IconButton>
-        <IconButton size="1" variant="soft" title={t("terminal.files.rename")} disabled={actionableEntries.length !== 1} onClick={() => {
+        <Button
+          className="remote-file-new"
+          variant="outlined"
+          disabled={!connected}
+          onClick={(event) => setNewMenuAnchor(event.currentTarget)}
+        >
+          <Plus size={14} />
+          {t("terminal.files.new")}
+        </Button>
+        <Menu
+          anchorEl={newMenuAnchor}
+          open={Boolean(newMenuAnchor)}
+          onClose={() => setNewMenuAnchor(null)}
+          {...getAdminMenuProps()}
+        >
+          <MenuItem onClick={() => { setNewMenuAnchor(null); setCreateKind("file"); }}><FilePlus2 size={14} />{t("terminal.files.new_file")}</MenuItem>
+          <MenuItem onClick={() => { setNewMenuAnchor(null); setCreateKind("folder"); }}><FolderPlus size={14} />{t("terminal.files.new_folder")}</MenuItem>
+        </Menu>
+        <IconButton size="small" title={t("terminal.files.download")} disabled={!actionableEntries.some((entry) => !entry.directory && !entry.symlink)} onClick={downloadSelected}><Download size={14} /></IconButton>
+        <IconButton size="small" title={t("terminal.files.rename")} disabled={actionableEntries.length !== 1} onClick={() => {
           const entry = actionableEntries[0];
           if (entry) { setRenameEntry(entry); setRenameName(entry.name); }
         }}><Pencil size={14} /></IconButton>
-        <IconButton size="1" color="red" variant="soft" title={t("common.delete")} disabled={actionableEntries.length === 0} onClick={() => setDeleteOpen(true)}><Trash2 size={14} /></IconButton>
+        <IconButton size="small" color="error" title={t("common.delete")} disabled={actionableEntries.length === 0} onClick={() => setDeleteOpen(true)}><Trash2 size={14} /></IconButton>
+        <span className="remote-file-toolbar-spacer" />
+        <IconButton size="small" title={t("terminal.session.more")} onClick={(event) => setMoreMenuAnchor(event.currentTarget)}>
+          <MoreHorizontal size={16} />
+        </IconButton>
+        <Menu
+          anchorEl={moreMenuAnchor}
+          open={Boolean(moreMenuAnchor)}
+          onClose={() => setMoreMenuAnchor(null)}
+          {...getAdminMenuProps()}
+        >
+          <MenuItem disabled={!connected} onClick={() => { setMoreMenuAnchor(null); setCreateKind("file"); }}>{t("terminal.files.new_file")}</MenuItem>
+          <MenuItem disabled={!connected} onClick={() => { setMoreMenuAnchor(null); setCreateKind("folder"); }}>{t("terminal.files.new_folder")}</MenuItem>
+          <MenuItem disabled={actionableEntries.length === 0} onClick={() => { setMoreMenuAnchor(null); copySelected(); }}>{t("common.copy")}</MenuItem>
+          <MenuItem disabled={!connected || !currentPath || copiedEntries.length === 0} onClick={() => { setMoreMenuAnchor(null); void pasteCopied(); }}>{t("terminal.session.paste")}</MenuItem>
+        </Menu>
       </div>
 
       <div className="remote-file-options">
@@ -715,7 +850,21 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         <label><Checkbox checked={overwrite} onCheckedChange={(checked) => setOverwrite(checked === true)} /> {t("terminal.files.overwrite")}</label>
       </div>
 
-      {transferLabel && <div className="remote-transfer-status">{transferLabel}</div>}
+      {transferLabel && (
+        <div className="remote-transfer-status">
+          <span>{transferLabel}</span>
+          {uploading && (
+            <IconButton
+              size="small"
+              className="remote-transfer-cancel"
+              aria-label={t("common.cancel")}
+              onClick={cancelActiveUpload}
+            >
+              <X size={14} />
+            </IconButton>
+          )}
+        </div>
+      )}
 
       {dropActive && connected && (
         <div className="remote-file-drop-overlay" aria-hidden="true">
@@ -739,8 +888,17 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         <Table container={false} className="remote-file-table">
           <TableHeader>
             <TableRow>
-              <TableHead aria-label={t("terminal.files.select")}>
-                <span className="remote-file-select" />
+              <TableHead aria-label={t("common.select_all")}>
+                <span className="remote-file-select">
+                  <Checkbox
+                    checked={selectAllState}
+                    disabled={!connected || selectableEntries.length === 0}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onCheckedChange={() => toggleSelectAll()}
+                    aria-label={selectAllState === true ? t("common.deselect_all") : t("common.select_all")}
+                  />
+                </span>
               </TableHead>
               <TableHead>{t("common.name")}</TableHead>
               <TableHead>{t("terminal.files.size")}</TableHead>
@@ -777,8 +935,10 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
                   </span>
                 </TableCell>
                 <TableCell title={entry.protected ? t("terminal.files.protected_sqlite") : undefined}>
-                  {entry.protected ? <LockKeyhole size={15} /> : entry.directory ? <Folder size={15} /> : <FileIcon size={15} />}
-                  <span>{entry.name}</span>
+                  <span className="remote-file-name">
+                    {entry.protected ? <LockKeyhole size={15} /> : entry.directory ? <Folder size={15} /> : <FileIcon size={15} />}
+                    <span>{entry.name}</span>
+                  </span>
                 </TableCell>
                 <TableCell>{entry.directory ? "-" : formatBytes(entry.size)}</TableCell>
                 <TableCell>{formatDate(entry.modified_at)}</TableCell>
@@ -787,7 +947,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
             {!loading && visibleEntries.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="remote-file-empty">
-                  <HardDrive size={18} /> {t("terminal.files.empty")}
+                  {t("terminal.files.empty")}
                 </TableCell>
               </TableRow>
             )}
@@ -842,44 +1002,53 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         </div>
       )}
 
-      <Dialog.Root open={createKind !== null} onOpenChange={(open) => !open && setCreateKind(null)}>
-        <AppDialogContent maxWidth="380px">
-          <Dialog.Title>{createKind === "folder" ? t("terminal.files.new_folder") : t("terminal.files.new_file")}</Dialog.Title>
-          <TextField.Root autoFocus value={createName} onChange={(event) => setCreateName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void createEntry()} />
-          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setCreateKind(null)}>{t("common.cancel")}</Button><Button onClick={() => void createEntry()}>{t("terminal.files.create")}</Button></div>
-        </AppDialogContent>
-      </Dialog.Root>
+      <Dialog open={createKind !== null} onClose={() => setCreateKind(null)} {...remoteConfirmDialogProps}>
+        <DialogTitle>{createKind === "folder" ? t("terminal.files.new_folder") : t("terminal.files.new_file")}</DialogTitle>
+        <DialogContent>
+          <TextField autoFocus fullWidth value={createName} onChange={(event) => setCreateName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void createEntry()} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateKind(null)}>{t("common.cancel")}</Button>
+          <Button variant="contained" onClick={() => void createEntry()}>{t("terminal.files.create")}</Button>
+        </DialogActions>
+      </Dialog>
 
-      <Dialog.Root open={renameEntry !== null} onOpenChange={(open) => !open && setRenameEntry(null)}>
-        <AppDialogContent maxWidth="380px">
-          <Dialog.Title>{t("terminal.files.rename")}</Dialog.Title>
-          <TextField.Root autoFocus value={renameName} onChange={(event) => setRenameName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void rename()} />
-          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setRenameEntry(null)}>{t("common.cancel")}</Button><Button onClick={() => void rename()}>{t("common.save")}</Button></div>
-        </AppDialogContent>
-      </Dialog.Root>
+      <Dialog open={renameEntry !== null} onClose={() => setRenameEntry(null)} {...remoteConfirmDialogProps}>
+        <DialogTitle>{t("terminal.files.rename")}</DialogTitle>
+        <DialogContent>
+          <TextField autoFocus fullWidth value={renameName} onChange={(event) => setRenameName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void rename()} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenameEntry(null)}>{t("common.cancel")}</Button>
+          <Button variant="contained" onClick={() => void rename()}>{t("common.save")}</Button>
+        </DialogActions>
+      </Dialog>
 
-      <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AppDialogContent maxWidth="420px">
-          <Dialog.Title>{t("terminal.files.delete_confirm")}</Dialog.Title>
-          <Dialog.Description>{t("terminal.files.delete_count", { count: actionableEntries.length })}</Dialog.Description>
-          <div className="remote-dialog-actions"><Button variant="soft" onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</Button><Button color="red" onClick={() => void removeSelected()}>{t("common.delete")}</Button></div>
-        </AppDialogContent>
-      </Dialog.Root>
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} {...remoteConfirmDialogProps}>
+        <DialogTitle>{t("terminal.files.delete_confirm")}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t("terminal.files.delete_count", { count: actionableEntries.length })}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</Button>
+          <Button color="error" variant="contained" onClick={() => void removeSelected()}>{t("common.delete")}</Button>
+        </DialogActions>
+      </Dialog>
 
-      <Dialog.Root open={pendingOverwriteFiles !== null} onOpenChange={(open) => !open && setPendingOverwriteFiles(null)}>
-        <AppDialogContent maxWidth="430px">
-          <Dialog.Title>{t("terminal.files.overwrite_title")}</Dialog.Title>
-          <Dialog.Description>{t("terminal.files.overwrite_confirm")}</Dialog.Description>
-          <div className="remote-dialog-actions">
-            <Button variant="soft" onClick={() => setPendingOverwriteFiles(null)}>{t("common.cancel")}</Button>
-            <Button onClick={() => {
-              const files = pendingOverwriteFiles || [];
-              setPendingOverwriteFiles(null);
-              void uploadFiles(files, true);
-            }}>{t("terminal.files.overwrite_and_upload")}</Button>
-          </div>
-        </AppDialogContent>
-      </Dialog.Root>
+      <Dialog open={pendingOverwriteFiles !== null} onClose={() => setPendingOverwriteFiles(null)} {...remoteConfirmDialogProps}>
+        <DialogTitle>{t("terminal.files.overwrite_title")}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t("terminal.files.overwrite_confirm")}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingOverwriteFiles(null)}>{t("common.cancel")}</Button>
+          <Button variant="contained" onClick={() => {
+            const files = pendingOverwriteFiles || [];
+            setPendingOverwriteFiles(null);
+            void uploadFiles(files, true);
+          }}>{t("terminal.files.overwrite_and_upload")}</Button>
+        </DialogActions>
+      </Dialog>
     </section>
   );
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  formatTrafficCalibrationCycleRange,
   formatTrafficResetRangeLabel,
   trafficResetCycleRange,
 } from "../src/utils/trafficCycle.ts";
@@ -45,4 +46,46 @@ test("disabled or missing reset day has no cycle range", () => {
   assert.equal(formatTrafficResetRangeLabel(null, now), null);
   assert.equal(formatTrafficResetRangeLabel(undefined, now), null);
   assert.equal(formatTrafficResetRangeLabel(32, now), null);
+});
+
+test("UTC 12:38:12 does not flip the cycle until that instant", () => {
+  const before = new Date("2026-09-15T12:38:11Z");
+  assert.equal(
+    formatTrafficResetRangeLabel(15, before, { time: "12:38:12", timezone: "UTC" }),
+    "8月15日 12:38:12 - 9月15日 12:38:12",
+  );
+  const at = new Date("2026-09-15T12:38:12Z");
+  assert.equal(
+    formatTrafficResetRangeLabel(15, at, { time: "12:38:12", timezone: "UTC" }),
+    "9月15日 12:38:12 - 10月15日 12:38:12",
+  );
+});
+
+test("calibration cycle range includes timezone date and clock", () => {
+  assert.deepEqual(
+    formatTrafficCalibrationCycleRange("2026-08-31T16:00:00.000Z", {
+      day: 1,
+      time: "00:00:00",
+      timezone: "Asia/Shanghai",
+      language: "zh-CN",
+    }),
+    {
+      timezone: "Asia/Shanghai (UTC+8)",
+      start: "2026年9月1日 00:00:00",
+      next: "2026年10月1日 00:00:00",
+    },
+  );
+  assert.deepEqual(
+    formatTrafficCalibrationCycleRange("2026-09-15T12:38:12.000Z", {
+      day: 15,
+      time: "12:38:12",
+      timezone: "UTC",
+      language: "zh-CN",
+    }),
+    {
+      timezone: "UTC (UTC)",
+      start: "2026年9月15日 12:38:12",
+      next: "2026年10月15日 12:38:12",
+    },
+  );
 });

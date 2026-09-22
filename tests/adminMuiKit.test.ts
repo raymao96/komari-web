@@ -41,12 +41,12 @@ test("radix space tokens stay in CSS pixels for MUI sx", () => {
 test("node list filters use a gray toolbar and white search field", () => {
   const css = readFileSync("src/global.css", "utf8");
   const layout = readFileSync("src/components/admin/adminListLayout.ts", "utf8");
-  assert.match(css, /\.km-admin-node-list-filters \{\s*padding: 16px 16px 20px;\s*background: #f4f6f8;/);
-  assert.match(css, /\.km-admin-node-list-filters \.MuiOutlinedInput-root \{\s*background-color: #fff;/);
+  assert.match(css, /\.km-admin-node-list-filters[\s\S]*?padding: 16px 16px 20px;\s*background: #f4f6f8;/);
+  assert.match(css, /\.km-admin-node-list-filters \.MuiOutlinedInput-root[\s\S]*?background-color: #fff;/);
   assert.match(layout, /const FILTER_BAR = NEBURST_NEUTRAL/);
   assert.match(layout, /const FILTER_FIELD = "#FFFFFF"/);
   assert.match(layout, /palette\.mode === "dark" \? INPUT_FILL_DARK : FILTER_FIELD/);
-  assert.match(css, /html\.dark \[data-admin-shell\] \.km-admin-node-list-filters \.MuiOutlinedInput-root \{\s*background-color: #212b36;/);
+  assert.match(css, /html\.dark \[data-admin-shell\] \.km-admin-node-list-filters \.MuiOutlinedInput-root[\s\S]*?background-color: #212b36;/);
   const theme = readFileSync("src/theme/createAppTheme.ts", "utf8");
   assert.match(theme, /primary: \{\s*main: ACCENT/);
   assert.match(theme, /MuiAppBar:[\s\S]*color: "inherit"/);
@@ -65,7 +65,9 @@ test("error screens use MUI Alert and keep icon text aligned", () => {
   assert.match(main, /MuiAppProvider[\s\S]*<ErrorBoundary>/);
   assert.doesNotMatch(main, /from "@radix-ui\/themes"/);
   assert.match(main, /lazy\(\(\) => import\("\.\/theme\/RadixThemeRoot"\)\)/);
-  assert.match(main, /isAdminRoute \? \(/);
+  assert.match(main, /isRemoteRoute/);
+  assert.match(main, /usePlainThemeRoot \? \(/);
+  assert.match(main, /isAdminRoute \|\| isRemoteRoute/);
   assert.match(theme, /MuiAlert:[\s\S]*alignItems: "flex-start"/);
   assert.match(theme, /MuiAlertTitle:[\s\S]*marginTop: 0/);
 });
@@ -77,7 +79,12 @@ test("admin overlays share one enter and exit duration", () => {
   const layout = readFileSync("src/pages/admin/_layout.tsx", "utf8");
   assert.match(theme, /MuiMenu:[\s\S]*transitionDuration: \{ enter: 220, exit: 150 \}/);
   assert.match(theme, /MuiPopover:[\s\S]*transitionDuration: \{ enter: 220, exit: 150 \}/);
+  assert.match(theme, /MuiDialog:[\s\S]*disableScrollLock: true/);
   assert.match(theme, /MuiDialog:[\s\S]*transitionDuration: \{ enter: 220, exit: 160 \}/);
+  assert.match(theme, /dialogContainerNoFadeSx/);
+  assert.match(theme, /dialogPaperVisibility\(Boolean\(ownerState\?\.open\)\)/);
+  assert.match(dialog, /dialogContainerNoFadeSx/);
+  assert.match(dialog, /dialogPaperVisibility\(isOpen\)/);
   assert.match(menu, /transitionDuration: \{ enter: 220, exit: 150 \}/);
   assert.doesNotMatch(dialog, /transitionDuration:\s*0/);
   assert.match(layout, /AdminRouteViewport/);
@@ -87,7 +94,8 @@ test("vite keeps system flags and logos on the admin origin", () => {
   const source = readFileSync("vite.config.ts", "utf8");
   assert.match(source, /pathname\.startsWith\("\/assets\/flags"\)/);
   assert.match(source, /pathname\.startsWith\("\/assets\/logo"\)/);
-  assert.match(source, /pathname\.startsWith\("\/favicon"\)/);
+  assert.match(source, /pathname\.startsWith\("\/favicon\.png"\)/);
+  assert.doesNotMatch(source, /pathname\.startsWith\("\/favicon"\) \|\|/);
 });
 
 test("node detail overview keeps flag assets, spec icons, and HK preview values", () => {

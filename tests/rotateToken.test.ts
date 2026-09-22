@@ -34,15 +34,16 @@ test("reset token action sits immediately before delete", () => {
 test("rotate token uses the existing sensitive API and 2FA header", () => {
   assert.match(tokenSource, /\/api\/admin\/client\/token\/rotate/);
   assert.match(tokenSource, /method: "POST"/);
-  assert.match(tokenSource, /JSON\.stringify\(\{ uuid \}\)/);
+  assert.match(tokenSource, /passkeyBody\(options, \{ uuid \}\)/);
   assert.match(tokenSource, /X-2FA-Code/);
   assert.match(tokenSource, /cache: "no-store"/);
   assert.match(rotateSource, /rotateClientToken\(node\.uuid/);
   assert.match(rotateSource, /isClientTokenTwoFactorRequired/);
   assert.match(rotateSource, /isClientTokenTwoFactorInvalid/);
-  assert.match(rotateSource, /identityAuthTitle/);
-  assert.match(rotateSource, /id="admin-node-rotate-otp"/);
-  assert.match(rotateSource, /otpInput\.length !== 6/);
+  assert.match(rotateSource, /otpFieldId="admin-node-rotate-otp"/);
+  assert.match(rotateSource, /confirmAdminPasskey/);
+  assert.match(source, /login\.passkey/);
+  assert.match(source, /identityAuthTitle/);
 });
 
 test("rotate token success and error toasts never include the new token", () => {
@@ -71,7 +72,7 @@ test("all admin languages include rotate token copy", () => {
       rotateToken: "重設 Token",
       confirmRotateToken: "確認重設",
       rotateTokenSuccess: "已重設 {{name}} 的 Token",
-      rotateTokenFailed: "重設 Token 失敗：{{error}}",
+      rotateTokenFailed: "無法重設 Token：{{error}}",
     },
     ja_JP: {
       rotateToken: "Token をリセット",

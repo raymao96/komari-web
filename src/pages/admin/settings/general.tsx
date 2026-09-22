@@ -83,26 +83,36 @@ export default function GeneralSettings() {
           await refetch();
         }}
       />
-      <div id="remote-management">
-        <SettingCardLabel>
-          {t("navigation.remote_management")}
-        </SettingCardLabel>
-        <SettingCardSwitch
-          title={t("settings.general.allow_remote_management")}
-          description={t("settings.general.allow_remote_management_description")}
-          defaultChecked={Boolean(settings.allow_remote_management)}
-          onChange={async (checked) => {
-            await updateSettingsWithToast(
-              { allow_remote_management: checked },
-              t,
-            );
-            setSettings((current) => ({
-              ...current,
-              allow_remote_management: checked,
-            }));
-          }}
-        />
-      </div>
+      <SettingCardLabel>
+        <span id="remote-management">{t("navigation.remote_management")}</span>
+      </SettingCardLabel>
+      <SettingCardSwitch
+        title={t("settings.general.allow_remote_management")}
+        description={t("settings.general.allow_remote_management_description")}
+        defaultChecked={Boolean(settings.allow_remote_management)}
+        onChange={async (checked) => {
+          await updateSettingsWithToast(
+            { allow_remote_management: checked },
+            t,
+          );
+          setSettings((current) => ({
+            ...current,
+            allow_remote_management: checked,
+          }));
+        }}
+      />
+      <SettingCardSwitch
+        title={t("settings.general.allow_mcp")}
+        description={t("settings.general.allow_mcp_description")}
+        defaultChecked={Boolean(settings.allow_mcp)}
+        onChange={async (checked) => {
+          await updateSettingsWithToast({ allow_mcp: checked }, t);
+          setSettings((current) => ({
+            ...current,
+            allow_mcp: checked,
+          }));
+        }}
+      />
       <SettingCardLabel>{t("settings.geoip.title")}</SettingCardLabel>
       <SettingCardSwitch
         title={t("settings.geoip.enable_title")}

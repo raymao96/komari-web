@@ -18,6 +18,22 @@ import {
 } from "@/contexts/NodeDetailsContext";
 import { createInstallTokenSession, installCommandCopyAllowed } from "@/lib/installTokenSession";
 import { AdminMobileCardStack, AdminMobileListCard } from "@/components/admin/AdminMobileListCard";
+import {
+  NODE_COLUMN_KEYS,
+  NODE_COLUMN_MIN,
+  NODE_SORT_COLUMN_WIDTH,
+  clampNodeColumnWidth,
+  clearNodeColumnWidths,
+  defaultNodeColumnWidths,
+  fitNodeColumnWidths,
+  nodeColumnStyle,
+  sameNodeColumnWidths,
+  readNodeColumnLayout,
+  readNodeColumnWidths,
+  writeNodeColumnWidths,
+  type NodeColumnKey,
+  type NodeColumnWidths,
+} from "@/components/admin/nodeTableColumnWidths";
 import Alert from "@mui/material/Alert";
 import MuiButton from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
@@ -62,19 +78,27 @@ import { Trans, useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
   DndContext,
+  DragOverlay,
+  MeasuringFrequency,
+  MeasuringStrategy,
   closestCenter,
+  useDndContext,
   useSensor,
   useSensors,
   TouchSensor,
   MouseSensor,
   KeyboardSensor,
+  type Collision,
+  type CollisionDetection,
+  type DragEndEvent,
 } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
+  arrayMove,
   useSortable,
-  verticalListSortingStrategy,
+  type SortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import {
   isClientTokenTwoFactorInvalid,
@@ -82,6 +106,7 @@ import {
   rotateClientToken,
 } from "@/lib/clientToken";
 import { localizeTokenRotationError } from "@/utils/tokenRotation";
+import { confirmAdminPasskey, passkeyUnavailableMessage } from "@/utils/webauthn";
 import Flag from "@/components/Flag";
 import { NODE_OFFLINE, NODE_ONLINE } from "@/theme/brand";
 import {
@@ -95,6 +120,17 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatBytes, stringToBytes } from "@/utils/unitHelper";
 import { normalizeBandwidth } from "@/utils/bandwidth";
+import { formatTrafficCalibrationCycleRange } from "@/utils/trafficCycle";
+import {
+  TRAFFIC_RESET_TIMEZONES,
+  normalizeTrafficResetTime,
+  normalizeTrafficResetTimezone,
+} from "@/utils/trafficResetTimezones";
+
+const trafficResetTimezoneOptions = TRAFFIC_RESET_TIMEZONES.map((zone) => ({
+  label: zone.label,
+  value: zone.value,
+}));
 import PriceTags, { CustomTags } from "@/components/PriceTags";
 import Loading from "@/components/loading";
 import Tips from "@/components/ui/tips";
@@ -113,6 +149,7 @@ import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import TrafficResetTimeField from "@/components/admin/TrafficResetTimeField";
 import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
 import AdminNodeListFilters, {
   type AdminNodeStatusValue,
@@ -133,6 +170,10 @@ import {
   getSupportedRegions,
 } from "@/utils/regionHelper";
 import {
+  nodeListInsertAfter,
+  nodeListReorderIndex,
+} from "@/utils/nodeListReorder";
+import {
   dashboardAlertNodeUuidSet,
   getDashboardAlertItemsSnapshot,
   parseServerListAlertKind,
@@ -152,6 +193,77 @@ const NodeDetailsPage = () => {
 
 const PREVIOUS_PAGE_DROP_ID = "admin-node-previous-page";
 const NEXT_PAGE_DROP_ID = "admin-node-next-page";
+const NODE_LIST_DND_MODIFIERS = [restrictToVerticalAxis];
+const NODE_LIST_AUTO_SCROLL = {
+  layoutShiftCompensation: false,
+  acceleration: 6,
+  threshold: { x: 0.2, y: 0.18 },
+  canScroll: (element: Element) =>
+    element instanceof HTMLElement &&
+    element.hasAttribute("data-admin-scroll-container"),
+};
+const NODE_LIST_MEASURING = {
+  droppable: {
+    strategy: MeasuringStrategy.WhileDragging,
+    frequency: MeasuringFrequency.Optimized,
+  },
+};
+const NODE_LIST_SORTING_STRATEGY: SortingStrategy = () => null;
+const NODE_LIST_ORIGIN_STYLE: React.CSSProperties = {
+  opacity: 0.4,
+  pointerEvents: "none",
+};
+
+const nodeListCollisionDetection: CollisionDetection = (args) => {
+  const pointerY = args.pointerCoordinates?.y
+    ?? args.collisionRect.top + args.collisionRect.height / 2;
+  const hits: Collision[] = [];
+  let nearest: Collision | null = null;
+  for (const container of args.droppableContainers) {
+    if (container.disabled) continue;
+    const rect = args.droppableRects.get(container.id);
+    if (!rect) continue;
+    const midpoint = rect.top + rect.height / 2;
+    if (pointerY >= rect.top && pointerY <= rect.bottom) {
+      hits.push({
+        id: container.id,
+        data: { droppableContainer: container, value: Math.abs(pointerY - midpoint) },
+      });
+      continue;
+    }
+    const distance =
+      pointerY < rect.top ? rect.top - pointerY : pointerY - rect.bottom;
+    if (!nearest || distance < (nearest.data?.value ?? Infinity)) {
+      nearest = {
+        id: container.id,
+        data: { droppableContainer: container, value: distance },
+      };
+    }
+  }
+  if (hits.length > 0) {
+    hits.sort((a, b) => (a.data?.value ?? 0) - (b.data?.value ?? 0));
+    return hits;
+  }
+  if (nearest) return [nearest];
+  return closestCenter(args);
+};
+
+function NodeListDragPreview({ nodes }: { nodes: readonly NodeDetail[] }) {
+  const { active } = useDndContext();
+  const isMobile = useIsMobile();
+  const node = active ? nodes.find((item) => item.uuid === active.id) : undefined;
+  if (!node) return null;
+  return (
+    <div
+      className={`admin-node-drag-overlay flex h-[52px] cursor-grabbing items-center gap-2 rounded-md border border-[var(--gray-a5)] bg-[var(--color-panel-solid)] px-3 shadow-md ${
+        isMobile ? "w-[min(360px,calc(100vw-2.5rem))]" : "w-[min(320px,80vw)]"
+      }`}
+    >
+      <GripVertical size={16} className="shrink-0 text-[var(--gray-9)]" />
+      <span className="truncate text-[15px] font-semibold leading-6">{node.name}</span>
+    </div>
+  );
+}
 
 function nodeSearchHaystack(node: NodeDetail) {
   return [
@@ -453,6 +565,13 @@ const compactIPv6 = (value: string) => {
     : value;
 };
 
+function nodePreferredAddress(node: NodeDetail) {
+  const ipv4 = node.ipv4?.trim();
+  if (ipv4) return ipv4;
+  const ipv6 = node.ipv6?.trim();
+  return ipv6 ? compactIPv6(ipv6) : "";
+}
+
 function nodeNetworkAddresses(node: NodeDetail) {
   return (
     [
@@ -531,15 +650,48 @@ const SortableRow = React.memo(({
   online: boolean | null;
   reorderEnabled: boolean;
 }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: node.uuid, disabled: !reorderEnabled });
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({
+    id: node.uuid,
+    disabled: !reorderEnabled,
+    animateLayoutChanges: () => false,
+  });
+  return (
+    <TableRow
+      ref={setNodeRef}
+      className={`text-sm hover:bg-[var(--accent-a2)] [&>td]:align-middle [&>td]:py-2.5${isDragging ? " admin-node-sortable-origin" : ""}`}
+      style={{ borderColor: "var(--gray-a5)" }}
+      data-node-status={online === null ? "pending" : online ? "online" : "offline"}
+    >
+      <SortableRowCells
+        node={node}
+        settings={settings}
+        online={online}
+        reorderEnabled={reorderEnabled}
+        attributes={attributes}
+        listeners={listeners}
+      />
+    </TableRow>
+  );
+});
+SortableRow.displayName = "SortableRow";
+
+const SortableRowCells = React.memo(function SortableRowCells({
+  node,
+  settings,
+  online,
+  reorderEnabled,
+  attributes,
+  listeners,
+}: {
+  node: NodeDetail;
+  settings: any;
+  online: boolean | null;
+  reorderEnabled: boolean;
+  attributes: React.HTMLAttributes<HTMLElement>;
+  listeners: Record<string, unknown> | undefined;
+}) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    borderColor: "var(--gray-a5)",
-  };
   async function copy(text: string) {
     try {
       await writeClipboardText(text);
@@ -554,12 +706,7 @@ const SortableRow = React.memo(({
     t,
   );
   return (
-    <TableRow
-      ref={setNodeRef}
-      style={style}
-      className="text-sm hover:bg-[var(--accent-a2)] [&>td]:align-middle [&>td]:py-2.5"
-      data-node-status={online === null ? "pending" : online ? "online" : "offline"}
-    >
+    <>
       <TableCell className="w-[44px] px-2 !align-middle" data-label={t("common.sort", "排序")}>
         <div className="flex items-center">
           <button
@@ -585,17 +732,17 @@ const SortableRow = React.memo(({
         </div>
       </TableCell>
       <TableCell
-        className="overflow-hidden !align-middle"
+        className="admin-node-name-cell overflow-hidden !align-middle"
         data-label={t("admin.nodeTable.name")}
         title={node.name}
       >
         <NodeNameLink node={node} online={online} />
       </TableCell>
-      <TableCell className="!align-middle" data-label={t("admin.nodeTable.network", "网络")}>
+      <TableCell className="!align-middle overflow-hidden" data-label={t("admin.nodeTable.network", "网络")}>
         <div className="flex min-w-0 flex-col justify-center text-sm leading-[1.125rem] text-muted-foreground">
           {networkAddresses.length > 0 ? networkAddresses.map(([type, address]) => (
-            <div key={type} className="flex min-w-0 items-center gap-1" title={address}>
-              <span className="whitespace-nowrap tabular-nums">
+            <div key={type} className="flex min-w-0 items-center gap-1 overflow-hidden" title={address}>
+              <span className="min-w-0 truncate whitespace-nowrap tabular-nums">
                 {type} {type === "IPv6" ? compactIPv6(address) : address}
               </span>
               <button
@@ -611,9 +758,9 @@ const SortableRow = React.memo(({
           )) : <span className="tabular-nums">--</span>}
         </div>
       </TableCell>
-      <TableCell className="!align-middle" data-label={t("admin.nodeTable.agent", "Agent")}>
-        <div className="admin-node-agent-cell flex min-w-0 flex-col items-center justify-center gap-0.5 text-center leading-none">
-          <span className="block max-w-full truncate text-sm leading-5 text-muted-foreground" title={publicVersion(node.version) || "--"}>
+      <TableCell className="!align-middle whitespace-normal" data-label={t("admin.nodeTable.agent", "Agent")}>
+        <div className="admin-node-agent-cell flex min-w-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-center" title={[publicVersion(node.version) || "--", deploymentStatusPresentation?.label].filter(Boolean).join(" ")}>
+          <span className="admin-node-agent-version text-sm text-muted-foreground">
             {publicVersion(node.version) || "--"}
           </span>
           {deploymentStatusPresentation ? (
@@ -647,7 +794,7 @@ const SortableRow = React.memo(({
           <PriceTags
             className="admin-node-billing-tags [&_label]:!text-xs"
             direction="row"
-            wrap="nowrap"
+            wrap="wrap"
             price={node.price}
             billing_cycle={node.billing_cycle}
             expired_at={node.expired_at}
@@ -655,7 +802,7 @@ const SortableRow = React.memo(({
           />
         )}
       </TableCell>
-      <TableCell className="!align-middle min-w-0 overflow-hidden" data-label={t("admin.nodeTable.tags", "标签")}>
+      <TableCell className="!align-middle min-w-0 whitespace-normal" data-label={t("admin.nodeTable.tags", "标签")}>
         {(node.tags || "").trim() ? (
           <div className="admin-cell-clip-row" title={node.tags || ""}>
             <CustomTags tags={node.tags || ""} />
@@ -667,10 +814,9 @@ const SortableRow = React.memo(({
       <TableCell className="!align-middle" data-label={t("common.action", "操作")}>
         <ActionButtons node={node} settings={settings} />
       </TableCell>
-    </TableRow>
+    </>
   );
 });
-SortableRow.displayName = "SortableRow";
 
 const SortableMobileCard = React.memo(function SortableMobileCard({
   node,
@@ -683,8 +829,11 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
   online: boolean | null;
   reorderEnabled: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: node.uuid, disabled: !reorderEnabled });
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({
+    id: node.uuid,
+    disabled: !reorderEnabled,
+    animateLayoutChanges: () => false,
+  });
   const { t } = useTranslation();
   const networkAddresses = nodeNetworkAddresses(node);
   const deploymentStatusPresentation = nodeDeploymentStatusPresentation(
@@ -759,28 +908,30 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
         ) : null}
       </Stack>,
     ],
-    [t("common.group", "分组"), node.group || "--"],
-    [t("common.remark", "备注"), node.remark || "--"],
-    [t("admin.nodeTable.billing"), billingValue],
-    [
-      t("admin.nodeTable.tags", "标签"),
-      (node.tags || "").trim() ? (
-        <Flex gap="1" wrap="wrap">
-          <CustomTags tags={node.tags || ""} />
-        </Flex>
-      ) : (
-        "--"
-      ),
-    ],
   ];
+  if (node.group?.trim()) {
+    cells.push([t("common.group", "分组"), node.group]);
+  }
+  if (node.remark?.trim()) {
+    cells.push([t("common.remark", "备注"), node.remark]);
+  }
+  if (Number(node.price) !== 0) {
+    cells.push([t("admin.nodeTable.billing"), billingValue]);
+  }
+  if ((node.tags || "").trim()) {
+    cells.push([
+      t("admin.nodeTable.tags", "标签"),
+      <Flex key="tags" gap="1" wrap="wrap">
+        <CustomTags tags={node.tags || ""} />
+      </Flex>,
+    ]);
+  }
 
   return (
     <AdminMobileListCard
       ref={setNodeRef}
-      sx={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
+      dense
+      style={isDragging ? NODE_LIST_ORIGIN_STYLE : undefined}
       title={<NodeNameLink node={node} online={online} />}
       headerExtra={
         <button
@@ -788,7 +939,7 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
           {...attributes}
           {...listeners}
           disabled={!reorderEnabled}
-          className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--gray-9)] ${
+          className={`inline-flex size-10 shrink-0 items-center justify-center rounded-md text-[var(--gray-9)] ${
             reorderEnabled
               ? "cursor-grab hover:bg-[var(--accent-a3)] hover:text-[var(--accent-11)] active:cursor-grabbing"
               : "cursor-not-allowed opacity-40"
@@ -809,6 +960,12 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
     />
   );
 });
+
+function nodeListTableWidth(root: HTMLElement | null) {
+  const scroller = root?.querySelector("[data-slot='table-container']");
+  if (scroller && scroller.clientWidth > 0) return Math.max(0, scroller.clientWidth - 1);
+  return root?.clientWidth ?? 0;
+}
 
 const NodeTable = ({
   nodes,
@@ -843,7 +1000,10 @@ const NodeTable = ({
   );
   // 添加 localNodes 状态，实现即时 UI 更新
   const [localNodes, setLocalNodes] = useState<NodeDetail[]>(nodes);
-  const [isDragging, setIsDragging] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<NodeColumnWidths | null>(() => readNodeColumnWidths());
+  const [defaultLayout, setDefaultLayout] = useState<NodeColumnWidths | null>(null);
+  const [sortColumnWidth, setSortColumnWidth] = useState(() => readNodeColumnLayout()?.sort ?? NODE_SORT_COLUMN_WIDTH);
+  const columnResizeLock = React.useRef(false);
   const [currentPage, setCurrentPage] = useState(1);
   const defaultPageSize = useAdminDefaultPageSize();
   const [pageSize, setPageSize] = useState(defaultPageSize);
@@ -866,6 +1026,33 @@ const NodeTable = ({
         `${node.uuid}:${node.price}:${node.billing_cycle}:${node.expired_at}:${node.currency}`,
     )
     .join("|");
+
+  const layoutMode = columnWidths ? "custom" : "default";
+  const activeWidths = columnWidths ?? defaultLayout;
+  const activeSort = columnWidths ? sortColumnWidth : NODE_SORT_COLUMN_WIDTH;
+
+  React.useLayoutEffect(() => {
+    if (isMobile) return;
+    const root = tableWrapRef.current;
+    if (!root) return;
+    const fit = () => {
+      if (columnResizeLock.current) return;
+      const width = nodeListTableWidth(root);
+      if (layoutMode === "custom") {
+        setColumnWidths((current) => {
+          if (!current) return current;
+          return fitNodeColumnWidths(current, width, sortColumnWidth);
+        });
+        return;
+      }
+      const next = defaultNodeColumnWidths(width, NODE_SORT_COLUMN_WIDTH);
+      setDefaultLayout((current) => (sameNodeColumnWidths(current, next) ? current : next));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [isMobile, sortColumnWidth, layoutMode]);
 
   React.useLayoutEffect(() => {
     if (isMobile) return;
@@ -896,14 +1083,18 @@ const NodeTable = ({
   }, [defaultPageSize]);
   const handleDragStart = () => {
     if (!reorderEnabled) return;
-    setIsDragging(true);
+    document.documentElement.classList.add("admin-node-dnd-dragging");
     if ("vibrate" in navigator) {
       navigator.vibrate(50);
     }
   };
 
-  const handleDragEnd = async (event: any) => {
-    setIsDragging(false);
+  const stopNodeListDragging = () => {
+    document.documentElement.classList.remove("admin-node-dnd-dragging");
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    stopNodeListDragging();
     if (!reorderEnabled) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -919,12 +1110,20 @@ const NodeTable = ({
     } else if (over.id === NEXT_PAGE_DROP_ID && visiblePage < totalPages) {
       destinationPage = visiblePage + 1;
       newIndex = (destinationPage - 1) * pageSize;
+    } else if (newIndex >= 0) {
+      const translated = active.rect.current.translated;
+      const pointerY = translated
+        ? translated.top + translated.height / 2
+        : over.rect.top + over.rect.height / 2;
+      newIndex = nodeListReorderIndex(
+        oldIndex,
+        newIndex,
+        nodeListInsertAfter(pointerY, over.rect.top, over.rect.height),
+      );
     }
-    if (newIndex < 0) return;
+    if (newIndex < 0 || newIndex === oldIndex) return;
 
-    const reorderedNodes = Array.from(localNodes);
-    const [reorderedItem] = reorderedNodes.splice(oldIndex, 1);
-    reorderedNodes.splice(Math.min(newIndex, reorderedNodes.length), 0, reorderedItem);
+    const reorderedNodes = arrayMove(localNodes, oldIndex, newIndex);
 
     // 立即更新 UI
     setLocalNodes(reorderedNodes);
@@ -951,23 +1150,109 @@ const NodeTable = ({
     }
   };
 
+  const startColumnResize = (column: NodeColumnKey, event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    const partner = NODE_COLUMN_KEYS[NODE_COLUMN_KEYS.indexOf(column) + 1];
+    if (!partner) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const row = event.currentTarget.closest("tr");
+    const cells = row ? [...row.querySelectorAll("th")] : [];
+    if (cells.length !== NODE_COLUMN_KEYS.length + 1) return;
+    const measured = {} as NodeColumnWidths;
+    const measuredSort = Math.max(44, Math.round(cells[0].getBoundingClientRect().width));
+    NODE_COLUMN_KEYS.forEach((key, index) => {
+      measured[key] = Math.round(cells[index + 1].getBoundingClientRect().width);
+    });
+    const container = nodeListTableWidth(tableWrapRef.current);
+    const baseline = container > 0 ? fitNodeColumnWidths(measured, container, measuredSort) : measured;
+    const origin = baseline[column];
+    const startX = event.clientX;
+    const handle = event.currentTarget;
+    const rightKeys = NODE_COLUMN_KEYS.slice(NODE_COLUMN_KEYS.indexOf(column) + 1);
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch {
+      /* The pointer is only capturable during a real drag. */
+    }
+    columnResizeLock.current = true;
+    setSortColumnWidth(measuredSort);
+    handle.classList.add("is-active");
+    document.body.classList.add("admin-node-col-resizing");
+    const widthsAt = (clientX: number) => {
+      const limits = NODE_COLUMN_MIN;
+      let desired = Math.max(limits[column], clampNodeColumnWidth(column, origin + clientX - startX));
+      let delta = desired - origin;
+      const next = { ...baseline };
+      if (delta > 0) {
+        let remain = delta;
+        for (const key of rightKeys) {
+          const spare = Math.max(0, baseline[key] - limits[key]);
+          const take = Math.min(spare, remain);
+          next[key] = baseline[key] - take;
+          remain -= take;
+        }
+        next[column] = origin + (delta - remain);
+      } else {
+        const shrink = Math.min(-delta, Math.max(0, origin - limits[column]));
+        next[column] = origin - shrink;
+        next[partner] = baseline[partner] + shrink;
+      }
+      return next;
+    };
+    const move = (ev: PointerEvent) => setColumnWidths(widthsAt(ev.clientX));
+    const end = (ev: PointerEvent) => {
+      columnResizeLock.current = false;
+      const root = tableWrapRef.current;
+      const fitted = root
+        ? fitNodeColumnWidths(widthsAt(ev.clientX), nodeListTableWidth(root), measuredSort)
+        : widthsAt(ev.clientX);
+      setSortColumnWidth(measuredSort);
+      setColumnWidths(fitted);
+      writeNodeColumnWidths(fitted, measuredSort);
+      handle.classList.remove("is-active");
+      document.body.classList.remove("admin-node-col-resizing");
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  };
+
+  const resetColumnWidths = () => {
+    clearNodeColumnWidths();
+    setColumnWidths(null);
+    setSortColumnWidth(NODE_SORT_COLUMN_WIDTH);
+  };
+
+  const resizeHandle = (column: NodeColumnKey) => (
+    <span
+      className="admin-node-col-resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={t("admin.nodeTable.resizeColumn", "拖动调整列宽")}
+      onPointerDown={(event) => startColumnResize(column, event)}
+    />
+  );
+
   return (
-    <div
-      className={`admin-responsive-table-wrap overflow-x-auto overflow-y-hidden ${
-        isDragging ? "select-none" : ""
-      }`}
-    >
+    <div className="admin-responsive-table-wrap admin-node-list-dnd-wrap overflow-x-auto">
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={nodeListCollisionDetection}
+        autoScroll={NODE_LIST_AUTO_SCROLL}
+        measuring={NODE_LIST_MEASURING}
+        modifiers={NODE_LIST_DND_MODIFIERS}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setIsDragging(false)}
+        onDragCancel={stopNodeListDragging}
       >
         {isMobile ? (
           <SortableContext
             items={visibleNodes.map((node) => node.uuid)}
-            strategy={verticalListSortingStrategy}
+            strategy={NODE_LIST_SORTING_STRATEGY}
           >
             <AdminMobileCardStack>
               {visibleNodes.map((node) => (
@@ -983,36 +1268,75 @@ const NodeTable = ({
           </SortableContext>
         ) : (
         <div ref={tableWrapRef}>
-        <Table className={`admin-responsive-table admin-node-table min-w-[1172px] table-fixed text-sm${billingStack ? " admin-node-billing-stack" : ""}`}>
+        <Table
+          className={`admin-responsive-table admin-node-table min-w-[1172px] table-fixed text-sm${billingStack ? " admin-node-billing-stack" : ""}${activeWidths ? " is-column-sized" : ""}`}
+        >
+          {activeWidths ? (
+            <colgroup>
+              <col style={{ width: activeSort }} />
+              {NODE_COLUMN_KEYS.map((key) => (
+                <col
+                  key={key}
+                  style={{ width: activeWidths[key] }}
+                />
+              ))}
+            </colgroup>
+          ) : null}
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[44px]">
+              <TableHead className="w-[44px]" style={activeWidths ? nodeColumnStyle(activeSort) : undefined}>
                 <span className="sr-only">{t("common.sort", "排序")}</span>
               </TableHead>
-              <TableHead className="w-[170px]">{t("admin.nodeTable.name")}</TableHead>
-              <TableHead className="w-[170px]">
+              <TableHead className="w-[170px]" style={nodeColumnStyle(activeWidths?.name)}>
+                {t("admin.nodeTable.name")}
+                {resizeHandle("name")}
+              </TableHead>
+              <TableHead className="w-[170px]" style={nodeColumnStyle(activeWidths?.network)}>
                 {t("admin.nodeTable.network", "网络")}
+                {resizeHandle("network")}
               </TableHead>
-              <TableHead className="w-[64px] text-center">
+              <TableHead
+                className="w-[64px] text-center"
+                style={nodeColumnStyle(activeWidths?.agent)}
+              >
                 {t("admin.nodeTable.agent", "Agent")}
+                {resizeHandle("agent")}
               </TableHead>
-              <TableHead className="w-[64px]">
+              <TableHead className="w-[64px]" style={nodeColumnStyle(activeWidths?.group)}>
                 {t("common.group", "分组")}
+                {resizeHandle("group")}
               </TableHead>
-              <TableHead className="w-[64px]">
+              <TableHead className="w-[64px]" style={nodeColumnStyle(activeWidths?.remark)}>
                 {t("common.remark", "备注")}
+                {resizeHandle("remark")}
               </TableHead>
-              <TableHead className="w-[80px]">{t("admin.nodeTable.billing")}</TableHead>
-              <TableHead className="w-[116px]">
+              <TableHead className="w-[80px]" style={nodeColumnStyle(activeWidths?.billing)}>
+                {t("admin.nodeTable.billing")}
+                {resizeHandle("billing")}
+              </TableHead>
+              <TableHead className="w-[116px]" style={nodeColumnStyle(activeWidths?.tags)}>
                 {t("admin.nodeTable.tags", "标签")}
+                {resizeHandle("tags")}
               </TableHead>
-              <TableHead className="w-[308px]">{t("common.action", "操作")}</TableHead>
+              <TableHead className="w-[308px]" style={nodeColumnStyle(activeWidths?.action)}>
+                <span className="admin-node-action-head">
+                  <span>{t("common.action", "操作")}</span>
+                  <button
+                    type="button"
+                    className="admin-node-col-reset"
+                    onClick={resetColumnWidths}
+                  >
+                    <RefreshCw size="14" />
+                    {t("admin.nodeTable.resetColumnWidths", "重置列宽")}
+                  </button>
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <SortableContext
               items={visibleNodes.map((node) => node.uuid)}
-              strategy={verticalListSortingStrategy}
+              strategy={NODE_LIST_SORTING_STRATEGY}
             >
               {visibleNodes.map((node) => (
                 <SortableRow
@@ -1040,9 +1364,11 @@ const NodeTable = ({
         }}
         previousDropId={PREVIOUS_PAGE_DROP_ID}
         nextDropId={NEXT_PAGE_DROP_ID}
-        dragging={isDragging}
         showSummary={false}
       />
+        <DragOverlay dropAnimation={null} zIndex={1600}>
+          <NodeListDragPreview nodes={localNodes} />
+        </DragOverlay>
       </DndContext>
     </div>
   );
@@ -1103,6 +1429,7 @@ type TrafficCalibrationSnapshot = {
   adjustment: SignedTrafficUsage;
   effective: TrafficUsage;
   history: TrafficCalibrationHistory[];
+  history_complete?: boolean;
 };
 
 const trafficInputPattern = /^\s*(\d+(?:\.\d+)?)\s*(b|kb|kib|mb|mib|gb|gib|tb|tib|pb|pib)?\s*$/i;
@@ -1117,17 +1444,6 @@ function parseTrafficInput(value: string): number | null {
 function formatSignedTraffic(value: number): string {
   if (value === 0) return formatBytes(0);
   return `${value > 0 ? "+" : "-"}${formatBytes(Math.abs(value))}`;
-}
-
-function formatTrafficCycleRange(snapshot: TrafficCalibrationSnapshot, language: string): string {
-  const locale = language.replace("_", "-");
-  const formatter = new Intl.DateTimeFormat(locale, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "Asia/Shanghai",
-  });
-  return `${formatter.format(new Date(snapshot.cycle_start))}-${formatter.format(new Date(snapshot.cycle_end))}`;
 }
 
 const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) => {
@@ -1193,8 +1509,12 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
       const data = payload?.data;
       const nextAvailable = data?.available !== false;
       setAvailable(nextAvailable);
-      setReason(data?.reason || "");
-      if (nextAvailable && data?.snapshot) {
+      setReason(
+        data?.history_complete === false
+          ? t("admin.nodeTable.trafficCalibration.historyIncomplete")
+          : (data?.reason || ""),
+      );
+      if (data?.snapshot) {
         const next = data.snapshot as TrafficCalibrationSnapshot;
         setSnapshot(next);
         setTargetUp(formatBytes(next.effective.up));
@@ -1241,6 +1561,8 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
       setSnapshot(next);
       setTargetUp(formatBytes(next.effective.up));
       setTargetDown(formatBytes(next.effective.down));
+      setAvailable(true);
+      setReason("");
       toast.success(t("admin.nodeTable.trafficCalibration.saved"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -1256,6 +1578,14 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
         [t("admin.nodeTable.trafficCalibration.effective"), snapshot.effective],
       ]
     : [];
+  const cycleLabel = snapshot
+    ? formatTrafficCalibrationCycleRange(snapshot.cycle_start, {
+        day: node.traffic_reset_day,
+        time: node.traffic_reset_time,
+        timezone: node.traffic_reset_timezone,
+        language: i18n.resolvedLanguage || i18n.language,
+      })
+    : null;
 
   return (
     <Dialog.Root
@@ -1290,7 +1620,7 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
           </div>
         ) : (
           <Flex direction="column" gap="4" mt="4">
-            {!available && (
+            {(reason || !available) && (
               <Callout.Root color="amber" role="alert">
                 <Callout.Text>{reason || t("admin.nodeTable.trafficCalibration.resetDayRequired")}</Callout.Text>
               </Callout.Root>
@@ -1303,11 +1633,20 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
 
             {snapshot && (
               <>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                  <Text size="2" color="gray">{t("admin.nodeTable.trafficCalibration.currentCycle")}</Text>
-                  <Text size="2" weight="bold">
-                    {formatTrafficCycleRange(snapshot, i18n.resolvedLanguage || i18n.language)}
-                  </Text>
+                <div className="flex flex-col gap-1 rounded-md border border-[var(--gray-a5)] bg-[var(--gray-a2)] px-3 py-2.5 md:flex-row md:items-center md:justify-between md:gap-4">
+                  <Badge color="blue" variant="soft" className="w-fit">
+                    {t("admin.nodeTable.trafficCalibration.currentCycle")}
+                  </Badge>
+                  {cycleLabel && (
+                    <div className="min-w-0 md:text-right">
+                      <Text as="div" size="2" weight="bold">{cycleLabel.timezone}</Text>
+                      <Text as="div" size="2" color="gray">
+                        <span className="whitespace-nowrap">{cycleLabel.start}</span>
+                        {" - "}
+                        <span className="whitespace-nowrap">{cycleLabel.next}</span>
+                      </Text>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1381,7 +1720,7 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
               <Dialog.Close>
                 <Button variant="soft">{t("admin.nodeTable.cancel")}</Button>
               </Dialog.Close>
-              <Button disabled={!snapshot || !available || saving} onClick={() => void saveCalibration()}>
+              <Button disabled={!snapshot || saving} onClick={() => void saveCalibration()}>
                 {saving ? t("common.loading") : t("admin.nodeTable.trafficCalibration.save")}
               </Button>
             </Flex>
@@ -1443,6 +1782,135 @@ function DeleteButton({ node }: { node: NodeDetail }) {
   );
 }
 
+function useAccountPasskeyAvailable() {
+  const [passkeyAvailable, setPasskeyAvailable] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/account/passkeys")
+      .then((response) => response.json())
+      .then((body) => {
+        const items = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+        if (!cancelled) setPasskeyAvailable(items.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) setPasskeyAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return passkeyAvailable;
+}
+
+function NodeIdentityAuthDialog({
+  otpFieldId,
+  otpFieldRef,
+  otpInput,
+  onOtpChange,
+  otpInvalid,
+  submitting,
+  onDismiss,
+  onConfirmOtp,
+  onConfirmPasskey,
+}: {
+  otpFieldId: string;
+  otpFieldRef: React.RefObject<HTMLInputElement | null>;
+  otpInput: string;
+  onOtpChange: (value: string) => void;
+  otpInvalid: boolean;
+  submitting: boolean;
+  onDismiss: () => void;
+  onConfirmOtp: () => void;
+  onConfirmPasskey: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const passkeyAvailable = useAccountPasskeyAvailable();
+  const [passkeyBusy, setPasskeyBusy] = React.useState(false);
+  const busy = submitting || passkeyBusy;
+
+  return (
+    <Dialog.Root
+      open
+      zIndex={1400}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) return;
+        onDismiss();
+      }}
+    >
+      <AppDialogContent className="admin-install-dialog">
+        <Dialog.Title>
+          {t("admin.nodeTable.identityAuthTitle", "身份验证")}
+        </Dialog.Title>
+        <Dialog.Description>
+          {t("admin.nodeTable.identityAuthDescription", "请输入身份验证器中的 6 位动态口令")}
+        </Dialog.Description>
+        <form
+          autoComplete="on"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (otpInput.length === 6 && !busy) {
+              onConfirmOtp();
+            }
+          }}
+        >
+          <TextField.Root
+            ref={otpFieldRef}
+            id={otpFieldId}
+            name="one-time-code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            maxLength={6}
+            color={otpInvalid ? "red" : undefined}
+            disabled={busy}
+            value={otpInput}
+            onChange={(event) =>
+              onOtpChange(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))
+            }
+            placeholder={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
+            aria-label={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
+          />
+          {otpInvalid ? (
+            <Text size="2" color="red" className="mt-2" role="alert">
+              {t("admin.nodeTable.twoFactorInvalid", "验证码错误")}
+            </Text>
+          ) : null}
+          <Flex justify="end" gap="2" mt="4" wrap="wrap">
+            <Button
+              type="button"
+              variant="soft"
+              disabled={busy}
+              onClick={onDismiss}
+            >
+              {t("admin.nodeTable.cancel")}
+            </Button>
+            {passkeyAvailable ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  setPasskeyBusy(true);
+                  void Promise.resolve(onConfirmPasskey()).finally(() => setPasskeyBusy(false));
+                }}
+              >
+                {t("login.passkey", "使用通行密钥")}
+              </Button>
+            ) : null}
+            <Button
+              type="submit"
+              disabled={otpInput.length !== 6 || busy}
+            >
+              {t("common.confirm", "确认")}
+            </Button>
+          </Flex>
+        </form>
+      </AppDialogContent>
+    </Dialog.Root>
+  );
+}
+
 function RotateTokenButton({ node }: { node: NodeDetail }) {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
@@ -1470,11 +1938,11 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
     return () => window.clearTimeout(timer);
   }, [needTwoFactor, rotating, twoFactorInvalid]);
 
-  const handleRotate = async (twoFactorCode?: string) => {
+  const handleRotate = async (auth: { twoFactorCode?: string; ceremony_id?: string; credential?: unknown } = {}) => {
     try {
       setRotating(true);
       setTwoFactorInvalid(false);
-      await rotateClientToken(node.uuid, { twoFactorCode });
+      await rotateClientToken(node.uuid, auth);
       toast.success(t("admin.nodeTable.rotateTokenSuccess", { name: node.name }));
       closeDialog();
     } catch (error) {
@@ -1489,12 +1957,15 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
         setOtpInput("");
         return;
       }
+      const cancelled = passkeyUnavailableMessage(error, "") === "cancelled";
       toast.error(
-        t("admin.nodeTable.rotateTokenFailed", {
-          error: localizeTokenRotationError(
-            error instanceof Error ? error.message : String(error),
-          ),
-        }),
+        cancelled
+          ? t("account.passkey_cancelled")
+          : t("admin.nodeTable.rotateTokenFailed", {
+              error: localizeTokenRotationError(
+                error instanceof Error ? error.message : String(error),
+              ),
+            }),
       );
     } finally {
       setRotating(false);
@@ -1541,72 +2012,36 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
         </Flex>
       </AppDialogContent>
       {needTwoFactor ? (
-        <Dialog.Root
-          open
-          zIndex={1400}
-          onOpenChange={(nextOpen) => {
-            if (nextOpen) return;
-            resetTwoFactor();
+        <NodeIdentityAuthDialog
+          otpFieldId="admin-node-rotate-otp"
+          otpFieldRef={otpFieldRef}
+          otpInput={otpInput}
+          onOtpChange={setOtpInput}
+          otpInvalid={twoFactorInvalid}
+          submitting={rotating}
+          onDismiss={resetTwoFactor}
+          onConfirmOtp={() => {
+            void handleRotate({ twoFactorCode: otpInput });
           }}
-        >
-          <AppDialogContent className="admin-install-dialog">
-            <Dialog.Title>
-              {t("admin.nodeTable.identityAuthTitle", "身份验证")}
-            </Dialog.Title>
-            <Dialog.Description>
-              {t("admin.nodeTable.identityAuthDescription", "请输入身份验证器中的 6 位动态口令")}
-            </Dialog.Description>
-            <form
-              autoComplete="on"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (otpInput.length === 6 && !rotating) {
-                  void handleRotate(otpInput);
-                }
-              }}
-            >
-              <TextField.Root
-                ref={otpFieldRef}
-                id="admin-node-rotate-otp"
-                name="one-time-code"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoFocus
-                maxLength={6}
-                color={twoFactorInvalid ? "red" : undefined}
-                disabled={rotating}
-                value={otpInput}
-                onChange={(event) =>
-                  setOtpInput(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))
-                }
-                placeholder={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
-                aria-label={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
-              />
-              {twoFactorInvalid ? (
-                <Text size="2" color="red" className="mt-2" role="alert">
-                  {t("admin.nodeTable.twoFactorInvalid", "验证码错误")}
-                </Text>
-              ) : null}
-              <Flex justify="end" gap="2" mt="4">
-                <Button
-                  type="button"
-                  variant="soft"
-                  disabled={rotating}
-                  onClick={resetTwoFactor}
-                >
-                  {t("admin.nodeTable.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={otpInput.length !== 6 || rotating}
-                >
-                  {t("common.confirm", "确认")}
-                </Button>
-              </Flex>
-            </form>
-          </AppDialogContent>
-        </Dialog.Root>
+          onConfirmPasskey={async () => {
+            try {
+              const assertion = await confirmAdminPasskey();
+              await handleRotate({
+                ceremony_id: assertion.ceremony_id,
+                credential: assertion.credential,
+              });
+            } catch (error) {
+              const cancelled = passkeyUnavailableMessage(error, "") === "cancelled";
+              toast.error(
+                cancelled
+                  ? t("account.passkey_cancelled")
+                  : error instanceof Error
+                    ? error.message
+                    : String(error),
+              );
+            }
+          }}
+        />
       ) : null}
     </Dialog.Root>
   );
@@ -1627,6 +2062,8 @@ type InstallOptions = {
   includeMountpoints: string;
   interval: string;
   monthRotate: string;
+  monthRotateTime: string;
+  monthRotateTimezone: string;
 };
 
 type DeploymentProfilePayload = {
@@ -1653,6 +2090,8 @@ type DeploymentProfilePayload = {
   interval: number;
   enable_month_rotate: boolean;
   month_rotate: number;
+  month_rotate_time: string;
+  month_rotate_timezone: string;
 };
 
 type DeploymentProfileResponse = {
@@ -1684,6 +2123,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     configuredResetDay <= 31
       ? String(configuredResetDay)
       : "";
+  const initialResetTime = normalizeTrafficResetTime(node.traffic_reset_time);
+  const initialResetTimezone = normalizeTrafficResetTimezone(node.traffic_reset_timezone);
   const [selectedPlatform, setSelectedPlatform] =
     React.useState<Platform>("linux");
   const [installOptions, setInstallOptions] = React.useState<InstallOptions>({
@@ -1701,6 +2142,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     includeMountpoints: "",
     interval: "",
     monthRotate: initialResetDay,
+    monthRotateTime: initialResetTime,
+    monthRotateTimezone: initialResetTimezone,
   });
 
   const [enableGhproxy, setEnableGhproxy] = React.useState(false);
@@ -1792,13 +2235,20 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     if (installToken) setOtpInput("");
   }, [installToken]);
 
-  React.useEffect(() => {
+  const revertTrafficResetClock = () => {
     setEnableMonthRotate(initialResetDay !== "");
     setInstallOptions((previous) => ({
       ...previous,
       monthRotate: initialResetDay,
+      monthRotateTime: initialResetTime,
+      monthRotateTimezone: initialResetTimezone,
     }));
-  }, [node.uuid, initialResetDay]);
+  };
+
+  React.useLayoutEffect(() => {
+    if (open) return;
+    revertTrafficResetClock();
+  }, [node.uuid, initialResetDay, initialResetTime, initialResetTimezone, open]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -1831,6 +2281,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           includeMountpoints: profile.include_mountpoints || "",
           interval: profile.enable_interval ? String(profile.interval) : "",
           monthRotate: profile.enable_month_rotate ? String(profile.month_rotate) : "",
+          monthRotateTime: normalizeTrafficResetTime(profile.month_rotate_time),
+          monthRotateTimezone: normalizeTrafficResetTimezone(profile.month_rotate_timezone),
         });
         setEnableGhproxy(profile.enable_ghproxy);
         setEnableCustomDir(profile.enable_custom_dir);
@@ -1926,6 +2378,8 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     interval: selectedInterval() ?? 0,
     enable_month_rotate: enableMonthRotate,
     month_rotate: selectedTrafficResetDay() ?? 0,
+    month_rotate_time: normalizeTrafficResetTime(installOptions.monthRotateTime),
+    month_rotate_timezone: normalizeTrafficResetTimezone(installOptions.monthRotateTimezone),
   });
 
   const generateCommand = () => {
@@ -1998,6 +2452,10 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
       const rotateVal = (installOptions.monthRotate || "").trim() || "1"; // 默认 1
       args.push(`--month-rotate`);
       args.push(rotateVal);
+      args.push(`--month-rotate-time`);
+      args.push(normalizeTrafficResetTime(installOptions.monthRotateTime));
+      args.push(`--month-rotate-timezone`);
+      args.push(normalizeTrafficResetTimezone(installOptions.monthRotateTimezone));
     }
     let scriptFile: "install.sh" | "install.ps1" = "install.sh";
     if (selectedPlatform === "windows") {
@@ -2216,11 +2674,17 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         };
     }
   })();
+  const nodeConfigName = node.name?.trim() || "";
+  const nodeConfigAddress = nodePreferredAddress(node);
+  const nodeConfigIdentity = [nodeConfigName, nodeConfigAddress]
+    .filter(Boolean)
+    .join(" ");
   return (
     <Dialog.Root
       open={open}
       disableEnforceFocus={needTwoFactor}
       onOpenChange={(nextOpen) => {
+        revertTrafficResetClock();
         setOpen(nextOpen);
         if (nextOpen) {
           setDialogTab("online");
@@ -2243,7 +2707,22 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         className="km-node-dialog km-node-deploy-dialog"
       >
         <Dialog.Title>
-          {t("admin.nodeTable.nodeConfig", "节点配置")}
+          <span className="km-node-config-title">
+            <span>{t("admin.nodeTable.nodeConfig", "节点配置")}</span>
+            {nodeConfigIdentity ? (
+              <span className="km-node-config-identity" title={nodeConfigIdentity}>
+                <span className="km-node-config-identity-flag" aria-hidden>
+                  <Flag flag={node.region} compact />
+                </span>
+                {nodeConfigName ? (
+                  <span className="km-node-config-identity-name">{nodeConfigName}</span>
+                ) : null}
+                {nodeConfigAddress ? (
+                  <span className="km-node-config-identity-ip">{nodeConfigAddress}</span>
+                ) : null}
+              </span>
+            ) : null}
+          </span>
         </Dialog.Title>
         <Tabs.Root
           value={dialogTab}
@@ -2782,6 +3261,12 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                         monthRotate: prev.monthRotate?.trim()
                           ? prev.monthRotate
                           : "1",
+                        monthRotateTime: prev.monthRotateTime?.trim()
+                          ? prev.monthRotateTime
+                          : initialResetTime,
+                        monthRotateTimezone: prev.monthRotateTimezone?.trim()
+                          ? prev.monthRotateTimezone
+                          : initialResetTimezone,
                       }));
                     }
                   }}
@@ -2802,24 +3287,70 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                         monthRotate: prev.monthRotate?.trim()
                           ? prev.monthRotate
                           : "1",
+                        monthRotateTime: prev.monthRotateTime?.trim()
+                          ? prev.monthRotateTime
+                          : initialResetTime,
+                        monthRotateTimezone: prev.monthRotateTimezone?.trim()
+                          ? prev.monthRotateTimezone
+                          : initialResetTimezone,
                       }));
                     }
                   }}
                 >
-                  {t("admin.nodeTable.monthRotate", "流量重置日")}
+                  {t("admin.nodeTable.monthRotate", "流量重置时间")}
                 </label>
               </Flex>
               {enableMonthRotate && (
-                <TextField.Root
-                  placeholder="1"
-                  value={installOptions.monthRotate}
-                  onChange={(e) =>
-                    setInstallOptions((prev) => ({
-                      ...prev,
-                      monthRotate: e.target.value,
-                    }))
-                  }
-                />
+                <Flex direction="column" gap="2">
+                  <div className="km-traffic-reset-clock-row">
+                    <div className="km-traffic-reset-timezone">
+                      <SelectOrInput
+                        options={trafficResetTimezoneOptions}
+                        value={installOptions.monthRotateTimezone}
+                        allowCustomInput
+                        onChange={(value) =>
+                          setInstallOptions((prev) => ({
+                            ...prev,
+                            monthRotateTimezone: value,
+                          }))
+                        }
+                        placeholder="Asia/Shanghai"
+                        aria-label={t("admin.nodeTable.monthRotateTimezone", "时区")}
+                      />
+                    </div>
+                    <div className="km-traffic-reset-day">
+                      <TextField.Root
+                        placeholder="1"
+                        aria-label={t("admin.nodeTable.monthRotateDay", "日期")}
+                        value={installOptions.monthRotate}
+                        onChange={(e) =>
+                          setInstallOptions((prev) => ({
+                            ...prev,
+                            monthRotate: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="km-traffic-reset-time">
+                      <TrafficResetTimeField
+                        ariaLabel={t("admin.nodeTable.monthRotateTime", "时间")}
+                        value={installOptions.monthRotateTime}
+                        onChange={(value) =>
+                          setInstallOptions((prev) => ({
+                            ...prev,
+                            monthRotateTime: value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <Text size="1" color="gray">
+                    {t(
+                      "admin.nodeTable.monthRotateHint",
+                      "流量重置时间按厂商账单填写，Lite 会换算到北京时间才重置。",
+                    )}
+                  </Text>
+                </Flex>
               )}
               <div
                 className="admin-deployment-delivery"
@@ -2936,74 +3467,37 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         </Tabs.Root>
       </AppDialogContent>
       {needTwoFactor ? (
-      <Dialog.Root
-        open
-        zIndex={1400}
-        onOpenChange={(nextOpen) => {
-          if (nextOpen) return;
-          if (tokenSessionRef.current?.getSnapshot().twoFactorOpen) {
-            cancelDeployTwoFactor();
-          }
-        }}
-      >
-        <AppDialogContent className="admin-install-dialog">
-          <Dialog.Title>
-            {t("admin.nodeTable.identityAuthTitle", "身份验证")}
-          </Dialog.Title>
-          <Dialog.Description>
-            {t("admin.nodeTable.identityAuthDescription", "请输入身份验证器中的 6 位动态口令")}
-          </Dialog.Description>
-          <form
-            autoComplete="on"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (otpInput.length === 6 && !otpSubmitting) {
-                void tokenSessionRef.current?.submitTwoFactor(node.uuid, otpInput);
-              }
-            }}
-          >
-            <TextField.Root
-              ref={otpFieldRef}
-              id="admin-node-deploy-otp"
-              name="one-time-code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              autoFocus
-              maxLength={6}
-              color={tokenState.twoFactorInvalid ? "red" : undefined}
-              disabled={otpSubmitting}
-              value={otpInput}
-              onChange={(event) =>
-                setOtpInput(event.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              placeholder={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
-              aria-label={t("admin.nodeTable.identityAuthInput", "6 位动态口令")}
-            />
-            {tokenState.twoFactorInvalid ? (
-              <Text size="2" color="red" className="mt-2" role="alert">
-                {t("admin.nodeTable.twoFactorInvalid", "验证码错误")}
-              </Text>
-            ) : null}
-            <Flex justify="end" gap="2" mt="4">
-              <Button
-                type="button"
-                variant="soft"
-                disabled={otpSubmitting}
-                onClick={cancelDeployTwoFactor}
-              >
-                {t("admin.nodeTable.cancel")}
-              </Button>
-              <Button
-                type="submit"
-                disabled={otpInput.length !== 6 || otpSubmitting}
-              >
-                {t("common.confirm", "确认")}
-              </Button>
-            </Flex>
-          </form>
-        </AppDialogContent>
-      </Dialog.Root>
+        <NodeIdentityAuthDialog
+          otpFieldId="admin-node-deploy-otp"
+          otpFieldRef={otpFieldRef}
+          otpInput={otpInput}
+          onOtpChange={setOtpInput}
+          otpInvalid={tokenState.twoFactorInvalid}
+          submitting={otpSubmitting}
+          onDismiss={cancelDeployTwoFactor}
+          onConfirmOtp={() => {
+            void tokenSessionRef.current?.submitTwoFactor(node.uuid, otpInput);
+          }}
+          onConfirmPasskey={async () => {
+            try {
+              const assertion = await confirmAdminPasskey();
+              await tokenSessionRef.current?.submitPasskey(
+                node.uuid,
+                assertion.ceremony_id,
+                assertion.credential,
+              );
+            } catch (error) {
+              const cancelled = passkeyUnavailableMessage(error, "") === "cancelled";
+              toast.error(
+                cancelled
+                  ? t("account.passkey_cancelled")
+                  : error instanceof Error
+                    ? error.message
+                    : String(error),
+              );
+            }
+          }}
+        />
       ) : null}
     </Dialog.Root>
   );
@@ -3023,9 +3517,25 @@ function EditButton({ node }: { node: NodeDetail }) {
   const [saving, setSaving] = useState(false);
   const [traffic_limit, setTrafficLimit] = useState(0);
   const [traffic_limit_type, setTrafficLimitType] = useState("sum");
-  const [trafficResetDay, setTrafficResetDay] = useState(0);
+  const [trafficResetDay, setTrafficResetDay] = useState(node.traffic_reset_day ?? 0);
+  const [trafficResetTime, setTrafficResetTime] = useState(() =>
+    normalizeTrafficResetTime(node.traffic_reset_time),
+  );
+  const [trafficResetTimezone, setTrafficResetTimezone] = useState(() =>
+    normalizeTrafficResetTimezone(node.traffic_reset_timezone),
+  );
   const [regionOverride, setRegionOverride] = useState("");
   const [trafficResetAllowance, setTrafficResetAllowance] = useState(0);
+  const pendingSavedEditRef = React.useRef<{
+    hidden: boolean;
+    traffic_limit: number;
+    traffic_limit_type: string;
+    trafficResetDay: number;
+    trafficResetTime: string;
+    trafficResetTimezone: string;
+    regionOverride: string;
+    trafficResetAllowance: number;
+  } | null>(null);
 
   const regionOptions = React.useMemo(
     () => [
@@ -3045,20 +3555,58 @@ function EditButton({ node }: { node: NodeDetail }) {
     [i18n.language, t],
   );
 
-  React.useEffect(() => {
-    setHidden(node.hidden);
-    setTrafficLimit(node.traffic_limit || 0);
-    setTrafficLimitType(node.traffic_limit_type || "sum");
-    setTrafficResetDay(node.traffic_reset_day ?? 0);
-    setRegionOverride(
-      node.region_override ? getRegionCode(node.region_override) : "",
-    );
-    setTrafficResetAllowance(node.traffic_reset_allowance ?? 0);
+  const editFormFromNode = () => ({
+    hidden: node.hidden,
+    traffic_limit: node.traffic_limit || 0,
+    traffic_limit_type: node.traffic_limit_type || "sum",
+    trafficResetDay: node.traffic_reset_day ?? 0,
+    trafficResetTime: normalizeTrafficResetTime(node.traffic_reset_time),
+    trafficResetTimezone: normalizeTrafficResetTimezone(node.traffic_reset_timezone),
+    regionOverride: node.region_override ? getRegionCode(node.region_override) : "",
+    trafficResetAllowance: node.traffic_reset_allowance ?? 0,
+  });
+
+  const applyEditForm = (form: ReturnType<typeof editFormFromNode>) => {
+    setHidden(form.hidden);
+    setTrafficLimit(form.traffic_limit);
+    setTrafficLimitType(form.traffic_limit_type);
+    setTrafficResetDay(form.trafficResetDay);
+    setTrafficResetTime(form.trafficResetTime);
+    setTrafficResetTimezone(form.trafficResetTimezone);
+    setRegionOverride(form.regionOverride);
+    setTrafficResetAllowance(form.trafficResetAllowance);
+  };
+
+  const hydrateEditForm = () => {
+    applyEditForm(pendingSavedEditRef.current ?? editFormFromNode());
+  };
+
+  React.useLayoutEffect(() => {
+    const pending = pendingSavedEditRef.current;
+    const fromNode = editFormFromNode();
+    if (
+      pending &&
+      pending.trafficResetDay === fromNode.trafficResetDay &&
+      pending.trafficResetTime === fromNode.trafficResetTime &&
+      pending.trafficResetTimezone === fromNode.trafficResetTimezone &&
+      pending.hidden === fromNode.hidden &&
+      pending.traffic_limit === fromNode.traffic_limit &&
+      pending.traffic_limit_type === fromNode.traffic_limit_type &&
+      pending.regionOverride === fromNode.regionOverride &&
+      pending.trafficResetAllowance === fromNode.trafficResetAllowance
+    ) {
+      pendingSavedEditRef.current = null;
+    }
+    if (open) return;
+    hydrateEditForm();
   }, [
+    open,
     node.hidden,
     node.traffic_limit,
     node.traffic_limit_type,
     node.traffic_reset_day,
+    node.traffic_reset_time,
+    node.traffic_reset_timezone,
     node.region_override,
     node.traffic_reset_allowance,
   ]);
@@ -3091,6 +3639,8 @@ function EditButton({ node }: { node: NodeDetail }) {
         payload.traffic_limit_type = traffic_limit_type;
       }
       payload.traffic_reset_day = trafficResetDay;
+      payload.traffic_reset_time = normalizeTrafficResetTime(trafficResetTime);
+      payload.traffic_reset_timezone = normalizeTrafficResetTimezone(trafficResetTimezone);
       const currentRegionOverride = node.region_override
         ? getRegionCode(node.region_override)
         : "";
@@ -3111,6 +3661,16 @@ function EditButton({ node }: { node: NodeDetail }) {
         const message = await response.text();
         throw new Error(message || `HTTP ${response.status}`);
       }
+      pendingSavedEditRef.current = {
+        hidden,
+        traffic_limit,
+        traffic_limit_type,
+        trafficResetDay,
+        trafficResetTime: normalizeTrafficResetTime(trafficResetTime),
+        trafficResetTimezone: normalizeTrafficResetTimezone(trafficResetTimezone),
+        regionOverride,
+        trafficResetAllowance,
+      };
       refresh();
       setOpen(false);
       toast.success(t("admin.nodeEdit.saveSuccess", "保存成功"));
@@ -3122,7 +3682,13 @@ function EditButton({ node }: { node: NodeDetail }) {
     }
   };
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next || !pendingSavedEditRef.current) hydrateEditForm();
+        setOpen(next);
+      }}
+    >
       <Dialog.Trigger>
         <IconButton
           variant="ghost"
@@ -3158,7 +3724,7 @@ function EditButton({ node }: { node: NodeDetail }) {
           </div>
           <div>
             <label className="block mb-1 text-sm font-medium text-muted-foreground">
-              {t("admin.nodeEdit.regionOverride", "国家\\地区图标")}
+              {t("admin.nodeEdit.regionOverride", "国家/地区图标")}
             </label>
             <SelectOrInput
               options={regionOptions}
@@ -3253,25 +3819,46 @@ function EditButton({ node }: { node: NodeDetail }) {
           <div className="km-node-traffic-section">
             <div className="space-y-2 pb-3 pt-2">
               <label className="block text-sm font-semibold leading-5">
-                {t("admin.nodeEdit.trafficResetDay", "流量重置日")}
+                {t("admin.nodeEdit.trafficResetDay", "流量重置时间")}
               </label>
-              <TextField.Root
-                aria-label={t("admin.nodeEdit.trafficResetDay")}
-                value={String(trafficResetDay)}
-                onChange={(event) => {
-                  const day = Number.parseInt(event.target.value || "0", 10);
-                  setTrafficResetDay(
-                    Math.min(
-                      31,
-                      Math.max(0, Number.isFinite(day) ? day : 0),
-                    ),
-                  );
-                }}
-              />
+              <div className="km-traffic-reset-clock-row">
+                <div className="km-traffic-reset-timezone">
+                  <SelectOrInput
+                    options={trafficResetTimezoneOptions}
+                    value={trafficResetTimezone}
+                    allowCustomInput
+                    onChange={setTrafficResetTimezone}
+                    placeholder="Asia/Shanghai"
+                    aria-label={t("admin.nodeEdit.trafficResetTimezone")}
+                  />
+                </div>
+                <div className="km-traffic-reset-day">
+                  <TextField.Root
+                    aria-label={t("admin.nodeEdit.trafficResetDate", "日期")}
+                    value={String(trafficResetDay)}
+                    onChange={(event) => {
+                      const day = Number.parseInt(event.target.value || "0", 10);
+                      setTrafficResetDay(
+                        Math.min(
+                          31,
+                          Math.max(0, Number.isFinite(day) ? day : 0),
+                        ),
+                      );
+                    }}
+                  />
+                </div>
+                <div className="km-traffic-reset-time">
+                  <TrafficResetTimeField
+                    ariaLabel={t("admin.nodeEdit.trafficResetTime")}
+                    value={trafficResetTime}
+                    onChange={setTrafficResetTime}
+                  />
+                </div>
+              </div>
               <p className="text-sm leading-6 text-muted-foreground">
                 {t(
                   "admin.nodeEdit.trafficResetDay_description",
-                  "0 表示关闭；1-31 表示每月重置日。保存后自动同步到 Agent。",
+                  "0 表示关闭；1-31 为每月重置日。流量重置时间按厂商账单填写，Lite 会换算到北京时间才重置。存量数据为北京时间 0:00。保存后同步到 Agent。",
                 )}
               </p>
             </div>
@@ -3378,24 +3965,51 @@ function EditButton({ node }: { node: NodeDetail }) {
   );
 }
 
+function hasVisibleTextSelection() {
+  const selection = window.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim());
+}
+
 function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | null }) {
   const { t } = useTranslation();
   const pending = online === null;
   const statusLabel = online
     ? t("nodeCard.online", "在线")
     : t("nodeCard.offline", "离线");
+  const pointerStart = React.useRef<{ x: number; y: number } | null>(null);
+
+  const onPointerDownCapture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const onNameClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start || !hasVisibleTextSelection()) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (dx * dx + dy * dy > 16) event.preventDefault();
+  };
 
   return (
-    <Link
-      to={`/admin/servers/${node.uuid}`}
-      className="flex w-full min-w-0 items-center gap-2 text-left"
+    <div
+      className="admin-node-name-select flex w-full min-w-0 items-center gap-2 text-left"
+      onPointerDownCapture={onPointerDownCapture}
     >
       <span className="admin-node-country-flag">
         <Flag flag={node.region} compact />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="block max-w-full truncate text-[15px] font-semibold leading-6 hover:underline">
-          {node.name}
+        <span className="block max-w-full truncate">
+          <Link
+            to={`/admin/servers/${node.uuid}`}
+            className="admin-node-name-link text-[15px] font-semibold leading-6 hover:underline"
+            title={node.name}
+            onClick={onNameClick}
+          >
+            {node.name}
+          </Link>
         </span>
         <span
           className="flex h-[18px] items-center gap-1.5 text-[13.5px] text-muted-foreground"
@@ -3409,7 +4023,7 @@ function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | nu
           {statusLabel}
         </span>
       </span>
-    </Link>
+    </div>
   );
 }
 
@@ -3513,7 +4127,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
               </label>
             </label>
             <SelectOrInput
-              options={["¥", "$", "€", "£", "₽", "₣", "₹", "₫", "฿", "C$"]}
+              options={["¥", "$", "€", "£", "C$", "HK$"]}
               name="currency"
               value={currency}
               onChange={(value) => setCurrency(value)}

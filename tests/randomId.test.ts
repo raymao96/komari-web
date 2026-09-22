@@ -30,6 +30,7 @@ test("createRandomId works when randomUUID is missing", () => {
 
 test("billing and remote tools do not call crypto.randomUUID", () => {
   const sources = [
+    readFileSync("src/pages/admin/exec.tsx", "utf8"),
     readFileSync("src/pages/admin/NodeDetailPage.tsx", "utf8"),
     readFileSync("src/pages/terminal/index.tsx", "utf8"),
     readFileSync("src/pages/terminal/FileManager.tsx", "utf8"),

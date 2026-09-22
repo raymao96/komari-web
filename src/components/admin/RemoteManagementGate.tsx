@@ -5,9 +5,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Typography from "@mui/material/Typography";
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -20,31 +18,62 @@ import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import { useSettings } from "@/lib/api";
 import {
   ALLOW_REMOTE_MANAGEMENT_SETTING_PATH,
+  isAllowMCPEnabled,
   isAllowRemoteManagementEnabled,
+  isMCPManagementPath,
   isRemoteManagementPath,
 } from "@/utils/allowRemoteManagement";
 import { clearStoredRemoteGrant } from "@/utils/remoteSession";
+import {
+  rememberRemoteManagementGate,
+  RemoteManagementGateContext,
+  type RemoteManagementGateValue,
+} from "@/components/admin/remoteManagementGateContext";
 
-type GateValue = {
-  enabled: boolean;
-  loading: boolean;
-  ensureEnabled: () => boolean;
-};
+export {
+  useOptionalRemoteManagementGate,
+  useRemoteManagementGate,
+} from "@/components/admin/remoteManagementGateContext";
 
-const RemoteManagementGateContext = createContext<GateValue | null>(null);
-
-export function useOptionalRemoteManagementGate(): GateValue | null {
-  return useContext(RemoteManagementGateContext);
-}
-
-export function useRemoteManagementGate(): GateValue {
-  const context = useContext(RemoteManagementGateContext);
-  if (!context) {
-    throw new Error(
-      "useRemoteManagementGate must be used within RemoteManagementGateProvider",
-    );
-  }
-  return context;
+function RequiredSettingDialog({
+  open,
+  title,
+  description,
+  actionLabel,
+  onGoEnable,
+  onDismiss,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onGoEnable: () => void;
+  onDismiss?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog
+      open={open}
+      onClose={onDismiss}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>{title}</DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontSize: 15, lineHeight: 1.6 }}>
+          {description}
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        {onDismiss ? (
+          <Button onClick={onDismiss}>{t("common.cancel")}</Button>
+        ) : null}
+        <Button variant="contained" onClick={onGoEnable}>
+          {actionLabel}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 function RemoteManagementRequiredDialog({
@@ -58,29 +87,36 @@ function RemoteManagementRequiredDialog({
 }) {
   const { t } = useTranslation();
   return (
-    <Dialog
+    <RequiredSettingDialog
       open={open}
-      onClose={onDismiss}
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>
-        {t("settings.general.allow_remote_management_required_title")}
-      </DialogTitle>
-      <DialogContent>
-        <Typography sx={{ fontSize: 15, lineHeight: 1.6 }}>
-          {t("settings.general.allow_remote_management_required_description")}
-        </Typography>
-      </DialogContent>
-      <DialogActions>
-        {onDismiss ? (
-          <Button onClick={onDismiss}>{t("common.cancel")}</Button>
-        ) : null}
-        <Button variant="contained" onClick={onGoEnable}>
-          {t("settings.general.allow_remote_management_go_enable")}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      title={t("settings.general.allow_remote_management_required_title")}
+      description={t("settings.general.allow_remote_management_required_description")}
+      actionLabel={t("settings.general.allow_remote_management_go_enable")}
+      onGoEnable={onGoEnable}
+      onDismiss={onDismiss}
+    />
+  );
+}
+
+function MCPRequiredDialog({
+  open,
+  onGoEnable,
+  onDismiss,
+}: {
+  open: boolean;
+  onGoEnable: () => void;
+  onDismiss?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <RequiredSettingDialog
+      open={open}
+      title={t("settings.general.allow_mcp_required_title")}
+      description={t("settings.general.allow_mcp_required_description")}
+      actionLabel={t("settings.general.allow_mcp_go_enable")}
+      onGoEnable={onGoEnable}
+      onDismiss={onDismiss}
+    />
   );
 }
 
@@ -91,22 +127,43 @@ export function RemoteManagementGateProvider({
 }) {
   const { settings, loading } = useSettings();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [remoteOpen, setRemoteOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const enabled = isAllowRemoteManagementEnabled(settings);
+  const mcpEnabled = isAllowMCPEnabled(settings);
 
   const ensureEnabled = useCallback(() => {
     if (loading || enabled) return true;
-    setOpen(true);
+    setMcpOpen(false);
+    setRemoteOpen(true);
     return false;
   }, [enabled, loading]);
 
-  const value = useMemo(
-    () => ({ enabled, loading, ensureEnabled }),
-    [enabled, loading, ensureEnabled],
+  const ensureMCPEnabled = useCallback(() => {
+    if (loading) return true;
+    if (!enabled) {
+      setMcpOpen(false);
+      setRemoteOpen(true);
+      return false;
+    }
+    if (mcpEnabled) return true;
+    setRemoteOpen(false);
+    setMcpOpen(true);
+    return false;
+  }, [enabled, loading, mcpEnabled]);
+
+  const value = useMemo<RemoteManagementGateValue>(
+    () => ({ enabled, mcpEnabled, loading, ensureEnabled, ensureMCPEnabled }),
+    [enabled, mcpEnabled, loading, ensureEnabled, ensureMCPEnabled],
   );
 
+  useEffect(() => {
+    rememberRemoteManagementGate(value);
+  }, [value]);
+
   const goEnable = useCallback(() => {
-    setOpen(false);
+    setRemoteOpen(false);
+    setMcpOpen(false);
     navigate(ALLOW_REMOTE_MANAGEMENT_SETTING_PATH);
   }, [navigate]);
 
@@ -114,9 +171,14 @@ export function RemoteManagementGateProvider({
     <RemoteManagementGateContext.Provider value={value}>
       {children}
       <RemoteManagementRequiredDialog
-        open={open}
+        open={remoteOpen}
         onGoEnable={goEnable}
-        onDismiss={() => setOpen(false)}
+        onDismiss={() => setRemoteOpen(false)}
+      />
+      <MCPRequiredDialog
+        open={mcpOpen}
+        onGoEnable={goEnable}
+        onDismiss={() => setMcpOpen(false)}
       />
     </RemoteManagementGateContext.Provider>
   );
@@ -125,12 +187,18 @@ export function RemoteManagementGateProvider({
 export function guardRemoteManagementNav(
   event: Pick<MouseEvent, "preventDefault">,
   path: string,
-  ensureEnabled: () => boolean,
+  gate: { ensureEnabled: () => boolean; ensureMCPEnabled: () => boolean },
 ): boolean {
   if (!isRemoteManagementPath(path)) return false;
-  if (ensureEnabled()) return false;
-  event.preventDefault();
-  return true;
+  if (!gate.ensureEnabled()) {
+    event.preventDefault();
+    return true;
+  }
+  if (isMCPManagementPath(path) && !gate.ensureMCPEnabled()) {
+    event.preventDefault();
+    return true;
+  }
+  return false;
 }
 
 export function RequireAllowRemoteManagement({
@@ -170,6 +238,30 @@ export function RequireAllowRemoteManagement({
     <>
       {loadingFallback ?? <SettingsPageSkeleton />}
       <RemoteManagementRequiredDialog
+        open
+        onGoEnable={() => navigate(ALLOW_REMOTE_MANAGEMENT_SETTING_PATH)}
+      />
+    </>
+  );
+}
+
+export function RequireAllowMCP({
+  children,
+  loadingFallback,
+}: {
+  children: ReactNode;
+  loadingFallback?: ReactNode;
+}) {
+  const { settings, loading } = useSettings();
+  const navigate = useNavigate();
+  const enabled = isAllowMCPEnabled(settings);
+
+  if (loading) return <>{loadingFallback ?? null}</>;
+  if (enabled) return <>{children}</>;
+  return (
+    <>
+      {loadingFallback ?? null}
+      <MCPRequiredDialog
         open
         onGoEnable={() => navigate(ALLOW_REMOTE_MANAGEMENT_SETTING_PATH)}
       />

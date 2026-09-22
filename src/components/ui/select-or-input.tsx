@@ -112,10 +112,16 @@ export function SelectOrInput<T extends Primitive = string>(
 
   const commit = React.useCallback(
     (nextValue: string, option?: SelectOption<T>) => {
-      if (!controlled) setInternalValue(nextValue);
-      onChange?.(nextValue, option);
+      const matched =
+        option ??
+        normalizedOptions.find(
+          (item) => optionValue(item) === nextValue || optionLabel(item) === nextValue,
+        );
+      const resolved = matched ? optionValue(matched) : nextValue;
+      if (!controlled) setInternalValue(resolved);
+      onChange?.(resolved, matched);
     },
-    [controlled, onChange],
+    [controlled, normalizedOptions, onChange, optionLabel, optionValue],
   );
 
   return (

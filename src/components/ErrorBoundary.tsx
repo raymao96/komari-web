@@ -39,6 +39,18 @@ class ErrorBoundary extends React.Component<
     console.error("Caught error in ErrorBoundary:", error, info);
   }
 
+  componentDidMount() {
+    import.meta.hot?.on("vite:afterUpdate", this.resetAfterHotUpdate);
+  }
+
+  componentWillUnmount() {
+    import.meta.hot?.off("vite:afterUpdate", this.resetAfterHotUpdate);
+  }
+
+  private resetAfterHotUpdate = () => {
+    if (this.state.hasError) this.setState({ hasError: false, error: null });
+  };
+
   render() {
     if (!this.state.hasError) return this.props.children;
 

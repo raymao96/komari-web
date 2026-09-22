@@ -15,6 +15,7 @@ import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
 import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +32,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { Badge } from "@/components/admin/ui";
 import AdminMultiSelect from "@/components/admin/AdminMultiSelect";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import Flag from "@/components/Flag";
@@ -417,6 +419,7 @@ function BreakdownPanel({ overview, currency }: { overview: BillingOverview; cur
 
 function TrendPanel({ overview, currency }: { overview: BillingOverview; currency: BillingCurrency }) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const chartData = overview.monthly_trend.map((item) => ({
     period: item.period.slice(5),
     base: Number(item.base),
@@ -424,6 +427,14 @@ function TrendPanel({ overview, currency }: { overview: BillingOverview; currenc
     other: Number(item.other),
     one_time: Number(item.one_time),
   }));
+  const tooltipStyle = {
+    borderRadius: 8,
+    fontSize: 12,
+    backgroundColor: theme.palette.background.paper,
+    borderColor: theme.palette.divider,
+    color: theme.palette.text.primary,
+    boxShadow: theme.shadows[2],
+  };
   return (
     <Paper variant="outlined" sx={{ ...panelSx, width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       <Box sx={{ minHeight: 44, px: 2, display: "flex", alignItems: "center", borderBottom: 1, borderColor: "divider" }}>
@@ -436,7 +447,13 @@ function TrendPanel({ overview, currency }: { overview: BillingOverview; currenc
             <CartesianGrid stroke="rgba(145,158,171,.16)" vertical={false} />
             <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fill: "#919EAB", fontSize: 11 }} />
             <YAxis axisLine={false} tickLine={false} width={48} tick={{ fill: "#919EAB", fontSize: 11 }} />
-            <Tooltip formatter={(value) => formatBillingMoney(String(value ?? "0"), currency)} contentStyle={{ borderRadius: 8, borderColor: "rgba(145,158,171,.24)", fontSize: 12 }} />
+            <Tooltip
+              formatter={(value) => formatBillingMoney(String(value ?? "0"), currency)}
+              contentStyle={tooltipStyle}
+              labelStyle={{ color: theme.palette.text.secondary }}
+              itemStyle={{ color: theme.palette.text.primary }}
+              cursor={{ fill: theme.palette.action.hover }}
+            />
             <Bar dataKey="base" name={t("billing.types.base")} fill="#0E86DD" radius={[4, 4, 0, 0]} maxBarSize={32} />
             <Bar dataKey="extra" name={t("billing.types.trafficReset")} fill="#FFAB00" radius={[4, 4, 0, 0]} maxBarSize={32} />
             <Bar dataKey="other" name={t("billing.types.ipChange")} fill="#118D57" radius={[4, 4, 0, 0]} maxBarSize={32} />
@@ -550,11 +567,18 @@ function BillingServerIdentity({
 
 function ServerStatus({ server }: { server: BillingServer }) {
   const { t } = useTranslation();
-  if (!server.currency_valid) return <Chip size="small" color="warning" label={t("billing.status.currencyCorrection")} />;
-  if (server.billing_status === "free") return <Chip size="small" color="success" label={t("billing.status.free")} />;
-  if (server.billing_status === "unconfigured") return <Chip size="small" label={t("billing.status.unconfigured")} />;
-  if (server.billing_status === "one_time") return <Chip size="small" color="info" label={t("billing.status.oneTime")} />;
+  if (!server.currency_valid) return <Badge color="orange">{t("billing.status.currencyCorrection")}</Badge>;
+  if (server.billing_status === "free") return <Badge color="blue">{t("billing.status.free")}</Badge>;
+  if (server.billing_status === "unconfigured") return <Badge color="gray">{t("billing.status.unconfigured")}</Badge>;
+  if (server.billing_status === "one_time") return <Badge color="blue">{t("billing.status.oneTime")}</Badge>;
   return null;
+}
+
+function periodStatusColor(status: string) {
+  if (status === "in_progress") return "blue";
+  if (status === "projected") return "orange";
+  if (status === "no_record") return "gray";
+  return "green";
 }
 
 function billingExpiryPrimary(t: TFunction, expiredAt?: string | null) {
@@ -678,7 +702,7 @@ function PeriodList({ data, currency, monthly, page, pageSize, onPage, onPageSiz
         <TableCell data-label={t("billing.table.period")}><Stack direction="row" spacing={1} sx={{ alignItems: "center" }}><Box sx={{ width: 30, height: 30, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: "primary.main", color: "primary.contrastText" }}><History size={15} /></Box><Typography sx={{ fontWeight: 400 }}>{period.period}</Typography></Stack></TableCell>
         <TableCell data-label={t("billing.types.base")}>{period.status === "no_record" ? "--" : formatBillingMoney(period.base, currency)}</TableCell><TableCell data-label={t("billing.types.trafficReset")}>{period.status === "no_record" ? "--" : formatBillingMoney(period.extra, currency)}</TableCell><TableCell data-label={t("billing.types.ipChange")}>{period.status === "no_record" ? "--" : formatBillingMoney(period.other, currency)}</TableCell><TableCell data-label={t("billing.types.oneTimeFee")}>{period.status === "no_record" ? "--" : formatBillingMoney(period.one_time, currency)}</TableCell><TableCell data-label={t("billing.table.total")}><Typography sx={{ fontWeight: 400 }}>{period.status === "no_record" ? "--" : formatBillingMoney(period.total, currency)}</Typography></TableCell>
         <TableCell data-label={monthly ? t("billing.table.server") : t("billing.table.yearOverYear")}>{monthly ? t("billing.common.serverCount", { count: period.server_count || 0 }) : period.year_over_year ? `${Number(period.year_over_year) > 0 ? "+" : ""}${period.year_over_year}%` : "--"}</TableCell>
-        <TableCell data-label={t("billing.table.status")}><Chip size="small" color={period.status === "in_progress" ? "info" : period.status === "projected" ? "warning" : period.status === "no_record" ? "default" : "success"} label={billingStatusLabel(t, period.status)} /></TableCell>
+        <TableCell data-label={t("billing.table.status")}><Badge color={periodStatusColor(period.status ?? "no_record")}>{billingStatusLabel(t, period.status ?? "no_record")}</Badge></TableCell>
         <BillingActionCell dataLabel={t("billing.table.actions")}><DetailsButton disabled={period.status === "no_record"} onClick={() => onDetails(period)} /></BillingActionCell>
       </TableRow>)}</TableBody>
     </Table></Box>
@@ -804,7 +828,7 @@ function EntryDetailsDialog({
         </AdminListFiltersBar>
         {request.error ? <ErrorPanel message={request.error} retry={request.retry} /> : null}
         {request.loading && !request.data ? <Box sx={{ p: 2 }}><Skeleton height={240} /></Box> : request.data?.items.length ? <>
-          <Box className="admin-responsive-table-wrap overflow-x-auto"><Table container={false} className="admin-responsive-table km-billing-details-table w-full table-fixed"><TableHeader><TableRow><TableHead className="w-[132px]">{t("billing.filters.feeType")}</TableHead><TableHead>{t("billing.table.server")}</TableHead><TableHead className="w-[120px]">{t("billing.table.originalAmount")}</TableHead><TableHead className="w-[120px]">{t("billing.table.convertedAmount")}</TableHead><TableHead className="w-[168px]">{t("billing.table.occurredAt")}</TableHead><TableHead className="km-billing-note">{t("billing.table.note")}</TableHead><BillingActionHead>{t("billing.table.actions")}</BillingActionHead></TableRow></TableHeader><TableBody>{request.data.items.map((entry) => <TableRow key={`${entry.client}-${entry.type}-${entry.day}-${entry.id}-${entry.occurred_at}`}><TableCell data-label={t("billing.filters.feeType")}><Chip size="small" color={entry.voided || entry.type === "reversal" ? "error" : entry.category === "traffic_reset" || entry.category === "ip_change" || entry.category === "adjustment" ? "warning" : "default"} label={entry.voided ? t("billing.types.voided") : billingTypeLabel(t, entry.type)} /></TableCell><TableCell data-label={t("billing.table.server")}><Typography sx={{ fontWeight: 600 }}>{entry.client_name || entry.client}</Typography></TableCell><TableCell data-label={t("billing.table.originalAmount")}>{formatBillingMoney(entry.original_amount, entry.original_currency)}</TableCell><TableCell data-label={t("billing.table.convertedAmount")}>{entry.pending_fx ? <Chip size="small" color="warning" label={t("billing.status.pendingFx")} /> : formatBillingMoney(entry.converted_amount, entry.converted_currency)}</TableCell><TableCell data-label={t("billing.table.occurredAt")}>{billingDateTime(entry.occurred_at)}</TableCell><TableCell className="km-billing-note" data-label={t("billing.table.note")}><Typography noWrap title={entry.note || undefined}>{entry.note || "--"}</Typography></TableCell><BillingActionCell dataLabel={t("billing.table.actions")}>{entry.voidable ? <Button className="km-billing-action-btn" color="error" data-text-action="true" size="small" onClick={() => setVoidEntry(entry)}>{t("billing.actions.void")}</Button> : "--"}</BillingActionCell></TableRow>)}</TableBody></Table></Box>
+          <Box className="admin-responsive-table-wrap overflow-x-auto"><Table container={false} className="admin-responsive-table km-billing-details-table w-full table-fixed"><TableHeader><TableRow><TableHead className="w-[132px]">{t("billing.filters.feeType")}</TableHead><TableHead>{t("billing.table.server")}</TableHead><TableHead className="w-[120px]">{t("billing.table.originalAmount")}</TableHead><TableHead className="w-[120px]">{t("billing.table.convertedAmount")}</TableHead><TableHead className="w-[168px]">{t("billing.table.occurredAt")}</TableHead><TableHead className="km-billing-note">{t("billing.table.note")}</TableHead><BillingActionHead>{t("billing.table.actions")}</BillingActionHead></TableRow></TableHeader><TableBody>{request.data.items.map((entry) => <TableRow key={`${entry.client}-${entry.type}-${entry.day}-${entry.id}-${entry.occurred_at}`}><TableCell data-label={t("billing.filters.feeType")}><Badge color={entry.voided || entry.type === "reversal" ? "red" : entry.category === "traffic_reset" || entry.category === "ip_change" || entry.category === "adjustment" ? "orange" : "gray"}>{entry.voided ? t("billing.types.voided") : billingTypeLabel(t, entry.type)}</Badge></TableCell><TableCell data-label={t("billing.table.server")}><Typography sx={{ fontWeight: 600 }}>{entry.client_name || entry.client}</Typography></TableCell><TableCell data-label={t("billing.table.originalAmount")}>{formatBillingMoney(entry.original_amount, entry.original_currency)}</TableCell><TableCell data-label={t("billing.table.convertedAmount")}>{entry.pending_fx ? <Badge color="orange">{t("billing.status.pendingFx")}</Badge> : formatBillingMoney(entry.converted_amount, entry.converted_currency)}</TableCell><TableCell data-label={t("billing.table.occurredAt")}>{billingDateTime(entry.occurred_at)}</TableCell><TableCell className="km-billing-note" data-label={t("billing.table.note")}><Typography noWrap title={entry.note || undefined}>{entry.note || "--"}</Typography></TableCell><BillingActionCell dataLabel={t("billing.table.actions")}>{entry.voidable ? <Button className="km-billing-action-btn" color="error" data-text-action="true" size="small" onClick={() => setVoidEntry(entry)}>{t("billing.actions.void")}</Button> : "--"}</BillingActionCell></TableRow>)}</TableBody></Table></Box>
         </> : <Box className="km-admin-list-empty">{t("billing.empty.details")}</Box>}
       </DialogContent>
       {request.data?.items.length ? <AdminPagination page={page} total={request.data.pagination.total} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} showSummary={false} /> : null}

@@ -193,6 +193,47 @@ test("query and hash updates keep the current admin route view mounted", () => {
   );
 });
 
+test("legacy theme admin dashboard uses the same admin home view", () => {
+  assert.equal(
+    getAdminRouteViewKey({
+      pathname: "/admin/dashboard",
+      search: "",
+      hash: "",
+    }),
+    "/admin",
+  );
+});
+
+test("legacy dashboard URL can replace Navigate with the real home outlet", () => {
+  const fromServers: RouteViewportState<string> = {
+    activeKey: "/admin/servers",
+    pendingKey: null,
+    views: [{ key: "/admin/servers", outlet: "servers" }],
+  };
+  const dashboardKey = getAdminRouteViewKey({
+    pathname: "/admin/dashboard",
+    search: "",
+    hash: "",
+  });
+  const homeKey = getAdminRouteViewKey({
+    pathname: "/admin",
+    search: "",
+    hash: "",
+  });
+  const staged = stageAdminRouteView(fromServers, dashboardKey, "home");
+  assert.equal(staged.pendingKey, homeKey);
+  assert.equal(
+    staged.views.find((view) => view.key === homeKey)?.outlet,
+    "home",
+  );
+  const arrived = stageAdminRouteView(staged, homeKey, "home");
+  assert.equal(arrived.pendingKey, homeKey);
+  const settled = promoteAdminRouteView(arrived, homeKey);
+  assert.equal(settled.activeKey, homeKey);
+  assert.equal(settled.pendingKey, null);
+  assert.equal(settled.views[0].outlet, "home");
+});
+
 test("visible route progress stays long enough to avoid a flash", () => {
   assert.equal(
     getAdminRouteProgressHideDelay({

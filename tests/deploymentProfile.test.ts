@@ -18,10 +18,18 @@ const globalCssSource = fs.readFileSync(
   "utf8",
 );
 
-test("deployment settings are restored and saved per node", () => {
-  assert.match(source, /client\/\$\{node\.uuid\}\/deployment-profile/);
-  assert.match(source, /cache: "no-store"/);
-  assert.match(source, /body: JSON\.stringify\(\{ profile: deploymentProfile\(\) \}\)/);
+test("online collection settings include traffic reset clock and timezone", () => {
+  assert.match(source, /month_rotate_time: normalizeTrafficResetTime/);
+  assert.match(source, /month_rotate_timezone: normalizeTrafficResetTimezone/);
+  assert.match(source, /admin\.nodeTable\.monthRotateDay/);
+  assert.match(source, /admin\.nodeTable\.monthRotateTime/);
+  assert.match(source, /admin\.nodeTable\.monthRotateTimezone/);
+  assert.match(source, /km-traffic-reset-clock-row/);
+  assert.match(source, /km-traffic-reset-timezone/);
+  assert.match(source, /--month-rotate-time/);
+  assert.match(source, /--month-rotate-timezone/);
+  assert.match(source, /installOptions\.monthRotateTime/);
+  assert.match(source, /installOptions\.monthRotateTimezone/);
 });
 
 test("deployment UI separates live dispatch from reinstall-only settings", () => {
@@ -133,6 +141,13 @@ test("install commands always emit an explicit remote-control flag", () => {
   const trueFlagCount = [...source.matchAll(/args\.push\("--enable-remote-control"\)/g)].length;
   assert.equal(falseFlagCount, 1);
   assert.equal(trueFlagCount, 1);
+});
+
+test("install commands do not emit a separate MCP flag", () => {
+  assert.doesNotMatch(source, /enableMCP/);
+  assert.doesNotMatch(source, /enable_mcp/);
+  assert.doesNotMatch(source, /--enable-mcp/);
+  assert.doesNotMatch(source, /admin\.nodeTable\.enableMCP/);
 });
 
 test("one-click Agent install uses Lite-agent latest paths", () => {

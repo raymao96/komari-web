@@ -7,6 +7,7 @@ import {
   ADMIN_IDLE_WARMUP_START_DELAY_MS,
   expandAdminPreloadTargets,
   getIdleAdminWarmupTargets,
+  normalizeAdminPathname,
   scheduleIdleAdminWarmup,
   shouldPreloadAdminRoutes,
   type AdminIdleWarmupTimers,
@@ -45,6 +46,20 @@ test("settings pages also warm the settings layout chunk", () => {
     "/admin/settings/theme",
   ]);
   assert.deepEqual(expandAdminPreloadTargets("/admin/ping"), ["/admin/ping"]);
+  assert.deepEqual(expandAdminPreloadTargets("/admin/dashboard"), ["/admin"]);
+  assert.deepEqual(
+    expandAdminPreloadTargets("/admin/settings/dashboard"),
+    ["/admin/settings", "/admin/settings/dashboard"],
+  );
+});
+
+test("legacy theme admin dashboard path aliases to /admin", () => {
+  assert.equal(normalizeAdminPathname("/admin/dashboard"), "/admin");
+  assert.equal(normalizeAdminPathname("/admin/dashboard/"), "/admin");
+  assert.equal(
+    normalizeAdminPathname("/admin/settings/dashboard"),
+    "/admin/settings/dashboard",
+  );
 });
 
 test("idle warmup loads one route per idle slice and can be cancelled", async () => {

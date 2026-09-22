@@ -10,10 +10,6 @@ const authPageSource = readFileSync(
   new URL("../src/components/admin/shell/AuthStandAlonePage.tsx", import.meta.url),
   "utf8",
 );
-const loginIdentitySource = readFileSync(
-  new URL("../src/components/LoginIdentityHeader.tsx", import.meta.url),
-  "utf8",
-);
 const mainSource = readFileSync(
   new URL("../src/main.tsx", import.meta.url),
   "utf8",
@@ -43,15 +39,20 @@ test("admin login is a standalone MUI page, not a dialog overlay", () => {
   assert.doesNotMatch(loginSource, /@radix-ui\/themes/);
 });
 
+test("auth card keeps a visible edge in dark mode", () => {
+  assert.match(authPageSource, /palette\.mode === "dark"/);
+  assert.match(authPageSource, /1px solid rgba\(145, 158, 171, 0\.40\)/);
+  assert.match(
+    authPageSource,
+    /0 2px 4px rgba\(0, 0, 0, 0\.40\), 0 24px 48px rgba\(0, 0, 0, 0\.36\)/,
+  );
+});
+
 test("login card does not use the framed favicon as a hero icon", () => {
   assert.doesNotMatch(loginSource, /width: 64, height: 64/);
   assert.doesNotMatch(authPageSource, /width: 64, height: 64/);
   assert.match(
     authPageSource,
-    /getAppAssetUrl\("assets\/logo\.png\?v=lite-icon-0e86dd"\)/,
-  );
-  assert.match(
-    loginIdentitySource,
     /getAppAssetUrl\("assets\/logo\.png\?v=lite-icon-0e86dd"\)/,
   );
 });
@@ -72,7 +73,10 @@ test("login shows two-factor only after the server asks for it", () => {
   assert.match(loginSource, /autoComplete="current-password"/);
   assert.match(loginSource, /autoComplete="one-time-code"/);
   assert.match(adminAuthSource, /loginTwoFactorRequiredMessage = "2FA code is required"/);
-  assert.match(loginSource, /WebkitBoxShadow: `0 0 0 100px \$\{fill\} inset`/);
+  assert.match(authPageSource, /export const authFieldSx/);
+  assert.match(authPageSource, /minHeight: 60/);
+  assert.match(authPageSource, /WebkitBoxShadow: `0 0 0 100px \$\{fill\} inset`/);
+  assert.match(loginSource, /sx=\{authFieldSx\}/);
   assert.doesNotMatch(loginSource, /autoComplete="off"/);
 });
 

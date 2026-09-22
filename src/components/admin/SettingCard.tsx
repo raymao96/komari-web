@@ -318,46 +318,6 @@ export function SettingCardButton({
   );
 }
 
-export function SettingCardIconButton({
-  label = "",
-  children,
-  onClick,
-  autoDisabled = true,
-  ...props
-}: SettingCardProps & {
-  label?: string;
-  variant?: "solid" | "soft" | "outline" | "ghost";
-  children?: React.ReactNode;
-  onClick?: (buttonElement: HTMLButtonElement) => void;
-  autoDisabled?: boolean;
-}) {
-  const [disabled, setDisabled] = React.useState(false);
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (autoDisabled) setDisabled(true);
-    const result: unknown = onClick ? onClick(event.currentTarget) : undefined;
-    if (autoDisabled) {
-      const promise = result as Promise<unknown> | undefined;
-      if (promise && typeof promise.then === "function") {
-        promise.finally(() => setDisabled(false)).catch(() => {});
-      } else {
-        setDisabled(false);
-      }
-    }
-  };
-  return (
-    <SettingCard {...props} direction="column">
-      <SettingCard.Action>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          {label ? <Typography variant="body2">{label}</Typography> : null}
-          <IconButton onClick={handleClick} disabled={disabled}>
-            {children}
-          </IconButton>
-        </Stack>
-      </SettingCard.Action>
-    </SettingCard>
-  );
-}
-
 interface SettingCardShortTextInputProps {
   title?: string;
   description?: string;
@@ -732,7 +692,7 @@ export function SettingCardSelect({
   value?: string;
   label?: string;
   options?: { value: string; label?: string; disabled?: boolean }[];
-  OnSave?: (value: string, buttonElement: HTMLButtonElement) => void;
+  OnSave?: (value: string, buttonElement?: HTMLButtonElement | null) => void;
   autoDisabled?: boolean;
   isSaving?: boolean;
   bordless?: boolean;
@@ -755,9 +715,7 @@ export function SettingCardSelect({
     const previousValue = selectedValue;
     setSelectedValue(next);
 
-    const result: unknown = buttonRef.current
-      ? OnSave(next, buttonRef.current)
-      : undefined;
+    const result: unknown = OnSave(next, buttonRef.current);
     if (autoDisabled) {
       const promise = result as Promise<unknown> | undefined;
       if (promise && typeof promise.then === "function") {

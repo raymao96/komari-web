@@ -1,6 +1,7 @@
 import { alpha, createTheme } from "@mui/material/styles";
 
 import { INPUT_FILL, INPUT_FILL_DARK, LITE_BLUE } from "@/theme/brand";
+import { dialogContainerNoFadeSx, dialogPaperVisibility } from "@/theme/dialogCloseMotion";
 
 const GREY = {
   100: "#F9FAFB",
@@ -325,15 +326,20 @@ export function createAppTheme(mode: "light" | "dark") {
       },
       MuiDialog: {
         defaultProps: {
+          disableScrollLock: true,
           transitionDuration: { enter: 220, exit: 160 },
         },
         styleOverrides: {
-          paper: {
+          container: {
+            ...dialogContainerNoFadeSx,
+          },
+          paper: ({ ownerState }: { ownerState?: { open?: boolean } }) => ({
             borderRadius: 8,
             border: `1px solid ${alpha(GREY[500], isLight ? 0.2 : 0.24)}`,
             backgroundImage: "none",
             boxShadow: isLight ? CARD_SHADOW_LIGHT : CARD_SHADOW_DARK,
-          },
+            visibility: dialogPaperVisibility(Boolean(ownerState?.open)),
+          }),
         },
       },
       MuiPopover: {
