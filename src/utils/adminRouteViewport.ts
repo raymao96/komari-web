@@ -30,7 +30,11 @@ export const getAdminRouteViewKey = ({
   pathname: string;
   search: string;
   hash: string;
-}): string => pathname;
+}): string => {
+  const normalized = pathname.replace(/\/$/, "") || "/";
+  if (normalized === "/admin/dashboard") return "/admin";
+  return pathname;
+};
 
 export const isAdminRouteViewReady = ({
   hasPendingMarker,

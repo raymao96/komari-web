@@ -78,6 +78,8 @@ export const ADMIN_LIST_FIELD_SX = {
   "& .MuiSelect-select": {
     display: "flex",
     alignItems: "center",
+    minWidth: 0,
+    overflow: "hidden",
     py: 0,
     height: 40,
     boxSizing: "border-box",

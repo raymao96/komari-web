@@ -9,6 +9,8 @@ export type Account = {
   "2fa_enabled": boolean;
   language?: string;
   color?: string;
+  avatar_url?: string;
+  has_password?: boolean;
 };
 
 export type AccountPreferences = {

@@ -20,6 +20,7 @@ export interface SettingsResponse {
   cors_origin_check_enabled: boolean;
   auto_order_new_clients_by_region: boolean;
   allow_remote_management: boolean;
+  allow_mcp: boolean;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
   o_auth_provider: string;
@@ -38,6 +39,7 @@ const createDefaultSettings = (): SettingsResponse => ({
   cors_origin_check_enabled: true,
   auto_order_new_clients_by_region: false,
   allow_remote_management: false,
+  allow_mcp: false,
   geo_ip_enabled: false,
   geo_ip_provider: "",
   o_auth_provider: "",
@@ -279,7 +281,23 @@ type SettingsContextValue = ReturnType<typeof useSettingsController>;
 const SettingsContext = React.createContext<SettingsContextValue | null>(null);
 
 export function useReduceMotionPreference(): boolean {
-  return false;
+  const [reduceMotion, setReduceMotion] = React.useState(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return false;
+    }
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+
+  React.useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceMotion(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return reduceMotion;
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {

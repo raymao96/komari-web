@@ -27,11 +27,16 @@ export type NodeDetail = {
   public_remark: string;
   remote_protocol?: number;
   remote_control_enabled?: boolean;
+  mcp_full?: boolean;
+  mcp_full_version?: number;
   traffic_reset_day?: number | null;
+  traffic_reset_time?: string;
+  traffic_reset_timezone?: string;
   traffic_reset_allowance: number;
   effective_traffic_limit: number;
   effective_traffic_type: "sum" | "max" | "min" | "up" | "down";
   group: string | undefined;
+  tags?: string;
   billing_cycle: number;
   expired_at: string;
   created_at: string;

@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 
 import { useOptionalAccount } from "@/contexts/AccountContext";
 import { ThemeContext } from "@/contexts/ThemeContext";
+import { useSystemTheme } from "@/hooks/useSystemTheme";
 import { changeUiLanguage, preloadUiLocales } from "@/i18n/config";
 import { ADMIN_UI_LANGUAGES } from "@/utils/language";
 
@@ -177,7 +178,40 @@ function AutoThemeIcon({ className }: { className?: string }) {
   );
 }
 
-export function ThemeMenu() {
+export function AppearanceSegment() {
+  const { t } = useTranslation();
+  const { appearance, setAppearance } = useContext(ThemeContext);
+  const resolved = useSystemTheme(appearance);
+
+  return (
+    <div className="remote-theme-segment" role="group" aria-label={t("terminal.session.appearance")}>
+      <button
+        type="button"
+        className={resolved === "light" ? "is-active" : undefined}
+        aria-label={t("theme.light", "浅色")}
+        aria-pressed={resolved === "light"}
+        onClick={() => setAppearance("light")}
+      >
+        <Sun />
+      </button>
+      <button
+        type="button"
+        className={resolved === "dark" ? "is-active" : undefined}
+        aria-label={t("theme.dark", "深色")}
+        aria-pressed={resolved === "dark"}
+        onClick={() => setAppearance("dark")}
+      >
+        <Moon />
+      </button>
+    </div>
+  );
+}
+
+export function ThemeMenu({
+  trigger = "icon",
+}: {
+  trigger?: "icon" | "label";
+} = {}) {
   const { t } = useTranslation();
   const { appearance, setAppearance } = useContext(ThemeContext);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -191,15 +225,28 @@ export function ThemeMenu() {
     { value: "system", label: t("theme.system", "跟随系统"), icon: AutoThemeIcon },
   ];
 
+  const openMenu = (event: MouseEvent<HTMLElement>) => setAnchor(event.currentTarget);
+
   return (
     <>
-      <ChromeIconButton
-        label={t("changeTheme", "切换外观")}
-        onClick={(event) => setAnchor(event.currentTarget)}
-      >
-        <Sun className="size-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-        <Moon className="absolute size-[18px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      </ChromeIconButton>
+      {trigger === "label" ? (
+        <button
+          type="button"
+          className="remote-theme-label"
+          aria-label={t("changeTheme", "切换外观")}
+          onClick={openMenu}
+        >
+          {t("terminal.session.appearance")}
+        </button>
+      ) : (
+        <ChromeIconButton
+          label={t("changeTheme", "切换外观")}
+          onClick={openMenu}
+        >
+          <Sun className="size-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute size-[18px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        </ChromeIconButton>
+      )}
       <ChromeMenu anchor={anchor} onClose={() => setAnchor(null)}>
         {options.map((option) => {
           const Icon = option.icon;

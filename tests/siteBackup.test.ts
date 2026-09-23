@@ -46,8 +46,8 @@ test("general settings does not expose a reduce-motion switch", () => {
 });
 
 test("node list region filter uses country/region wording", () => {
-  assert.equal(locales.zhCN.admin.nodeTable.region, "国家\\地区");
-  assert.equal(locales.zhTW.admin.nodeTable.region, "國家\\地區");
+  assert.equal(locales.zhCN.admin.nodeTable.region, "国家/地区");
+  assert.equal(locales.zhTW.admin.nodeTable.region, "國家/地區");
   assert.equal(locales.en.admin.nodeTable.region, "Country/Region");
   assert.equal(locales.ja.admin.nodeTable.region, "国/地域");
 });
@@ -88,35 +88,46 @@ test("full and configuration exports download through authenticated requests", (
   assert.doesNotMatch(source, /window\.open\("\/api\/admin\/download\/backup/);
 });
 
-test("both backup rows use the same text action as restore", () => {
-  assert.equal(source.match(/\{t\("common\.export"\)\}/g)?.length, 2);
-  assert.match(source, /\{t\("common\.select"\)\}/);
+test("backup download rows export, restore row uploads", () => {
+  assert.equal(source.match(/t\("common\.export"\)/g)?.length, 2);
+  assert.match(source, /onDropFiles=/);
+  assert.match(source, /settings\.site\.upload_backup_file/);
+  assert.equal(locales.zhCN.settings.site.upload_backup_file, "上传备份");
+  assert.doesNotMatch(source, /t\("common\.select"\)/);
   assert.doesNotMatch(source, /SettingCardIconButton/);
-});
-
-test("account backup hint points to the actual site settings page", () => {
-  const hints = Object.values(locales).map(
-    (locale) => locale.account_settings.looking_for_backup,
-  );
-
-  assert.deepEqual(hints, [
-    "Looking for backups? They are now under System Settings > Site.",
-    "バックアップは「システム設定 > サイト」に移動しました。",
-    "正在寻找备份？现已迁移至「系统设置 > 站点」。",
-    "尋找備份功能嗎？現已移至【系統設定】->【網站設定】。",
-  ]);
 });
 
 test("backup restore dialog uses staged progress instead of a fake 95 percent finish", () => {
   assert.match(source, /phase_uploading/);
   assert.match(source, /phase_processing/);
-  assert.match(source, /phase_completed/);
-  assert.match(source, /uploadState={restoreState}/);
-  assert.match(
-    source,
-    /setRestoreOpen\(false\);\s*await delay\(UPLOAD_DIALOG_EXIT_MS\);\s*setTrackedRestoreState\(null\)/,
-  );
+  assert.match(source, /backup_submitted/);
+  assert.match(source, /createCompletedUploadState/);
+  assert.match(source, /setRestoreState/);
   assert.doesNotMatch(source, /setRestoreProgress/);
+});
+
+test("favicon preview is centered without site-name copy", () => {
+  assert.match(source, /settings\.site\.current_icon/);
+  assert.doesNotMatch(source, /settings\.site\.tab_icon/);
+  assert.doesNotMatch(source, /sitename=\{settings\.sitename/);
+  assert.doesNotMatch(source, /settingsNeutralBg/);
+});
+
+test("favicon restore confirmation shows current and default square icons", () => {
+  assert.match(source, /confirmReset[\s\S]{0,80}settings\.custom\.favicon_default/);
+  assert.match(source, /favicon\.png\?v=lite-icon-0e86dd/);
+  assert.match(source, /settings\.site\.reset_favicon_hint/);
+  assert.match(source, /borderRadius: "16px"/);
+  assert.doesNotMatch(source, /<Avatar[\s\S]*favicon/);
+  assert.doesNotMatch(source, /settings\.site\.reset_favicon_confirm/);
+});
+
+test("configuration backup copy does not mention upstream Komari", () => {
+  assert.match(source, /backup_config_download_description/);
+  for (const locale of Object.values(locales)) {
+    const description = locale.settings.site.backup_config_download_description;
+    assert.doesNotMatch(description, /upstream|上游|上流|Komari|komari|仅可用于 Lite|Lite only|Lite 専用|僅可用於 Lite/i);
+  }
 });
 
 test("favicon upload refreshes the current icon link", () => {

@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-const dialogSource = readFileSync("src/components/AppDialogContent.tsx", "utf8");
+const dialogSource = readFileSync("src/components/admin/ui/dialog.tsx", "utf8");
 const themeSettingsSource = readFileSync("src/pages/admin/settings/theme.tsx", "utf8");
 const themeManagedSource = readFileSync("src/pages/admin/theme_managed.tsx", "utf8");
 const marketSource = readFileSync("src/pages/admin/market/themes.tsx", "utf8");
@@ -82,12 +82,7 @@ test("theme pages share preview-image loading treatment", () => {
 test("theme and upload dialogs use shared dialog content and staged upload UI", () => {
   assert.match(themeSettingsSource, /AppDialogContent/);
   assert.match(marketSource, /AppDialogContent/);
-  assert.match(dialogSource, /containsDialogDescription/);
-  assert.match(dialogSource, /disabledDescriptionProps/);
-  assert.match(
-    dialogSource,
-    /"aria-describedby": undefined,\s*}\s*as const/,
-  );
+  assert.match(dialogSource, /aria-describedby=\{undefined\}/);
   assert.match(uploadDialogSource, /normalizedState\.indeterminate/);
   assert.match(uploadDialogSource, /km-upload-indeterminate-bar/);
   assert.match(uploadDialogSource, /disabled=\{uploadActive\}/);
@@ -125,7 +120,7 @@ test("all application dialogs use the shared description contract", () => {
   const directDialogContentUsers = sourceFiles
     .filter((file) => readFileSync(file, "utf8").includes("<Dialog.Content"))
     .map((file) => file.replaceAll("\\", "/"));
-  assert.deepEqual(directDialogContentUsers, ["src/components/AppDialogContent.tsx"]);
+  assert.deepEqual(directDialogContentUsers, []);
 });
 
 test("theme, site backup, and install staged-progress copy is present in every locale", () => {
@@ -142,7 +137,7 @@ test("theme, site backup, and install staged-progress copy is present in every l
     assert.equal(typeof locale.settings.site.phase_uploading, "string");
     assert.equal(typeof locale.settings.site.phase_processing, "string");
     assert.equal(typeof locale.settings.site.phase_restarting, "string");
-    assert.equal(typeof locale.settings.site.phase_completed, "string");
+    assert.equal(typeof locale.settings.site.backup_submitted, "string");
     assert.equal(typeof locale.settings.site.phase_non_cancelable, "string");
 
     assert.equal(typeof locale.install.phase_preparing, "string");

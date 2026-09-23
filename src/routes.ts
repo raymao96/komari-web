@@ -38,7 +38,7 @@ const loadAdminSettingsLayout = () =>
 
 export const preloadAdminEntry = (pathname: string) => {
   void loadAdminLayout();
-  if (pathname === "/admin") void loadAdminDashboard();
+  if (normalizeAdminPathname(pathname) === "/admin") void loadAdminDashboard();
 };
 
 const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
@@ -49,6 +49,7 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin/return-route": loadAdminReturnRoute,
   "/admin/logs": () => import("./pages/admin/log"),
   "/admin/exec": () => import("./pages/admin/exec"),
+  "/admin/remote-management/mcp": () => import("./pages/admin/remote-management/mcp"),
   "/admin/theme_managed": () => import("./pages/admin/theme_managed.tsx"),
   "/admin/theme_raw": () => import("./pages/admin/theme_raw.tsx"),
   "/admin/market/themes": () => import("./pages/admin/market/themes"),
@@ -56,7 +57,6 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin/settings/site": () => import("./pages/admin/settings/site"),
   "/admin/settings/dashboard": () => import("./pages/admin/settings/dashboard"),
   "/admin/settings/theme": () => import("./pages/admin/settings/theme"),
-  "/admin/settings/custom": () => import("./pages/admin/settings/custom"),
   "/admin/settings/notification": () => import("./pages/admin/settings/notification"),
   "/admin/settings/general": () => import("./pages/admin/settings/general"),
   "/admin/settings/xtermjs": () => import("./pages/admin/settings/xtermjs"),
@@ -118,6 +118,11 @@ export const preloadAdminRoute = async (target: string): Promise<void> => {
       .then((mod) => mod.prefetchDatabaseOverview())
       .catch(() => undefined);
   }
+  if (pathname === "/admin/settings/account-security") {
+    void import("./lib/accountPasskeys")
+      .then((mod) => mod.prefetchAccountPasskeys())
+      .catch(() => undefined);
+  }
   await Promise.all(
     expandAdminPreloadTargets(pathname).map((path) => {
       const preload = adminRoutePreloaders[path];
@@ -165,6 +170,10 @@ export const routes: RouteObject[] = [
     element: React.createElement(AdminLayout),
     children: [
       { index: true, element: React.createElement(AdminDashboard) },
+      {
+        path: "dashboard",
+        element: React.createElement(AdminDashboard),
+      },
       {
         path: "servers",
         element: React.createElement(AdminServers),
@@ -235,9 +244,10 @@ export const routes: RouteObject[] = [
           },
           {
             path: "custom",
-            element: React.createElement(
-              lazy(() => import("./pages/admin/settings/custom"))
-            ),
+            element: React.createElement(Navigate, {
+              replace: true,
+              to: "/admin/settings/site",
+            }),
           },
           {
             path: "sign-on",
@@ -263,6 +273,13 @@ export const routes: RouteObject[] = [
             element: React.createElement(
               lazy(() => import("./pages/admin/settings/xtermjs"))
             ),
+          },
+          {
+            path: "mcp",
+            element: React.createElement(Navigate, {
+              replace: true,
+              to: "/admin/remote-management/mcp",
+            }),
           },
           {
             path: "reverse-proxy",
@@ -334,6 +351,12 @@ export const routes: RouteObject[] = [
       {
         path: "exec",
         element: React.createElement(lazy(() => import("./pages/admin/exec"))),
+      },
+      {
+        path: "remote-management/mcp",
+        element: React.createElement(
+          lazy(() => import("./pages/admin/remote-management/mcp")),
+        ),
       }
     ],
   },

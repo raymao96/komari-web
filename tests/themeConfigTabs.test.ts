@@ -12,7 +12,6 @@ const tabsSource = readFileSync(
   "utf8",
 );
 const panelSource = [
-  "AdminPanelBar.tsx",
   "shell/AdminShell.tsx",
 ]
   .map((file) =>

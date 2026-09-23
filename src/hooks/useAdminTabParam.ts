@@ -31,7 +31,7 @@ export function useAdminTabParam<T extends string>(
     }
     setSearchParams(
       (current) => nextAdminTabSearchParams(current, next, fallback, param, aliases),
-      { replace: true },
+      { replace: true, preventScrollReset: true },
     );
   }, [aliases, fallback, param, searchParams, setSearchParams, tabs]);
 

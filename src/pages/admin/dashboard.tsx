@@ -5,6 +5,7 @@ import Button from "@mui/material/Button";
 import { Skeleton } from "@/components/admin/ui";
 import ArrowDownward from "@mui/icons-material/ArrowDownward";
 import ArrowUpward from "@mui/icons-material/ArrowUpward";
+import BarChartOutlined from "@mui/icons-material/BarChartOutlined";
 import CreditCardOutlined from "@mui/icons-material/CreditCardOutlined";
 import DnsOutlined from "@mui/icons-material/DnsOutlined";
 import ErrorOutlined from "@mui/icons-material/ErrorOutlined";
@@ -12,7 +13,7 @@ import PaymentsOutlined from "@mui/icons-material/PaymentsOutlined";
 import Refresh from "@mui/icons-material/Refresh";
 import StorageOutlined from "@mui/icons-material/StorageOutlined";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAccount } from "@/contexts/AccountContext";
@@ -43,6 +44,7 @@ import {
   dashboardLocalStorageTotal,
   dashboardRuntimeStorageTotal,
   dashboardTrafficAxisWidth,
+  dashboardTrafficPeriod,
   shortDashboardDay,
   type DashboardChartsData,
   type DashboardData,
@@ -52,7 +54,6 @@ import {
   dashboardCostCenterEnabled,
   dashboardModuleSpans,
   dashboardSummarySections,
-  DASHBOARD_SUMMARY_CARD_IDS,
   enabledDashboardModules,
   packDashboardModules,
   type DashboardModuleId,
@@ -90,6 +91,14 @@ const moduleGridClass: Record<number, string> = {
 export default function AdminDashboard() {
   const { t, i18n } = useTranslation();
   const { account } = useAccount();
+  const location = useLocation();
+  const navigate = useNavigate();
+  React.useLayoutEffect(() => {
+    const path = location.pathname.replace(/\/$/, "") || "/";
+    if (path === "/admin/dashboard") {
+      navigate("/admin", { replace: true });
+    }
+  }, [location.pathname, navigate]);
   const accountKey = account?.uuid || account?.username || "authenticated";
   const {
     settings,
@@ -128,6 +137,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = React.useState(() => getDashboardSnapshot(summaryKey, accountKey) === null);
   const [error, setError] = React.useState<string | null>(null);
   const [chartsError, setChartsError] = React.useState<string | null>(null);
+  const rankingPrefetchReady = !loading
+    && (chartSections.length === 0 || charts !== null || chartsError !== null);
 
   const loadSummary = React.useCallback(async (silent = false) => {
     if (summarySections.length === 0) {
@@ -309,6 +320,8 @@ export default function AdminDashboard() {
     data?.storage.shm,
     charts?.traffic.today_up,
     charts?.traffic.today_down,
+    charts?.traffic.period_billable,
+    charts?.traffic.daily_average_billable,
     billing?.summary.year.total,
     billing?.summary.remaining_value,
   ].join(":"));
@@ -376,7 +389,7 @@ export default function AdminDashboard() {
         return (
           <SummaryPanel
             icon={<CreditCardOutlined />}
-            label={t("admin_dashboard.today_billable")}
+            label={t("admin_dashboard.today_overview")}
             value={charts && !charts.traffic.error ? formatBytes(charts.traffic.today_billable) : "-"}
             tone="accent"
           >
@@ -394,6 +407,25 @@ export default function AdminDashboard() {
             ) : <span>{chartsError ? t("admin_dashboard.data_unavailable") : t("admin_dashboard.chart_loading")}</span>}
           </SummaryPanel>
         );
+      case "traffic_30d_summary": {
+        const period = dashboardTrafficPeriod(charts?.traffic);
+        return (
+          <SummaryPanel
+            icon={<BarChartOutlined />}
+            label={t("admin_dashboard.traffic_30d")}
+            value={charts && !charts.traffic.error ? formatBytes(period.billable) : "-"}
+            tone="accent"
+          >
+            {charts && !charts.traffic.error ? (
+              <SummaryFooter>
+                <span className="whitespace-nowrap">
+                  {t("admin_dashboard.daily_average")} {formatBytes(period.averageBillable)}
+                </span>
+              </SummaryFooter>
+            ) : <span>{chartsError ? t("admin_dashboard.data_unavailable") : t("admin_dashboard.chart_loading")}</span>}
+          </SummaryPanel>
+        );
+      }
       case "storage_summary":
         return data ? (
           <Link to="/admin/settings/metrics" className="group block h-full min-w-0 text-inherit no-underline">
@@ -434,7 +466,14 @@ export default function AdminDashboard() {
         );
       case "resource_ranking":
         return data
-          ? <ResourceRankingPanel data={data} limit={settings.ranking_limit} />
+          ? (
+            <ResourceRankingPanel
+              data={data}
+              limit={settings.ranking_limit}
+              accountKey={accountKey}
+              allowPrefetch={rankingPrefetchReady}
+            />
+          )
           : <Skeleton className="h-[260px] w-full" />;
       case "daily_traffic_ranking":
         return (
@@ -442,6 +481,8 @@ export default function AdminDashboard() {
             charts={charts}
             error={chartsError}
             limit={settings.ranking_limit}
+            accountKey={accountKey}
+            allowPrefetch={rankingPrefetchReady}
           />
         );
       case "latency_ranking":
@@ -450,6 +491,8 @@ export default function AdminDashboard() {
             charts={charts}
             error={chartsError}
             limit={settings.ranking_limit}
+            accountKey={accountKey}
+            allowPrefetch={rankingPrefetchReady}
           />
         );
       case "latency_jitter_ranking":
@@ -458,6 +501,8 @@ export default function AdminDashboard() {
             charts={charts}
             error={chartsError}
             limit={settings.ranking_limit}
+            accountKey={accountKey}
+            allowPrefetch={rankingPrefetchReady}
           />
         );
       case "packet_loss_ranking":
@@ -466,6 +511,8 @@ export default function AdminDashboard() {
             charts={charts}
             error={chartsError}
             limit={settings.ranking_limit}
+            accountKey={accountKey}
+            allowPrefetch={rankingPrefetchReady}
           />
         );
       case "latency_trend":
@@ -509,15 +556,21 @@ export default function AdminDashboard() {
   const initialDataPending = summarySections.length > 0 && loading && !data;
   const formalLayout = (
     <>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        {DASHBOARD_SUMMARY_CARD_IDS.map((module) => (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {(["server_status", "traffic_summary", "storage_summary", "cost_center"] as const).map((module) => (
           <div key={module} data-dashboard-module={module} className="min-w-0">{renderModule(module)}</div>
         ))}
       </div>
       <div data-dashboard-module="latency_trend" className="min-w-0">{renderModule("latency_trend")}</div>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {(["traffic_trend", "billing_trend"] as const).map((module) => (
-          <div key={module} data-dashboard-module={module} className="min-w-0 [&>*]:h-full">{renderModule(module)}</div>
+          <div
+            key={module}
+            data-dashboard-module={module}
+            className="min-w-0 [&>*]:h-full"
+          >
+            {renderModule(module)}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">

@@ -14,7 +14,6 @@ test("administrator language menu keeps Simplified, Traditional, English, then J
     "src/components/admin/shell/ChromeActions.tsx",
     "utf8",
   );
-  const switchSource = readFileSync("src/components/Language.tsx", "utf8");
   const i18nSource = readFileSync("src/i18n/config.ts", "utf8");
   const mainSource = readFileSync("src/main.tsx", "utf8");
   const syncSource = readFileSync(
@@ -26,9 +25,7 @@ test("administrator language menu keeps Simplified, Traditional, English, then J
     /ADMIN_UI_LANGUAGES = \[[\s\S]*"zh-CN"[\s\S]*"zh-TW"[\s\S]*"en-US"[\s\S]*"ja-JP"/,
   );
   assert.match(chromeSource, /ADMIN_UI_LANGUAGES/);
-  assert.match(switchSource, /ADMIN_UI_LANGUAGES/);
   assert.doesNotMatch(chromeSource, /Bahasa Indonesia/);
-  assert.doesNotMatch(switchSource, /Bahasa Indonesia/);
   assert.doesNotMatch(
     i18nSource,
     /import en from ["']\.\/locales\/en\.json["']/,
@@ -40,8 +37,6 @@ test("administrator language menu keeps Simplified, Traditional, English, then J
   assert.match(mainSource, /i18nReady/);
   assert.match(chromeSource, /preloadUiLocales\(\)/);
   assert.match(chromeSource, /changeUiLanguage\(lang\.code\)/);
-  assert.match(switchSource, /preloadUiLocales\(\)/);
-  assert.match(switchSource, /changeUiLanguage\(lang\.code\)/);
   assert.match(syncSource, /changeUiLanguage\(savedLanguage\)/);
 });
 

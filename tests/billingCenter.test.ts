@@ -64,6 +64,8 @@ test("keeps financial query values as decimal strings and CSV filters", () => {
   assert.equal(formatBillingMoney("1.990000", "£"), "£1.99");
   assert.equal(formatBillingMoney("1.990000", "GBP"), "£1.99");
   assert.equal(formatBillingMoney("4.000000", "C$"), "C$4.00");
+  assert.equal(formatBillingMoney("8.800000", "HK$"), "HK$8.80");
+  assert.equal(formatBillingMoney("8.800000", "HKD"), "HK$8.80");
   assert.equal(
     billingQuery("/api/admin/billing/periods/monthly", {
       currency: "CNY",
@@ -125,6 +127,10 @@ test("persists display currency without exposing manual FX controls", () => {
       'export const billingCurrencies: BillingCurrency[] = ["CNY", "USD"]',
     ),
     true,
+  );
+  assert.match(
+    readFileSync("src/utils/billing.ts", "utf8"),
+    /"HKD"/,
   );
 });
 
@@ -246,4 +252,10 @@ test("ships complete billing copy for every administrator locale", () => {
   });
   assert.ok(keys[0].length >= 100);
   keys.slice(1).forEach((current) => assert.deepEqual(current, keys[0]));
+});
+
+test("yearly cost trend tooltip follows the current appearance", () => {
+  assert.match(pageSource, /useTheme\(\)/);
+  assert.match(pageSource, /backgroundColor: theme\.palette\.background\.paper/);
+  assert.match(pageSource, /itemStyle=\{\{ color: theme\.palette\.text\.primary \}\}/);
 });

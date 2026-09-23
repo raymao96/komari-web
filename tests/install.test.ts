@@ -25,8 +25,8 @@ test("completed installation messaging is localized", () => {
     );
     assert.equal(typeof messages.install.completed_title, "string");
     assert.notEqual(messages.install.completed_title.trim(), "");
-    assert.equal(typeof messages.install.completed, "string");
-    assert.notEqual(messages.install.completed.trim(), "");
+    assert.equal(typeof messages.install.guide.completed_description, "string");
+    assert.notEqual(messages.install.guide.completed_description.trim(), "");
   }
 });
 

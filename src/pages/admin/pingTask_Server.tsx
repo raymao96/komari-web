@@ -74,12 +74,13 @@ export const ServerView = ({
           ))}
         </AdminMobileCardStack>
       ) : (
-      <div className="admin-responsive-table-wrap overflow-x-auto">
-      <Table container={false} className="admin-responsive-table min-w-[640px]">
+      <div className="admin-responsive-table-wrap min-w-0 overflow-hidden">
+      <Table container={false} className="admin-responsive-table table-fixed w-full min-w-0">
         <TableHeader>
           <TableRow>
             <TableHead className="w-[22%]">{t("common.server")}</TableHead>
-            <TableHead>{t("ping.task")}</TableHead>
+            <TableHead className="max-w-0">{t("ping.task")}</TableHead>
+            <TableHead className="w-[56px]">{t("common.action")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -196,13 +197,15 @@ const ServerRow: React.FC<{
       ? ownedTasks.map((task) => task.name).join("、")
       : "";
   const taskValue = (
-    <div
-      className="min-w-0 truncate whitespace-nowrap leading-5"
-      title={taskNames || undefined}
-    >
-      {taskNames || (
-        <span className="text-muted-foreground">{t("common.none")}</span>
-      )}
+    <div className="min-w-0 overflow-hidden">
+      <div
+        className="truncate whitespace-nowrap leading-5"
+        title={taskNames || undefined}
+      >
+        {taskNames || (
+          <span className="text-muted-foreground">{t("common.none")}</span>
+        )}
+      </div>
     </div>
   );
   const taskBindDialog = (
@@ -281,12 +284,12 @@ const ServerRow: React.FC<{
 
   return (
     <TableRow>
-      <TableCell data-label={t("common.server")}>{serverIdentity}</TableCell>
-      <TableCell data-label={t("ping.task")}>
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="min-w-0 flex-1">{taskValue}</div>
-          {taskBindDialog}
-        </div>
+      <TableCell className="max-w-0" data-label={t("common.server")}>{serverIdentity}</TableCell>
+      <TableCell className="max-w-0 overflow-hidden" data-label={t("ping.task")}>
+        {taskValue}
+      </TableCell>
+      <TableCell className="w-[56px] overflow-hidden" data-label={t("common.action")}>
+        {taskBindDialog}
       </TableCell>
     </TableRow>
   );

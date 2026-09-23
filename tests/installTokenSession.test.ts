@@ -152,6 +152,23 @@ test("copy stays blocked when the token is missing, failed, or 2FA is cancelled"
   assert.equal(installCommandCopyAllowed(failed.getSnapshot()), false);
 });
 
+test("passkey confirmation keeps the identity dialog open on failure", async () => {
+  const session = createInstallTokenSession(async (_uuid, options) => {
+    if (!options?.ceremony_id) throw twoFactorRequired();
+    throw new Error("passkey denied");
+  });
+
+  await session.openDialog("node-a");
+  assert.equal(session.getSnapshot().twoFactorOpen, true);
+  await assert.rejects(
+    () => session.submitPasskey("node-a", "ceremony", { id: "cred" }),
+    /passkey denied/,
+  );
+  assert.equal(session.getSnapshot().twoFactorOpen, true);
+  assert.equal(session.getSnapshot().token, null);
+  assert.equal(session.getSnapshot().error, null);
+});
+
 test("omitting a client token copies the node and deletes the secret", () => {
   const node = {
     uuid: "node-1",

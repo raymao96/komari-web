@@ -110,7 +110,7 @@ test("keeps remote execution behind a login grant", () => {
   assert.match(execPageSource, /const \{ account \} = useAccount\(\)/);
   assert.match(execPageSource, /Boolean\(account\?\.\["2fa_enabled"\]\)/);
   assert.match(execPageSource, /scope: "exec"/);
-  assert.doesNotMatch(execPageSource, /page_id: pageInstanceIdRef\.current/);
+  assert.match(execPageSource, /page_id: pageIDRef\.current/);
   assert.doesNotMatch(execPageSource, /remote\/revoke/);
   assert.doesNotMatch(execPageSource, /pagehide/);
   assert.match(execPageSource, /loadStoredRemoteGrant\("exec"\)/);
@@ -133,6 +133,10 @@ test("keeps remote execution behind a login grant", () => {
   );
   assert.ok(liveCheck >= 0 && otpGuard > liveCheck && passwordGuard > otpGuard);
   assert.ok(authorizeFetch > passwordGuard);
+  assert.match(execPageSource, /confirmAdminPasskey/);
+  assert.match(execPageSource, /login\.passkey/);
+  assert.match(execPageSource, /ceremony_id/);
+  assert.match(execPageSource, /executeCommand\(true\)/);
   assert.match(execPageSource, /setInterval\(\(\) => \{/);
   assert.match(execPageSource, /if \(isRemoteGrantLive\(grantRef\.current, grantExpiresAtRef\.current\)\) return;/);
   assert.match(execPageSource, /if \(!hasLiveGrant\) clearExecGrant\(\);/);

@@ -25,8 +25,9 @@ export const shouldPreloadAdminRoutes = (
 };
 
 export const normalizeAdminPathname = (target: string): string => {
-  const pathname = target.split(/[?#]/, 1)[0].replace(/\/$/, "");
-  return pathname || "/admin";
+  const pathname = target.split(/[?#]/, 1)[0].replace(/\/$/, "") || "/admin";
+  if (pathname === "/admin/dashboard") return "/admin";
+  return pathname;
 };
 
 export const expandAdminPreloadTargets = (target: string): string[] => {

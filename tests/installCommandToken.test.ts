@@ -22,6 +22,10 @@ const installDialogSource = indexSource.slice(
   indexSource.indexOf("function GenerateCommandButton"),
   indexSource.indexOf("function EditButton"),
 );
+const identityAuthSource = indexSource.slice(
+  indexSource.indexOf("function NodeIdentityAuthDialog"),
+  indexSource.indexOf("function RotateTokenButton"),
+);
 
 test("NodeDetail and node list context do not keep token", () => {
   assert.match(contextSource, /export type NodeDetail = \{/);
@@ -107,6 +111,13 @@ test("node config dialog stays compact and uses the live-config hint", () => {
 test("online config tab does not fetch the node token", () => {
   assert.match(installDialogSource, /useState<"online" \| "install">\("online"\)/);
   assert.match(installDialogSource, /admin\.nodeTable\.nodeConfig/);
+  assert.match(installDialogSource, /nodeConfigIdentity/);
+  assert.match(installDialogSource, /km-node-config-identity/);
+  assert.match(installDialogSource, /km-node-config-identity-name/);
+  assert.match(installDialogSource, /km-node-config-identity-ip/);
+  assert.match(installDialogSource, /<Flag flag=\{node\.region\} compact/);
+  assert.match(indexSource, /function nodePreferredAddress/);
+  assert.match(indexSource, /const ipv4 = node\.ipv4\?\.trim\(\);\s*if \(ipv4\) return ipv4;/);
   assert.match(installDialogSource, /admin\.nodeTable\.onlineConfigTab/);
   assert.match(installDialogSource, /admin\.nodeTable\.deployCommandTab/);
   assert.match(installDialogSource, /dialogTab !== "install"/);
@@ -117,22 +128,25 @@ test("online config tab does not fetch the node token", () => {
 });
 
 test("deploy command 2FA uses dedicated identity keys and six digits", () => {
-  assert.match(installDialogSource, /identityAuthTitle/);
-  assert.match(installDialogSource, /identityAuthDescription/);
-  assert.match(installDialogSource, /identityAuthInput/);
-  assert.match(installDialogSource, /otpInput\.length !== 6/);
+  assert.match(identityAuthSource, /identityAuthTitle/);
+  assert.match(identityAuthSource, /identityAuthDescription/);
+  assert.match(identityAuthSource, /identityAuthInput/);
+  assert.match(identityAuthSource, /otpInput\.length !== 6/);
+  assert.match(identityAuthSource, /login\.passkey/);
   assert.match(installDialogSource, /cancelDeployTwoFactor/);
   assert.match(installDialogSource, /setDialogTab\("online"\)/);
+  assert.match(installDialogSource, /confirmAdminPasskey/);
+  assert.match(installDialogSource, /submitPasskey/);
   assert.doesNotMatch(installDialogSource, /未开启 2FA 可留空/);
   assert.doesNotMatch(installDialogSource, /admin\.nodeTable\.twoFactorCode/);
 });
 
 test("deploy command 2FA only mounts while verifying and keeps password-manager attributes", () => {
   assert.match(installDialogSource, /disableEnforceFocus=\{needTwoFactor\}/);
-  assert.match(installDialogSource, /zIndex=\{1400\}/);
-  assert.match(installDialogSource, /id="admin-node-deploy-otp"/);
-  assert.match(installDialogSource, /name="one-time-code"/);
-  assert.match(installDialogSource, /autoComplete="one-time-code"/);
+  assert.match(identityAuthSource, /zIndex=\{1400\}/);
+  assert.match(installDialogSource, /otpFieldId="admin-node-deploy-otp"/);
+  assert.match(identityAuthSource, /name="one-time-code"/);
+  assert.match(identityAuthSource, /autoComplete="one-time-code"/);
   assert.match(installDialogSource, /\{needTwoFactor \? \(/);
   assert.match(installDialogSource, /otpFieldRef\.current\?\.focus\(\)/);
   assert.doesNotMatch(installDialogSource, /<>\s*<Dialog.Root\s+open=\{open\}/);
@@ -143,4 +157,25 @@ test("admin RPC2 mounts only after login", () => {
   assert.match(mainSource, /if \(!account\?\.logged_in\)/);
   assert.match(mainSource, /<RPC2Provider>\{children\}<\/RPC2Provider>/);
   assert.match(mainSource, /<AccountScopedRPC2>/);
+});
+
+const editDialogSource = indexSource.slice(
+  indexSource.indexOf("function EditButton"),
+  indexSource.indexOf("function BillingButton") !== -1
+    ? indexSource.indexOf("function BillingButton")
+    : indexSource.length,
+);
+
+test("unsaved traffic reset clock reverts before the dialog paints again", () => {
+  assert.match(installDialogSource, /const revertTrafficResetClock = \(\) =>/);
+  assert.match(installDialogSource, /revertTrafficResetClock\(\);\s*setOpen\(nextOpen\)/);
+  assert.match(installDialogSource, /React\.useLayoutEffect\(\(\) => \{\s*if \(open\) return;\s*revertTrafficResetClock\(\);/);
+  assert.match(editDialogSource, /const hydrateEditForm = \(\) =>/);
+  assert.match(editDialogSource, /if \(next \|\| !pendingSavedEditRef\.current\) hydrateEditForm\(\)/);
+  assert.match(editDialogSource, /React\.useLayoutEffect/);
+  assert.match(editDialogSource, /pendingSavedEditRef/);
+  assert.doesNotMatch(
+    editDialogSource,
+    /<Dialog\.Root open=\{open\} onOpenChange=\{setOpen\}>/,
+  );
 });

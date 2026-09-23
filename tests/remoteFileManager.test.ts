@@ -12,6 +12,21 @@ const source = readFileSync(
   "utf8",
 );
 
+test("file chrome keeps parent, upload, and new as icon buttons on one left edge", () => {
+  assert.match(source, /className="remote-file-up"/);
+  assert.match(source, /<Upload size=\{14\} \/>/);
+  assert.match(source, /<Plus size=\{14\} \/>/);
+  assert.match(source, /\{t\("terminal\.files\.upload"\)\}/);
+  assert.match(source, /\{t\("terminal\.files\.new"\)\}/);
+  assert.doesNotMatch(source, /startIcon=\{<Upload/);
+});
+
+test("empty file directory has no decorative badge", () => {
+  assert.match(source, /className="remote-file-empty"/);
+  assert.match(source, /\{t\("terminal\.files\.empty"\)\}/);
+  assert.doesNotMatch(source, /HardDrive/);
+});
+
 test("file manager reuses the shared table header and keeps multi-select rows", () => {
   assert.match(source, /Table container=\{false\} className="remote-file-table"/);
   assert.match(source, /<TableHeader>/);
@@ -21,7 +36,17 @@ test("file manager reuses the shared table header and keeps multi-select rows", 
   assert.doesNotMatch(source, /<input type="checkbox"/);
   assert.match(source, /<Checkbox checked=\{showHidden\}/);
   assert.match(source, /className="remote-file-select"/);
+  assert.match(source, /className="remote-file-name"/);
   assert.match(source, /<Checkbox\s+checked=\{selected\.has\(entry\.path\)\}/);
+  assert.match(source, /toggleSelectAll/);
+  assert.match(source, /checked=\{selectAllState\}/);
+  assert.match(source, /common\.select_all/);
+  assert.match(source, /hour12: false/);
+  assert.match(source, /file\.upload\.cancel/);
+  assert.match(source, /offset: sent/);
+  assert.match(source, /className="remote-transfer-cancel"/);
+  assert.match(source, /\{uploading && \(/);
+  assert.match(source, /terminal\.files\.upload_cancelled/);
 });
 
 test("the existing multi-selection context menu can download selected files", () => {

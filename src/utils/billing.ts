@@ -1,5 +1,5 @@
 export type BillingCurrency = "CNY" | "USD";
-export type BillingNativeCurrency = "CNY" | "USD" | "EUR" | "GBP" | "CAD";
+export type BillingNativeCurrency = "CNY" | "USD" | "EUR" | "GBP" | "CAD" | "HKD";
 
 export type AmountBreakdown = {
   base: string;
@@ -136,6 +136,7 @@ export const billingNativeCurrencies: BillingNativeCurrency[] = [
   "EUR",
   "GBP",
   "CAD",
+  "HKD",
 ];
 
 const currencySymbols: Record<string, string> = {
@@ -144,6 +145,7 @@ const currencySymbols: Record<string, string> = {
   CAD: "C$",
   EUR: "€",
   GBP: "£",
+  HKD: "HK$",
   "¥": "¥",
   "￥": "¥",
   $: "$",
@@ -151,6 +153,7 @@ const currencySymbols: Record<string, string> = {
   "£": "£",
   "C$": "C$",
   "CA$": "C$",
+  "HK$": "HK$",
 };
 
 export function billingCurrencySymbol(currency: string): string {

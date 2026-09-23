@@ -426,7 +426,10 @@ export default function NodeUsageStats({
   );
 
   const usageRangeLabel =
-    formatTrafficResetRangeLabel(node.traffic_reset_day) ?? EMPTY_DISPLAY;
+    formatTrafficResetRangeLabel(node.traffic_reset_day, new Date(), {
+      time: node.traffic_reset_time,
+      timezone: node.traffic_reset_timezone,
+    }) ?? EMPTY_DISPLAY;
 
   const remainingTraffic =
     usedTraffic != null && trafficLimit > 0

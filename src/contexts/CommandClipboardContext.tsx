@@ -30,8 +30,11 @@ export const CommandClipboardProvider: React.FC<{
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
   const [commands, setCommands] = React.useState<CommandClipboard[]>([]);
+  const initialLoad = React.useRef(true);
   const refresh = async () => {
-    setLoading(true);
+    if (initialLoad.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const response = await fetch("/api/admin/clipboard");
@@ -47,6 +50,7 @@ export const CommandClipboardProvider: React.FC<{
     } catch (err) {
       setError(err as Error);
     } finally {
+      initialLoad.current = false;
       setLoading(false);
     }
   };
@@ -62,7 +66,7 @@ export const CommandClipboardProvider: React.FC<{
       if (!response.ok) {
         throw new Error("Failed to add command");
       }
-      refresh();
+      await refresh();
     } catch (err) {
       setError(err as Error);
     } finally {
@@ -88,7 +92,7 @@ export const CommandClipboardProvider: React.FC<{
       if (!response.ok) {
         throw new Error("Failed to update command");
       }
-      refresh();
+      await refresh();
     } catch (err) {
       setError(err as Error);
     } finally {
@@ -104,7 +108,7 @@ export const CommandClipboardProvider: React.FC<{
       if (!response.ok) {
         throw new Error("Failed to delete command");
       }
-      refresh();
+      await refresh();
     } catch (err) {
       setError(err as Error);
     } finally {

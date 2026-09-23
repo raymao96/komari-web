@@ -23,6 +23,10 @@ export interface DashboardTrafficHour {
 export interface DashboardTrafficRankItem {
   uuid: string;
   name: string;
+  ipv4?: string;
+  ipv6?: string;
+  group?: string;
+  tags?: string;
   up: number;
   down: number;
   billable: number;
@@ -130,6 +134,8 @@ export interface DashboardLatencyRankItem {
   uuid: string;
   name: string;
   average: number;
+  task_id?: number;
+  task_name?: string;
   detail_url?: string;
 }
 
@@ -139,6 +145,8 @@ export interface DashboardLatencyJitterRankItem {
   previous: number;
   current: number;
   delta: number;
+  task_id?: number;
+  task_name?: string;
   detail_url?: string;
 }
 
@@ -201,6 +209,13 @@ export interface DashboardChartsData {
     today_up: number;
     today_down: number;
     today_billable: number;
+    period_up?: number;
+    period_down?: number;
+    period_billable?: number;
+    period_days?: number;
+    daily_average_up?: number;
+    daily_average_down?: number;
+    daily_average_billable?: number;
     hourly: DashboardTrafficHour[];
     daily: DashboardTrafficDay[];
     ranking: DashboardTrafficRankItem[];
@@ -214,6 +229,68 @@ export interface DashboardChartsData {
     error?: string;
   };
   generated_at: string;
+}
+
+export interface DashboardTrafficDayResponse {
+  day: string;
+  items: DashboardTrafficRankItem[];
+  generated_at: string;
+}
+
+export type DashboardTrafficDaySortKey = "name" | "up" | "down" | "billable";
+export type DashboardTrafficDaySortDir = "asc" | "desc";
+
+export function dashboardTrafficPeriod(traffic: DashboardChartsData["traffic"] | undefined) {
+  const daily = traffic?.daily ?? [];
+  const days = traffic?.period_days && traffic.period_days > 0 ? traffic.period_days : daily.length;
+  const periodUp = traffic?.period_up ?? daily.reduce((sum, item) => sum + item.up, 0);
+  const periodDown = traffic?.period_down ?? daily.reduce((sum, item) => sum + item.down, 0);
+  const periodBillable = traffic?.period_billable ?? daily.reduce((sum, item) => sum + item.billable, 0);
+  return {
+    up: periodUp,
+    down: periodDown,
+    billable: periodBillable,
+    days,
+    averageUp: traffic?.daily_average_up ?? (days > 0 ? Math.floor(periodUp / days) : 0),
+    averageDown: traffic?.daily_average_down ?? (days > 0 ? Math.floor(periodDown / days) : 0),
+    averageBillable: traffic?.daily_average_billable ?? (days > 0 ? Math.floor(periodBillable / days) : 0),
+  };
+}
+
+export function trafficDaySearchHaystack(item: DashboardTrafficRankItem): string {
+  const tags = (item.tags || "")
+    .split(";")
+    .map((tag) => tag.replace(/<\w+>$/, "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return [item.name, item.uuid, item.ipv4, item.ipv6, item.group, item.tags, tags]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export function filterAndSortTrafficDayItems(
+  items: readonly DashboardTrafficRankItem[],
+  query: string,
+  sortKey: DashboardTrafficDaySortKey,
+  sortDir: DashboardTrafficDaySortDir,
+): DashboardTrafficRankItem[] {
+  const needle = query.trim().toLowerCase();
+  const filtered = needle
+    ? items.filter((item) => trafficDaySearchHaystack(item).includes(needle))
+    : [...items];
+  const direction = sortDir === "asc" ? 1 : -1;
+  filtered.sort((left, right) => {
+    if (sortKey === "name") {
+      const byName = left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+      if (byName !== 0) return byName * direction;
+      return left.uuid.localeCompare(right.uuid) * direction;
+    }
+    const delta = left[sortKey] - right[sortKey];
+    if (delta !== 0) return delta * direction;
+    return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+  });
+  return filtered;
 }
 
 export function dashboardLocalStorageTotal(data: DashboardData): number | null {

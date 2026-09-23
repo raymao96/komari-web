@@ -21,6 +21,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { dialogContainerNoFadeSx, dialogPaperVisibility } from "@/theme/dialogCloseMotion";
 import { isComponentType, spaceToPx } from "./shared";
 
 type DialogContextValue = {
@@ -222,12 +223,17 @@ function DialogRoot({
         onClose={() => setOpen(false)}
         maxWidth={false}
         scroll="paper"
+        disableScrollLock
         disableEnforceFocus={disableEnforceFocus}
         aria-describedby={undefined}
-        sx={zIndex ? { zIndex } : undefined}
+        sx={{
+          ...(zIndex ? { zIndex } : {}),
+          "& .MuiDialog-container": dialogContainerNoFadeSx,
+        }}
         slotProps={{
           paper: {
             sx: {
+              visibility: dialogPaperVisibility(isOpen),
               width: "calc(100% - 32px)",
               maxWidth: paperMaxWidth ?? 480,
               m: 2,

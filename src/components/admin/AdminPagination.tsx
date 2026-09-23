@@ -1,5 +1,5 @@
 import React from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, useDndContext } from "@dnd-kit/core";
 import ChevronLeft from "@mui/icons-material/ChevronLeft";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import Menu from "@mui/material/Menu";
@@ -86,16 +86,18 @@ const PageDropButton = ({
   dragging,
   ...props
 }: PageButtonProps & { id: string; dragging: boolean }) => {
+  const { active } = useDndContext();
   const { isOver, setNodeRef } = useDroppable({
     id,
     disabled: props.disabled,
   });
+  const showDropTarget = (dragging || Boolean(active)) && !props.disabled;
   const Icon = props.direction === "previous" ? ChevronLeft : ChevronRight;
   return (
     <button
       ref={setNodeRef}
       type="button"
-      className={`admin-pagination-btn${dragging && !props.disabled ? " is-drop-target" : ""}${isOver ? " is-over" : ""}`}
+      className={`admin-pagination-btn${showDropTarget ? " is-drop-target" : ""}${isOver ? " is-over" : ""}`}
       disabled={props.disabled}
       title={props.label}
       aria-label={props.label}
@@ -117,6 +119,7 @@ export const AdminPagination = ({
   dragging = false,
   summary,
   showSummary = true,
+  hideDivider = false,
 }: {
   page: number;
   total: number;
@@ -128,6 +131,7 @@ export const AdminPagination = ({
   dragging?: boolean;
   summary?: React.ReactNode;
   showSummary?: boolean;
+  hideDivider?: boolean;
 }) => {
   const { t } = useTranslation();
   const [pageSizeAnchor, setPageSizeAnchor] = React.useState<HTMLElement | null>(null);
@@ -152,7 +156,7 @@ export const AdminPagination = ({
   };
 
   return (
-    <div className="admin-pagination px-3 py-1.5">
+    <div className={`admin-pagination px-3 py-1.5${hideDivider ? " admin-pagination--plain" : ""}`}>
       {showSummary ? (
         <span className="admin-pagination-text">
           {summary ??

@@ -24,6 +24,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
   type FocusEvent,
+  type FormEvent,
   type InputHTMLAttributes,
   type KeyboardEvent,
   type MouseEvent,
@@ -386,6 +387,8 @@ type TextFieldRootProps = LayoutProps & {
   onFocus?: (event: FocusEvent<HTMLInputElement>) => void;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onMouseUp?: (event: MouseEvent<HTMLInputElement>) => void;
+  onBeforeInput?: (event: FormEvent<HTMLInputElement>) => void;
 };
 
 export const TextFieldRoot = forwardRef<HTMLInputElement, TextFieldRootProps>(
@@ -409,6 +412,8 @@ export const TextFieldRoot = forwardRef<HTMLInputElement, TextFieldRootProps>(
       onFocus,
       onBlur,
       onKeyDown,
+      onMouseUp,
+      onBeforeInput,
       ...rest
     },
     ref,
@@ -454,6 +459,8 @@ export const TextFieldRoot = forwardRef<HTMLInputElement, TextFieldRootProps>(
             pattern: rest.pattern,
             "aria-label": rest["aria-label"],
             "aria-expanded": rest["aria-expanded"],
+            onMouseUp,
+            onBeforeInput,
           },
           input: {
             startAdornment: start.length ? (

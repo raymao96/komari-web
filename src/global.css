@@ -197,8 +197,31 @@ body, * {
   scrollbar-color: rgba(80,80,80,0.4) transparent;
 }
 
-.admin-responsive-table-wrap {
-  background: var(--color-panel-solid);
+.admin-node-drag-overlay {
+  pointer-events: none;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+html.admin-node-dnd-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.admin-node-sortable-origin {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.admin-node-list-dnd-wrap {
+  overflow-y: hidden;
+}
+
+@supports (overflow: clip) {
+  .admin-node-list-dnd-wrap {
+    overflow-y: clip;
+  }
 }
 
 .admin-table-header {
@@ -290,6 +313,21 @@ body, * {
   background: transparent !important;
 }
 
+.admin-node-name-cell,
+.admin-node-name-select {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.admin-node-name-link {
+  display: inline;
+  max-width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: pointer;
+}
+
 .admin-node-detail-country-flag {
   display: inline-flex;
   flex: 0 0 auto;
@@ -314,11 +352,13 @@ body, * {
   line-height: 0;
 }
 
-[data-admin-shell] .km-dashboard-chip {
+[data-admin-shell] .km-dashboard-chip,
+html[data-admin-shell-active="true"] .km-dashboard-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  border: 0;
   border-radius: 999px;
   padding: 4px 10px;
   background: var(--accent-a3);
@@ -326,6 +366,22 @@ body, * {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
+  font-family: inherit;
+}
+
+button.km-dashboard-chip {
+  cursor: pointer;
+  appearance: none;
+}
+
+button.km-dashboard-chip:hover,
+button.km-dashboard-chip:focus-visible {
+  filter: brightness(0.97);
+}
+
+button.km-dashboard-chip:focus-visible {
+  outline: 2px solid var(--accent-8);
+  outline-offset: 2px;
 }
 
 [data-admin-shell] .km-dashboard-chip--orange {
@@ -364,7 +420,8 @@ body, * {
 .admin-node-table .admin-node-billing-tags {
   width: 100%;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 
 .admin-node-table .admin-node-billing-tags > * {
@@ -373,8 +430,17 @@ body, * {
 }
 
 .admin-node-table.admin-node-billing-stack .admin-node-billing-tags {
-  flex-direction: column !important;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: flex-start;
+}
+
+.admin-node-table .admin-cell-clip-row {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  overflow: hidden;
+  row-gap: 4px;
+  max-height: 52px;
 }
 
 .admin-mini-nav-menu.admin-mini-nav-slide {
@@ -438,6 +504,18 @@ body, * {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
+}
+
+.km-traffic-day-dialog-title.MuiDialogTitle-root {
+  padding-bottom: 16px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 36px;
+  letter-spacing: 0;
+}
+
+.km-traffic-day-dialog-title .km-admin-dialog-title-row {
+  align-items: flex-start;
 }
 
 .km-node-dialog > .MuiDialogContentText-root {
@@ -510,6 +588,70 @@ body, * {
 
 .km-node-dialog-actions .MuiButton-root {
   min-width: 88px;
+}
+
+.km-node-deploy-dialog > .MuiDialogTitle-root {
+  padding-bottom: 10px;
+}
+
+.km-node-deploy-dialog .km-admin-dialog-title-row {
+  align-items: flex-start;
+}
+
+.km-node-deploy-dialog .km-admin-dialog-title-close.MuiIconButton-root {
+  margin-top: 2px;
+}
+
+.km-node-config-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.km-node-config-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 10px 4px 8px;
+  border-radius: 8px;
+  background: var(--gray-a3);
+  color: var(--gray-11);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.km-node-config-identity-flag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.km-node-config-identity-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gray-12);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.km-node-config-identity-ip {
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 8px;
+  border-left: 1px solid var(--gray-a6);
+  color: var(--gray-11);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .km-node-deploy-dialog .admin-install-platforms {
@@ -618,6 +760,93 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
 .km-node-traffic-section {
   min-width: 0;
   padding-top: 0;
+}
+
+.km-traffic-reset-clock-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.km-traffic-reset-timezone {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.km-traffic-reset-day {
+  flex: 0 0 4.75rem;
+  width: 4.75rem;
+  min-width: 4.75rem;
+  max-width: 4.75rem;
+}
+
+.km-traffic-reset-time {
+  flex: 0 0 7.5rem;
+  width: 7.5rem;
+  min-width: 7.5rem;
+  max-width: 7.5rem;
+}
+
+.km-traffic-reset-time-parts {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+.km-traffic-reset-time-part {
+  display: flex;
+  flex: 1 1 0;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.km-traffic-reset-time-part-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.km-traffic-reset-time-sep {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 1px;
+  color: var(--gray-9);
+  user-select: none;
+}
+
+.km-traffic-reset-time-part-input .MuiOutlinedInput-input {
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+
+@media (max-width: 1023px) {
+  .km-traffic-reset-clock-row {
+    flex-wrap: wrap;
+  }
+
+  .km-traffic-reset-timezone {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .km-traffic-reset-time {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 8.75rem;
+    max-width: none;
+  }
+}
+
+.km-traffic-reset-clock-row .MuiAutocomplete-root,
+.km-traffic-reset-clock-row .MuiFormControl-root,
+.km-traffic-reset-clock-row .MuiTextField-root {
+  width: 100% !important;
+  min-width: 0;
 }
 
 .km-return-route-rules > .MuiAlert-root {
@@ -779,7 +1008,7 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
 
   .admin-responsive-table tbody {
     display: grid;
-    gap: 0.75rem;
+    gap: 10px;
   }
 
   .admin-responsive-table tbody tr {
@@ -802,10 +1031,14 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
     max-width: none !important;
     gap: 0.25rem;
     overflow: hidden;
-    padding: 0.7rem 0.85rem !important;
+    padding: 0.85rem 0.9rem !important;
     border: 0 !important;
     border-top: 1px solid var(--gray-a5) !important;
     white-space: normal !important;
+  }
+
+  .admin-responsive-table tbody td:nth-child(odd):not(:last-child) {
+    border-right: 1px solid var(--gray-a5) !important;
   }
 
   .admin-responsive-table tbody td::before {
@@ -828,6 +1061,10 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
     margin-top: 0;
     border-right: 0 !important;
     text-align: left !important;
+  }
+
+  .km-traffic-day-table tbody td:last-child {
+    grid-column: auto;
   }
 
   .admin-responsive-table tbody td:last-child::before {
@@ -1210,11 +1447,6 @@ html.dark .km-theme-config-tabs-viewport::after {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.admin-active-filter {
-  min-height: 2.25rem;
-  padding: 0.35rem 0.625rem !important;
-}
-
 /* Keep the admin visual baseline scoped away from dashboard themes. */
 [data-admin-shell],
 html[data-admin-shell-active="true"] {
@@ -1320,7 +1552,8 @@ html.dark [data-admin-shell] .km-theme-config-tabs-trigger[data-state="active"] 
   align-items: center !important;
 }
 
-[data-admin-shell] .km-admin-node-list {
+[data-admin-shell] .km-admin-node-list,
+html[data-admin-shell-active="true"] .km-admin-node-list {
   overflow: hidden;
   border: 1px solid rgba(145, 158, 171, 0.2);
   border-radius: 8px;
@@ -1337,6 +1570,13 @@ html.dark [data-admin-shell] .km-theme-config-tabs-trigger[data-state="active"] 
   background: #fff;
 }
 
+@media (max-width: 1023px) {
+  .admin-mobile-card-stack {
+    gap: 8px;
+    padding: 8px;
+  }
+}
+
 .admin-mobile-card-stack > * {
   margin: 0;
 }
@@ -1345,10 +1585,18 @@ html.dark .admin-mobile-card-stack {
   background: #212b36;
 }
 
-[data-admin-shell] .km-admin-node-list-filters {
+[data-admin-shell] .km-admin-node-list-filters,
+html[data-admin-shell-active="true"] .km-admin-node-list-filters {
   padding: 16px 16px 20px;
   background: #f4f6f8;
   border-bottom: 1px solid rgba(145, 158, 171, 0.16);
+}
+
+@media (max-width: 1023px) {
+  [data-admin-shell] .km-admin-node-list-filters,
+  html[data-admin-shell-active="true"] .km-admin-node-list-filters {
+    padding: 12px;
+  }
 }
 
 .km-search-before-content {
@@ -1356,22 +1604,26 @@ html.dark .admin-mobile-card-stack {
   margin-bottom: 20px;
 }
 
-[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root {
+[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root,
+html[data-admin-shell-active="true"] .km-admin-node-list-filters .MuiOutlinedInput-root {
   background-color: #fff;
 }
 
-[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-notchedOutline {
+[data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-notchedOutline,
+html[data-admin-shell-active="true"] .km-admin-node-list-filters .MuiOutlinedInput-notchedOutline {
   border-radius: inherit;
 }
 
-[data-admin-shell] .km-admin-node-list .admin-responsive-table-wrap {
+[data-admin-shell] .km-admin-node-list .admin-responsive-table-wrap,
+html[data-admin-shell-active="true"] .km-admin-node-list .admin-responsive-table-wrap {
   border: 0;
   border-radius: 0;
   background: #fff;
   box-shadow: none;
 }
 
-[data-admin-shell] .km-admin-node-list .km-admin-list-empty {
+[data-admin-shell] .km-admin-node-list .km-admin-list-empty,
+html[data-admin-shell-active="true"] .km-admin-node-list .km-admin-list-empty {
   padding: 24px 20px;
   background: #fff;
   color: #637381;
@@ -1401,6 +1653,57 @@ html[data-admin-shell-active="true"] .km-table td {
   font-size: 14.5px;
   font-weight: 400;
   vertical-align: middle;
+}
+
+[data-admin-shell] .km-log-table,
+html[data-admin-shell-active="true"] .km-log-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+[data-admin-shell] .km-log-col-id,
+html[data-admin-shell-active="true"] .km-log-col-id {
+  width: 72px;
+}
+
+[data-admin-shell] .km-log-col-ip,
+html[data-admin-shell-active="true"] .km-log-col-ip {
+  width: 148px;
+}
+
+[data-admin-shell] .km-log-col-type,
+html[data-admin-shell-active="true"] .km-log-col-type {
+  width: 110px;
+}
+
+[data-admin-shell] .km-log-col-time,
+html[data-admin-shell-active="true"] .km-log-col-time {
+  width: 188px;
+}
+
+[data-admin-shell] .km-log-col-message,
+html[data-admin-shell-active="true"] .km-log-col-message {
+  overflow: hidden;
+}
+
+[data-admin-shell] .km-log-message,
+html[data-admin-shell-active="true"] .km-log-message {
+  display: block;
+  cursor: default;
+}
+
+[data-admin-shell] .km-traffic-day-table th:first-child,
+[data-admin-shell] .km-traffic-day-table td:first-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table th:first-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table td:first-child {
+  padding-left: 24px;
+}
+
+[data-admin-shell] .km-traffic-day-table th:last-child,
+[data-admin-shell] .km-traffic-day-table td:last-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table th:last-child,
+html[data-admin-shell-active="true"] .km-traffic-day-table td:last-child {
+  padding-right: 32px;
 }
 
 table.return-route-task-table thead th,
@@ -1469,6 +1772,16 @@ html[data-admin-shell-active="true"] .MuiAlert-icon {
 
 html[data-admin-shell-active="true"] .MuiAlert-icon > svg {
   display: block;
+}
+
+html[data-admin-shell-active="true"] .km-settings-alert.MuiAlert-root {
+  align-items: center;
+}
+
+html[data-admin-shell-active="true"] .km-settings-alert .MuiAlert-icon {
+  align-items: center;
+  align-self: center;
+  padding-block: 0;
 }
 
 .MuiButton-root[data-text-action="true"] {
@@ -1555,6 +1868,11 @@ html[data-admin-shell-active="true"] .MuiAlert-icon > svg {
   gap: 12px;
   border-top: 1px solid var(--gray-a5);
   background: var(--color-panel-solid);
+}
+
+.admin-pagination--plain {
+  border-top: 0;
+  background: transparent;
 }
 
 .admin-pagination-text,
@@ -1677,7 +1995,8 @@ html.dark .admin-pagination-btn {
   box-shadow: none;
 }
 
-[data-admin-shell] .km-admin-node-list .admin-pagination {
+[data-admin-shell] .km-admin-node-list .admin-pagination,
+html[data-admin-shell-active="true"] .km-admin-node-list .admin-pagination {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1894,23 +2213,29 @@ html.dark [data-admin-shell] .admin-responsive-table-wrap {
   box-shadow: none;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list {
+html.dark [data-admin-shell] .km-admin-node-list,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list {
   background: #212b36;
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: none;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list-filters {
+html.dark [data-admin-shell] .km-admin-node-list-filters,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list-filters {
   background: #161c24;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root {
+html.dark [data-admin-shell] .km-admin-node-list-filters .MuiOutlinedInput-root,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list-filters .MuiOutlinedInput-root {
   background-color: #212b36;
 }
 
 html.dark [data-admin-shell] .km-admin-node-list .admin-responsive-table-wrap,
 html.dark [data-admin-shell] .km-admin-node-list .admin-pagination,
-html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty {
+html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .admin-responsive-table-wrap,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .admin-pagination,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .km-admin-list-empty {
   background: #212b36;
 }
 
@@ -1924,11 +2249,13 @@ html.dark [data-admin-shell] .admin-table-header th {
   color: #919eab;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty {
+html.dark [data-admin-shell] .km-admin-node-list .km-admin-list-empty,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .km-admin-list-empty {
   color: #919eab;
 }
 
-html.dark [data-admin-shell] .km-admin-node-list .admin-pagination {
+html.dark [data-admin-shell] .km-admin-node-list .admin-pagination,
+html.dark[data-admin-shell-active="true"] .km-admin-node-list .admin-pagination {
   border-top-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -2278,4 +2605,194 @@ html[data-reduce-motion="true"] .admin-select-or-input-content {
 
 [data-reduce-motion="true"] .km-theme-preview-skeleton {
   animation: none;
+}
+
+html [data-sonner-toaster] {
+  font-family: inherit;
+}
+
+html [data-sonner-toast] {
+  transition: transform 320ms ease-in-out, opacity 280ms ease-in-out, box-shadow 280ms ease;
+}
+
+html [data-sonner-toast] > * {
+  transition: opacity 280ms ease-in-out;
+}
+
+html [data-sonner-toast][data-removed="true"][data-front="true"][data-swipe-out="false"] {
+  transition: transform 320ms ease-in-out, opacity 300ms ease-in-out;
+}
+
+html[data-admin-shell-active="true"] [data-sonner-toaster][data-y-position="top"] {
+  top: var(--admin-toast-top, calc(72px + 12px + var(--safe-area-top)));
+}
+
+html:has([data-testid="admin-login-toolbar"]) [data-sonner-toaster][data-y-position="top"] {
+  top: calc(72px + 12px + var(--safe-area-top));
+}
+
+html.remote-terminal-open [data-sonner-toaster][data-y-position="top"] {
+  top: calc(var(--remote-header-h, 56px) + 12px + var(--safe-area-top));
+}
+
+@media (min-width: 1024px) {
+  html[data-admin-shell-active="true"] [data-sonner-toaster][data-x-position="center"] {
+    left: 50%;
+  }
+
+  html [data-sonner-toaster][data-x-position="center"] [data-sonner-toast][data-styled="true"]:not([data-swiping="true"]):not([data-swipe-out="true"]) {
+    left: 50%;
+    transform: translateX(-50%) var(--y);
+  }
+
+  html [data-sonner-toaster][data-x-position="center"] [data-sonner-toast][data-styled="true"][data-swiping="true"] {
+    left: 50%;
+    transform: translateX(calc(-50% + var(--swipe-amount-x, 0px))) var(--y) translateY(var(--swipe-amount-y, 0px));
+  }
+
+  html [data-sonner-toaster][data-x-position="center"] [data-sonner-toast][data-styled="true"]:is([data-type="success"], [data-type="info"], [data-type="default"], [data-type="loading"]) {
+    width: 320px;
+    max-width: min(320px, calc(100vw - 48px));
+  }
+
+  html [data-sonner-toaster][data-x-position="center"] [data-sonner-toast][data-styled="true"]:is([data-type="error"], [data-type="warning"]) {
+    width: max-content;
+    max-width: min(560px, calc(100vw - 48px));
+  }
+
+  html [data-sonner-toaster][data-x-position="center"] [data-sonner-toast] [data-title] {
+    text-wrap: wrap;
+  }
+}
+
+@media (max-width: 599.95px) {
+  html:has([data-testid="admin-login-toolbar"]) [data-sonner-toaster][data-y-position="top"] {
+    top: calc(56px + 12px + var(--safe-area-top));
+  }
+}
+
+@media (max-width: 600px) {
+  html [data-sonner-toaster][data-x-position="center"] {
+    left: calc(12px + var(--safe-area-left));
+    right: auto;
+    width: calc(100vw - 24px - var(--safe-area-left) - var(--safe-area-right));
+    transform: none;
+  }
+
+  html [data-sonner-toaster][data-x-position="center"][data-lifted="true"] {
+    transform: none;
+  }
+
+  html [data-sonner-toaster][data-x-position="center"] [data-sonner-toast] {
+    left: 0;
+    right: auto;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-admin-shell-active="true"] [data-sonner-toaster][data-x-position="center"] {
+    transition: none;
+  }
+}
+
+.admin-node-table .admin-node-agent-version,
+.admin-node-table .admin-node-agent-cell .MuiChip-root {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.admin-node-table .admin-node-agent-version {
+  text-overflow: ellipsis;
+}
+
+.admin-node-table .admin-node-agent-cell .MuiChip-root {
+  height: 24px;
+}
+
+.admin-node-table th:nth-child(4),
+.admin-node-table td:nth-child(4) {
+  min-width: 64px;
+}
+
+.admin-node-table thead th {
+  position: relative;
+}
+
+.admin-node-col-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.admin-node-col-resize::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+}
+
+.admin-node-col-resize:hover::after,
+.admin-node-table thead th:hover > .admin-node-col-resize::after,
+.admin-node-col-resize.is-active::after {
+  background: #078dee;
+}
+
+body.admin-node-col-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.admin-node-table.is-column-sized {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100%;
+}
+
+.admin-node-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-node-col-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(145, 158, 171, 0.16);
+  color: #454f5b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-node-col-reset svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.admin-node-col-reset:hover {
+  background: rgba(7, 141, 238, 0.12);
+  color: #078dee;
 }

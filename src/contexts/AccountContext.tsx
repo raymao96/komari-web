@@ -26,9 +26,13 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [account, setAccount] = React.useState<Account | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
+  const accountRef = React.useRef(account);
+  accountRef.current = account;
 
   const refresh = React.useCallback(async () => {
-    setLoading(true);
+    if (accountRef.current === null) {
+      setLoading(true);
+    }
     setError(null);
     try {
       setAccount(await fetchAccount());

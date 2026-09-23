@@ -9,11 +9,19 @@ import { Button, Text } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import React from "react";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
 import { renderProviderInputs } from "@/utils/renderProviders";
 import { toast } from "sonner";
 import { AdminSectionTitle } from "@/components/admin/AdminPageTitle";
 
-export default function SignOnSettings() {
+export default function SignOnSettings({
+  embedded = false,
+  hideApi = false,
+}: {
+  embedded?: boolean;
+  hideApi?: boolean;
+}) {
   const { t } = useTranslation();
   const { settings, loading, error } = useSettings();
   const [providerDefs, setProviderDefs] = React.useState<any>({});
@@ -98,7 +106,15 @@ export default function SignOnSettings() {
   // 渲染 provider 的输入项已抽象到 utils/renderProviders.tsx 中
 
   if (loading) {
-    return <SettingsPageSkeleton />;
+    return embedded ? (
+      <Stack spacing={1.5} role="status" aria-label={t("common.loading")}>
+        <Skeleton height={36} />
+        <Skeleton height={36} />
+        <Skeleton height={72} />
+      </Stack>
+    ) : (
+      <SettingsPageSkeleton />
+    );
   }
   if (error) {
     return <Text color="red">{error}</Text>;
@@ -109,10 +125,12 @@ export default function SignOnSettings() {
 
   return (
     <>
-      {hydrated ? null : (
+      {hydrated || embedded ? null : (
         <div data-admin-route-pending="true" hidden />
       )}
-      <AdminSectionTitle>{t("settings.sign_on.title")}</AdminSectionTitle>
+      {embedded ? null : (
+        <AdminSectionTitle>{t("settings.sign_on.title")}</AdminSectionTitle>
+      )}
       <SettingCardSwitch
         title={t("settings.sign_on.disable_password")}
         defaultChecked={settings.disable_password_login}
@@ -152,8 +170,12 @@ export default function SignOnSettings() {
         handleSave: handleOidcSave,
         t,
       })}
-      <SettingCardLabel>API</SettingCardLabel>
-      <ApiCard />
+      {hideApi ? null : (
+        <>
+          <SettingCardLabel>API</SettingCardLabel>
+          <ApiCard />
+        </>
+      )}
     </>
   );
 }

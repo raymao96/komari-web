@@ -41,5 +41,5 @@ test("terminal waits for login before using RPC2", () => {
   assert.match(outer, /resolveAdminAuthView/);
   assert.doesNotMatch(outer, /useRPC2Call/);
   assert.match(inner, /useRPC2Call/);
-  assert.match(inner, /authorization !== "authorized"/);
+  assert.match(inner, /authorization === "checking"/);
 });

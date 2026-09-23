@@ -890,7 +890,7 @@ function CloudflareTunnelPanel({ onReady }: { onReady: () => void }) {
             <Text size="2" color="gray">
               {t(
                 "settings.reverse_proxy.install_hint",
-                "In non-Docker deployments, install cloudflared manually or set `KOMARI_CLOUDFLARED_BIN` to the cloudflared binary path."
+                "Install cloudflared yourself before using Cloudflare Tunnel, or set `LITE_CLOUDFLARED_BIN` to its path."
               )}
             </Text>
           ) : null}

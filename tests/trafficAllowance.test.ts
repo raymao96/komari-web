@@ -25,9 +25,11 @@ test("reset traffic requires a billing reset day and shows the effective quota",
     /if \(trafficResetDay !== \(node\.traffic_reset_day \?\? 0\)\)/,
   );
   assert.match(editSource, /trafficResetAllowance !== \(node\.traffic_reset_allowance \?\? 0\)/);
-  assert.match(editSource, /aria-label=\{t\("admin\.nodeEdit\.trafficResetDay"\)\}/);
+  assert.match(editSource, /aria-label=\{t\("admin\.nodeEdit\.trafficResetDate"/);
+  assert.match(editSource, /admin\.nodeEdit\.trafficResetTime/);
+  assert.match(editSource, /aria-label=\{t\("admin\.nodeEdit\.trafficResetTimezone"\)\}/);
   assert.match(editSource, /aria-label=\{t\("admin\.nodeEdit\.trafficResetAllowance"\)\}/);
-  assert.match(editSource, /trafficResetDay[\s\S]*text-sm font-semibold leading-5/);
+  assert.match(editSource, /km-traffic-reset-clock-row/);
   assert.match(editSource, /space-y-2 pb-3 pt-2/);
   assert.doesNotMatch(editSource, /trafficResetType|traffic_reset_type/);
 });

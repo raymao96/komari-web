@@ -30,6 +30,13 @@ export function omitClientTokenFromNode<T extends object>(node: T): T {
   return copy;
 }
 
+export type ClientTokenAuth = {
+  signal?: AbortSignal;
+  twoFactorCode?: string;
+  ceremony_id?: string;
+  credential?: unknown;
+};
+
 async function readSafeErrorMessage(response: Response): Promise<string> {
   const text = await response.text();
   try {
@@ -52,16 +59,31 @@ function twoFactorHeaders(twoFactorCode?: string): HeadersInit {
   return headers;
 }
 
+function passkeyBody(options: ClientTokenAuth, extra: Record<string, unknown> = {}) {
+  if (!options.ceremony_id || options.credential == null) return extra;
+  return {
+    ...extra,
+    ceremony_id: options.ceremony_id,
+    credential: options.credential,
+  };
+}
+
 export async function fetchClientToken(
   uuid: string,
-  options: { signal?: AbortSignal; twoFactorCode?: string } = {},
+  options: ClientTokenAuth = {},
 ): Promise<string> {
+  const usingPasskey = Boolean(options.ceremony_id && options.credential);
   const response = await fetch(
     `/api/admin/client/${encodeURIComponent(uuid)}/token`,
     {
+      method: usingPasskey ? "POST" : "GET",
       cache: "no-store",
       signal: options.signal,
-      headers: twoFactorHeaders(options.twoFactorCode),
+      headers: {
+        ...(usingPasskey ? { "Content-Type": "application/json" } : {}),
+        ...twoFactorHeaders(options.twoFactorCode),
+      },
+      body: usingPasskey ? JSON.stringify(passkeyBody(options)) : undefined,
     },
   );
   if (!response.ok) {
@@ -80,7 +102,7 @@ export async function fetchClientToken(
 
 export async function rotateClientToken(
   uuid: string,
-  options: { signal?: AbortSignal; twoFactorCode?: string } = {},
+  options: ClientTokenAuth = {},
 ): Promise<void> {
   const response = await fetch("/api/admin/client/token/rotate", {
     method: "POST",
@@ -90,7 +112,7 @@ export async function rotateClientToken(
       "Content-Type": "application/json",
       ...twoFactorHeaders(options.twoFactorCode),
     },
-    body: JSON.stringify({ uuid }),
+    body: JSON.stringify(passkeyBody(options, { uuid })),
   });
   if (!response.ok) {
     throw new ClientTokenRequestError(
