@@ -30,6 +30,7 @@ import {
   ClipboardPaste,
   Copy,
   CornerDownLeft,
+  KeyboardTab,
   Cpu,
   Files,
   HardDrive,
@@ -276,10 +277,17 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
     }
   }, [sendTerminalText]);
 
+  const sendTerminalTab = useCallback(() => {
+    if (mobileComposing.current) return;
+    const pending = mobileCommand;
+    if (!sendTerminalText(pending ? `${pending}\t` : "\t")) return;
+    if (pending) setMobileCommand("");
+  }, [mobileCommand, sendTerminalText]);
+
   const submitMobileCommand = useCallback(() => {
-    if (mobileComposing.current || !mobileCommand) return;
+    if (mobileComposing.current) return;
     if (!sendTerminalText(`${mobileCommand}\r`)) return;
-    setMobileCommand("");
+    if (mobileCommand) setMobileCommand("");
     const dismissKeyboard = () => {
       mobileCommandInput.current?.blur();
       terminalHost.current?.querySelector<HTMLTextAreaElement>("textarea.xterm-helper-textarea")?.blur();
@@ -848,6 +856,15 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
                   <ClipboardPaste size={13} />
                   {t("terminal.session.paste")}
                 </button>
+                <button
+                  type="button"
+                  disabled={!remoteReady}
+                  aria-label={t("terminal.session.tab_complete")}
+                  onClick={sendTerminalTab}
+                >
+                  <KeyboardTab size={13} />
+                  Tab
+                </button>
               </div>
             ) : null}
             <form
@@ -887,8 +904,8 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
               <button
                 type="submit"
                 className="remote-mobile-send"
-                aria-label={t("terminal.session.send_command")}
-                disabled={!remoteReady || !mobileCommand}
+                aria-label={mobileCommand ? t("terminal.session.send_command") : t("terminal.session.send_enter")}
+                disabled={!remoteReady}
               >
                 <CornerDownLeft size={18} />
               </button>

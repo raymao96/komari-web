@@ -6,6 +6,8 @@ import {
 } from "@/components/admin/SettingCard";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import { Button, Text } from "@/components/admin/ui";
+import LastSignInMethodDialog from "@/components/admin/LastSignInMethodDialog";
+import { remainingSignInMethods } from "@/lib/signInMethods";
 import { useTranslation } from "react-i18next";
 import SettingsPageSkeleton from "@/components/admin/SettingsPageSkeleton";
 import React from "react";
@@ -18,9 +20,15 @@ import { AdminSectionTitle } from "@/components/admin/AdminPageTitle";
 export default function SignOnSettings({
   embedded = false,
   hideApi = false,
+  hasPassword = true,
+  ssoBound = false,
+  passkeyCount = 0,
 }: {
   embedded?: boolean;
   hideApi?: boolean;
+  hasPassword?: boolean;
+  ssoBound?: boolean;
+  passkeyCount?: number;
 }) {
   const { t } = useTranslation();
   const { settings, loading, error } = useSettings();
@@ -30,6 +38,23 @@ export default function SignOnSettings({
   const [providerValues, setProviderValues] = React.useState<any>({});
   const [hydrated, setHydrated] = React.useState(false);
   const [providerError, setProviderError] = React.useState("");
+  const [keepOneOpen, setKeepOneOpen] = React.useState(false);
+  const passwordDisabled = Boolean(settings.disable_password_login);
+  const oauthEnabled = Boolean(settings.o_auth_enabled);
+
+  const rejectIfLastSignInMethod = (nextPasswordDisabled: boolean, nextOauthEnabled: boolean) => {
+    const remaining = remainingSignInMethods({
+      passwordDisabled: nextPasswordDisabled,
+      hasPassword,
+      oauthEnabled: nextOauthEnabled,
+      ssoBound,
+      passkeyCount,
+    });
+    if (remaining === 0) {
+      setKeepOneOpen(true);
+      throw new Error("last-sign-in-method");
+    }
+  };
 
 
   // 拉取所有 provider 及字段定义
@@ -135,6 +160,7 @@ export default function SignOnSettings({
         title={t("settings.sign_on.disable_password")}
         defaultChecked={settings.disable_password_login}
         onChange={async (checked) => {
+          rejectIfLastSignInMethod(checked, oauthEnabled);
           await updateSettingsWithToast({ disable_password_login: checked }, t);
         }}
       />
@@ -144,9 +170,11 @@ export default function SignOnSettings({
         defaultChecked={settings.o_auth_enabled}
         description={t("settings.sso.enable_description")}
         onChange={async (checked) => {
+          rejectIfLastSignInMethod(passwordDisabled, checked);
           await updateSettingsWithToast({ o_auth_enabled: checked }, t);
         }}
       />
+      <LastSignInMethodDialog open={keepOneOpen} onClose={() => setKeepOneOpen(false)} />
       <SettingCardSelect
         title={String(t("settings.sso.provider"))}
         description={String(t("settings.sso.provider_description"))}

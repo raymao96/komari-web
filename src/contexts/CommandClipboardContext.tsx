@@ -68,7 +68,9 @@ export const CommandClipboardProvider: React.FC<{
       }
       await refresh();
     } catch (err) {
-      setError(err as Error);
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -94,7 +96,9 @@ export const CommandClipboardProvider: React.FC<{
       }
       await refresh();
     } catch (err) {
-      setError(err as Error);
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -110,7 +114,9 @@ export const CommandClipboardProvider: React.FC<{
       }
       await refresh();
     } catch (err) {
-      setError(err as Error);
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      throw error;
     } finally {
       setLoading(false);
     }

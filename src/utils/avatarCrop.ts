@@ -5,14 +5,6 @@ export const AVATAR_MAX_PIXELS = 16_000_000;
 export const AVATAR_MAX_OUTPUT_BYTES = 512 * 1024;
 export const AVATAR_ACCEPT = "image/jpeg,image/png,image/webp";
 
-export type AvatarCropState = {
-  image: HTMLImageElement;
-  objectUrl: string;
-  zoom: number;
-  offsetX: number;
-  offsetY: number;
-};
-
 export function isSupportedAvatarType(file: File) {
   const type = (file.type || "").toLowerCase();
   return type === "image/jpeg" || type === "image/png" || type === "image/webp";

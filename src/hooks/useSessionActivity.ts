@@ -24,12 +24,6 @@ export function subscribeSessionTouch(listener: TouchListener) {
   };
 }
 
-export function parseSessionTouchTime(value?: string) {
-  if (!value) return 0;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : 0;
-}
-
 async function postSessionTouch(): Promise<TouchPayload | null> {
   const response = await fetch(
     sameOriginApiPath("/api/session/touch"),

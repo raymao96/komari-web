@@ -8,7 +8,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
-  AppDialogContent, Button, Dialog, Flex } from "@/components/admin/ui";
+  AppDialogContent, Badge, Button, Dialog, Flex } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
@@ -26,6 +26,7 @@ import {
   AdminListSearch,
   AdminListShell,
 } from "@/components/admin/AdminListShell";
+import { formatAuditMessage } from "@/pages/admin/auditLogMessage";
 
 interface Log {
   id: number;
@@ -74,10 +75,29 @@ function optionsFromLogs(
   return [...counts.entries()].map(([value, count]) => ({ value, count }));
 }
 
+function logTypeColor(value: string) {
+  if (value === "error") return "red";
+  if (value === "warn") return "yellow";
+  if (value === "info") return "green";
+  if (value === "terminal") return "blue";
+  return "gray";
+}
+
+function LogTypeBadge({ value }: { value: string }) {
+  const { t } = useTranslation();
+  return (
+    <Badge className="self-start" color={logTypeColor(value)} variant="soft">
+      {t(`logs.types.${value}`, { defaultValue: value })}
+    </Badge>
+  );
+}
+
 function LogMessageCell({ message }: { message: string }) {
+  const { t } = useTranslation();
+  const text = formatAuditMessage(message, t);
   return (
     <Tooltip
-      title={message}
+      title={text}
       placement="top-start"
       enterDelay={300}
       slotProps={{
@@ -93,7 +113,7 @@ function LogMessageCell({ message }: { message: string }) {
       }}
     >
       <Box component="span" className="admin-cell-clip km-log-message">
-        {message}
+        {text}
       </Box>
     </Tooltip>
   );
@@ -181,7 +201,7 @@ const LogPage = () => {
       ? dayOptions
       : optionsFromLogs(logs, (log) => logDayKey(log.time));
   const typeLabel = (value: string) =>
-    resolvedTypeOptions.find((option) => option.value === value)?.value || value;
+    t(`logs.types.${value}`, { defaultValue: value });
   const searchTerm = searchInput.trim();
   const clearAllFilters = () => {
     setTypeFilters([]);
@@ -221,7 +241,7 @@ const LogPage = () => {
               }}
               options={resolvedTypeOptions.map((option) => ({
                 value: option.value,
-                label: option.value,
+                label: typeLabel(option.value),
                 secondary: filterCountLabel(option.count),
               }))}
             />
@@ -330,10 +350,10 @@ const LogPage = () => {
                                   <label className="font-bold">{t("logs.uuid", "UUID")}</label>
                                   <label className="text-sm">{log.uuid}</label>
                                   <label className="font-bold">{t("logs.type", "类型")}</label>
-                                  <label className="text-sm">{log.msg_type}</label>
+                                  <LogTypeBadge value={log.msg_type} />
                                   <label className="font-bold">{t("logs.message", "内容")}</label>
                                   <label className="text-sm whitespace-pre-wrap break-all">
-                                    {log.message}
+                                    {formatAuditMessage(log.message, t)}
                                   </label>
                                   <label className="font-bold">{t("logs.time", "时间")}</label>
                                   <label className="text-sm">{timeLabel}</label>
@@ -347,7 +367,9 @@ const LogPage = () => {
                             </Dialog.Root>
                           </TableCell>
                           <TableCell className="km-log-col-ip">{log.ip}</TableCell>
-                          <TableCell className="km-log-col-type">{log.msg_type}</TableCell>
+                          <TableCell className="km-log-col-type">
+                            <LogTypeBadge value={log.msg_type} />
+                          </TableCell>
                           <TableCell className="km-log-col-message">
                             <LogMessageCell message={log.message} />
                           </TableCell>
