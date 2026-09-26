@@ -5,6 +5,7 @@ import test from "node:test";
 import { avatarCropSourceRect, avatarPreviewTransform, clampAvatarPreviewOffset } from "../src/utils/avatarCrop.ts";
 import { formatSessionAge, remainingSessionLabel, sessionLastActivityMs, sessionLogoutAtMs, sessionTtlInputToSeconds } from "../src/utils/sessionTtl.ts";
 import { ssoExternalId, ssoProviderKey, ssoProviderLabel } from "../src/utils/ssoIdentity.ts";
+import { isWindowsHelloPasskey } from "../src/lib/accountPasskeys.ts";
 import { withPasskeyCreatePreference } from "../src/utils/webauthn.ts";
 
 test("dragging the avatar preview right samples more of the left side of the source", () => {
@@ -100,7 +101,7 @@ test("session touch logs out on 401 and coalesces inflight activity", () => {
 test("passkeys can be deleted from the account sheet", () => {
   const source = readFileSync("src/pages/admin/settings/account-security.tsx", "utf8");
   assert.match(source, /method: "DELETE"/);
-  assert.match(source, /account\.passkey_last_method/);
+  assert.match(source, /LastSignInMethodDialog/);
   assert.match(source, /onCount=\{setPasskeyCount\}/);
   assert.match(source, /getAccountPasskeySnapshot/);
   assert.match(source, /prefetchAccountPasskeys/);
@@ -137,6 +138,18 @@ test("API key is not a password field and passkey confirm does not keep identity
   assert.doesNotMatch(source, /password_mismatch_error[\s\S]{0,80}: " "/);
 });
 
+test("Windows Hello passkeys use the computer icon and other passkeys use the key", () => {
+  assert.equal(isWindowsHelloPasskey("08987058-cadc-4b81-b6e1-30de50dcbe96"), true);
+  assert.equal(isWindowsHelloPasskey("9DDD1817-AF5A-4672-A2B9-3E3DD95000A9"), true);
+  assert.equal(isWindowsHelloPasskey("6028b017-b1d4-4c02-b4b3-afcdafc96bb2"), true);
+  assert.equal(isWindowsHelloPasskey("d548826e-79b4-db40-a3d8-11116f7e8349"), false);
+  assert.equal(isWindowsHelloPasskey(""), false);
+  const source = readFileSync("src/pages/admin/settings/account-security.tsx", "utf8");
+  const passkeys = source.slice(source.indexOf("function PasskeysPanel"));
+  assert.match(passkeys, /isWindowsHelloPasskey\(item\.aaguid\)/);
+  assert.doesNotMatch(passkeys, /index === 0 \? <Devices/);
+});
+
 test("Hello stays a Windows platform request and password managers are not hybrid", () => {
   const hello = withPasskeyCreatePreference({ challenge: "x", hints: ["hybrid"] }, "platform");
   assert.deepEqual(hello.hints, ["client-device"]);
@@ -152,13 +165,8 @@ test("Hello stays a Windows platform request and password managers are not hybri
   assert.equal(manager.hints, undefined);
   assert.equal(manager.authenticatorSelection.authenticatorAttachment, undefined);
   assert.equal(manager.authenticatorSelection.residentKey, "required");
-  const managerOnWindows = withPasskeyCreatePreference(
-    { challenge: "x", hints: ["hybrid"] },
-    "password-manager",
-    { windows: true },
-  );
-  assert.equal(managerOnWindows.hints, undefined);
-  assert.equal(managerOnWindows.authenticatorSelection.authenticatorAttachment, "cross-platform");
+  const webauthn = readFileSync("src/utils/webauthn.ts", "utf8");
+  assert.doesNotMatch(webauthn, /authenticatorAttachment: "cross-platform"/);
 });
 
 test("API key drafts are discarded if the sheet closes without saving", () => {
@@ -190,7 +198,8 @@ test("password and passkey drafts are discarded if the sheet closes without savi
   assert.match(passkeys, /if \(open\) return;\s*abortCeremony\(\);\s*setName\(""\);\s*setPassword\(""\);\s*setTwoFa\(""\);/s);
   assert.match(passkeys, /signal: controller\.signal/);
   assert.match(passkeys, /onClose=\{close\}/);
-  assert.match(passkeys, /toPasskeyCreateOptions\(\s*optionsBody\.data\?\.publicKey \|\| optionsBody\.publicKey,\s*prefer,\s*\{ windows: windowsHelloAvailable \}/s);
+  assert.match(passkeys, /toPasskeyCreateOptions\(\s*optionsBody\.data\?\.publicKey \|\| optionsBody\.publicKey,\s*prefer,\s*\)/s);
+  assert.doesNotMatch(passkeys, /authenticatorAttachment:\s*"cross-platform"/);
 });
 
 test("account security passkey count is prefetched like other settings pages", () => {

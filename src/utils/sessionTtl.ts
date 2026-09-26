@@ -41,10 +41,6 @@ export function sessionTtlInputToSeconds(amount: number, unit: SessionTtlUnit) {
   return seconds;
 }
 
-export function sessionTtlToSeconds(amount: number, unit: SessionTtlUnit) {
-  return sessionTtlInputToSeconds(amount, unit) ?? DEFAULT_SESSION_TTL_SECONDS;
-}
-
 const ACTIVITY_FLOOR_MS = Date.parse("2000-01-01T00:00:00Z");
 
 function parseActivityMs(value?: string): number {

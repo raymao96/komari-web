@@ -84,8 +84,6 @@ export const JSONRPC2ErrorCode = {
   INTERNAL_ERROR: -32603,
 } as const;
 
-export type JSONRPC2ErrorCodeType = typeof JSONRPC2ErrorCode[keyof typeof JSONRPC2ErrorCode];
-
 /**
  * RPC 连接状态
  */

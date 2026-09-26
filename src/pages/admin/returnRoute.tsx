@@ -614,7 +614,11 @@ function MultiNodeSelect({
         label: node.name || node.uuid,
       }))}
       sx={{
-        "& .MuiOutlinedInput-root": { minHeight: 40, height: 40 },
+        flex: { xs: "0 0 auto", md: "0 0 auto" },
+        width: "100%",
+        maxWidth: { xs: "100%", md: "100%" },
+        minWidth: { xs: 0, md: 0 },
+        "& .MuiOutlinedInput-root": { minHeight: 40, height: 40, maxWidth: "100%" },
         "& .MuiSelect-select": {
           display: "flex",
           height: 40,
