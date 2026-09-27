@@ -34,6 +34,8 @@ import {
     useAdminPagination,
 } from "@/components/admin/AdminPagination";
 import { confirmAdminPasskey, passkeyUnavailableMessage } from "@/utils/webauthn";
+import { CommandClipboardProvider } from "@/contexts/CommandClipboardContext";
+import { SavedExecCommands } from "@/pages/admin/execSavedCommands";
 
 interface TaskResult {
     task_id: string;
@@ -105,11 +107,13 @@ const getCommandEditorCollapsedHeight = (textarea: HTMLTextAreaElement, editor: 
 const ExecPage = () => {
     return (
         <RequireAllowRemoteManagement>
-            <NodeDetailsProvider>
-                <AdminNodeLiveDataProvider>
-                    <ExecContent />
-                </AdminNodeLiveDataProvider>
-            </NodeDetailsProvider>
+            <CommandClipboardProvider>
+                <NodeDetailsProvider>
+                    <AdminNodeLiveDataProvider>
+                        <ExecContent />
+                    </AdminNodeLiveDataProvider>
+                </NodeDetailsProvider>
+            </CommandClipboardProvider>
         </RequireAllowRemoteManagement>
     );
 };
@@ -526,6 +530,7 @@ const ExecContent = () => {
                     <label htmlFor={COMMAND_EDITOR_ID} className="text-base font-semibold leading-6">
                         {t("exec.command")}
                     </label>
+                    <SavedExecCommands onApply={setCommand} />
                     <div
                         ref={commandEditorRef}
                         className="grid grid-cols-[3.75rem_minmax(0,1fr)] overflow-hidden rounded-md border border-[var(--gray-a7)] bg-[var(--color-panel-solid)] transition-[height,border-color,box-shadow] duration-200 focus-within:border-[var(--accent-8)] focus-within:shadow-[0_0_0_1px_var(--accent-8)]"

@@ -54,6 +54,7 @@ import {
 } from "@/hooks/use-admin-node-live-data";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
 import { dateInputToISOString, timestampToDateInput } from "@/lib/dateInput";
+import { advanceBillingExpiry } from "@/lib/renewalDate";
 import NodeUsageStats from "@/pages/admin/NodeUsageStats";
 import {
   EMPTY_DISPLAY,
@@ -1017,13 +1018,13 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
               {t("admin.nodeDetail.changeCycle", "变更周期")}
             </Button>
             <Button
-              disabled={saving}
+              disabled={saving || !(parseInt(billingCycle || "30", 10) > 0)}
               startIcon={<RefreshCw size={17} />}
               onClick={() => {
-                const days = parseInt(billingCycle || "30", 10);
-                const base = expiredAt ? new Date(`${expiredAt}T00:00:00`) : new Date();
-                base.setDate(base.getDate() + Math.max(1, days));
-                const next = timestampToDateInput(base);
+                const cycle = parseInt(billingCycle || "30", 10);
+                const base = expiredAt || timestampToDateInput(new Date());
+                const next = advanceBillingExpiry(base, cycle);
+                if (!next) return;
                 setExpiredAt(next);
                 void save({ expired_at: dateInputToISOString(next) });
               }}

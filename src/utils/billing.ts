@@ -298,15 +298,6 @@ export function formatBillingMoney(
   return `${sign}${prefix}${grouped}${decimal}`;
 }
 
-export function billingCycleText(days: number): string {
-  if (days === -1) return "一次性";
-  if (days >= 27 && days <= 32) return "月付";
-  if (days >= 87 && days <= 95) return "季付";
-  if (days >= 175 && days <= 185) return "半年付";
-  if (days >= 360 && days <= 370) return "年付";
-  return `${days} 天`;
-}
-
 export function billingDate(value?: string | null): string {
   if (!value) return "--";
   const date = new Date(value);

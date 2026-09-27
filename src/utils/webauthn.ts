@@ -35,7 +35,6 @@ export type PasskeyCreatePrefer = "platform" | "password-manager";
 export function withPasskeyCreatePreference<T extends Record<string, any>>(
   options: T,
   prefer: PasskeyCreatePrefer,
-  env?: { windows?: boolean },
 ) {
   const { hints: _hints, authenticatorSelection: _selection, ...rest } = options;
   const authenticatorSelection: Record<string, unknown> = {
@@ -44,17 +43,9 @@ export function withPasskeyCreatePreference<T extends Record<string, any>>(
     userVerification: "required",
   };
   if (prefer === "password-manager") {
-    // iOS password managers need unspecified attachment. On Windows, leaving it
-    // unset lets Chrome fall through to Hello after Bitwarden is dismissed.
-    if (env?.windows) {
-      return {
-        ...rest,
-        authenticatorSelection: {
-          ...authenticatorSelection,
-          authenticatorAttachment: "cross-platform",
-        },
-      };
-    }
+    // Leave attachment unset on every system, including Windows. Enpass,
+    // Bitwarden, and 1Password only save platform passkeys, so a
+    // cross-platform request never reaches them.
     return { ...rest, authenticatorSelection };
   }
   return {
@@ -70,10 +61,9 @@ export function withPasskeyCreatePreference<T extends Record<string, any>>(
 export function toPasskeyCreateOptions(
   raw: any,
   prefer: PasskeyCreatePrefer,
-  env?: { windows?: boolean },
 ): PublicKeyCredentialCreationOptions {
   const source = raw && typeof raw === "object" ? raw : {};
-  const decoded: any = decodePublicKeyCreationOptions(withPasskeyCreatePreference(source, prefer, env));
+  const decoded: any = decodePublicKeyCreationOptions(withPasskeyCreatePreference(source, prefer));
   return withPasskeyCreatePreference(
     {
       rp: decoded.rp,
@@ -86,7 +76,6 @@ export function toPasskeyCreateOptions(
       extensions: decoded.extensions,
     },
     prefer,
-    env,
   ) as PublicKeyCredentialCreationOptions;
 }
 

@@ -1,7 +1,5 @@
 export const GITHUB_ALERTS = ["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"] as const;
 
-export type GithubAlertType = (typeof GITHUB_ALERTS)[number];
-
 export const GITHUB_ALERT_LABELS: Record<string, string> = {
   note: "Note",
   tip: "Tip",

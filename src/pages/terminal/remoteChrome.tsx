@@ -5,7 +5,6 @@ import { LITE_BLUE } from "@/theme/brand";
 
 export const REMOTE_COMPACT_QUERY = "(max-width: 900px)";
 export const UNREPORTED_ADDRESS = "—";
-export const REMOTE_DRAWER_WIDTH = "min(864px, calc(100vw - 48px))";
 export const remoteConfirmDialogProps = {
   fullWidth: true,
   maxWidth: "xs" as const,

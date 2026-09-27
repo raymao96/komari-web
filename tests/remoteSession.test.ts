@@ -122,6 +122,12 @@ test("mobile terminal input avoids iOS zoom and refits around the keyboard", () 
   assert.match(terminalSource, /helper\.tabIndex = -1/);
   assert.match(terminalSource, /dismissKeyboard/);
   assert.match(terminalSource, /mobileCommandInput\.current\?\.blur\(\)/);
+  assert.match(terminalSource, /if \(mobileComposing\.current\) return;/);
+  assert.match(terminalSource, /if \(!sendTerminalText\(`\$\{mobileCommand\}\\r`\)\) return;/);
+  assert.match(terminalSource, /if \(mobileCommand\) setMobileCommand\(""\);/);
+  assert.match(terminalSource, /disabled=\{!remoteReady\}/);
+  assert.doesNotMatch(terminalSource, /disabled=\{!remoteReady \|\| !mobileCommand\}/);
+  assert.match(terminalSource, /terminal\.session\.send_enter/);
   assert.match(terminalSource, /compactLayout \? 220 : 0/);
   assert.doesNotMatch(terminalSource, /keepFocus/);
   assert.match(workspace, /syncRemoteVisualViewport/);

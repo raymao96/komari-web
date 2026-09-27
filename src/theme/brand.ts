@@ -5,8 +5,6 @@ export const LITE_BLUE_SOFT_STRONG = "rgba(7, 141, 238, 0.16)";
 /** Same online/offline marks as the MUI server list. */
 export const NODE_ONLINE = "#22C55E";
 export const NODE_OFFLINE = "#FF5630";
-export const NODE_ONLINE_SOFT = "rgba(34, 197, 94, 0.10)";
-export const NODE_OFFLINE_SOFT = "rgba(255, 86, 48, 0.10)";
 export const LITE_NAME = "Lite";
 /** dash.neburst.com grey.200 / background.neutral */
 export const NEBURST_NEUTRAL = "#F4F6F8";

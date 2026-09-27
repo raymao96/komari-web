@@ -33,25 +33,6 @@ export function nodeLookup(nodes: readonly MCPNodeRef[]): Map<string, MCPNodeRef
   return map;
 }
 
-export function nodeNameList(
-  uuids: readonly string[],
-  nodes: Map<string, MCPNodeRef>,
-): string[] {
-  return uuids.map((uuid) => nodeDisplayName(nodes.get(uuid)));
-}
-
-export function formatClockTime(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-}
-
 const ANSI_ESCAPE = /\u001b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
 export function stripANSI(value: string): string {
@@ -64,38 +45,6 @@ export function previewLine(preview?: string): string {
     .split("\n")
     .find((item) => item.trim());
   return line?.replace(/^\$\s*/, "").trim() || "";
-}
-
-export function formatClockDateTime(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-}
-
-export function leaseDurationMinutes(createdAt: string, expiresAt: string): number {
-  const created = Date.parse(createdAt);
-  const expires = Date.parse(expiresAt);
-  if (!Number.isFinite(created) || !Number.isFinite(expires) || expires <= created) {
-    return 0;
-  }
-  return Math.max(1, Math.round((expires - created) / 60_000));
-}
-
-export function operationToolKey(toolName: string): "exec" | "file_read" | "file_write" | "file" | "terminal" | "grant" | "other" {
-  const name = toolName.trim().toLowerCase();
-  if (name === "exec") return "exec";
-  if (name === "grant" || name === "authorize") return "grant";
-  if (name.startsWith("terminal")) return "terminal";
-  if (name.includes("file.read") || name === "file_read") return "file_read";
-  if (name.includes("file.write") || name === "file_write") return "file_write";
-  if (name.includes("file")) return "file";
-  return "other";
 }
 
 export function operationResultKey(

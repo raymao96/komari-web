@@ -24,7 +24,3 @@ export function clientCookieSuffix() {
 export function isSafeTempKey(value: string) {
   return /^[A-Za-z0-9._-]{8,256}$/.test(value);
 }
-
-export function safeExternalRel(openInNewTab?: boolean) {
-  return openInNewTab ? "noopener noreferrer" : undefined;
-}

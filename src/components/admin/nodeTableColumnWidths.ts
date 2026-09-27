@@ -93,10 +93,6 @@ export function nodeColumnStyle(width: number | undefined): CSSProperties | unde
   return { width, minWidth: width, maxWidth: width }
 }
 
-export function nodeTableWidth(widths: NodeColumnWidths, sort = NODE_SORT_COLUMN_WIDTH): number {
-  return sort + NODE_COLUMN_KEYS.reduce((sum, key) => sum + widths[key], 0)
-}
-
 /** Match the desktop list width. A wider saved layout is scaled down so the table does not scroll while every column still fits. */
 export function fitNodeColumnWidths(
   widths: NodeColumnWidths,

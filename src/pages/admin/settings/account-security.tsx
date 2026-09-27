@@ -64,11 +64,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { updateSettingsWithToast, useSettings } from "@/lib/api";
 import {
   getAccountPasskeySnapshot,
+  isWindowsHelloPasskey,
   prefetchAccountPasskeys,
   rememberAccountPasskeys,
   type AccountPasskeySummary,
 } from "@/lib/accountPasskeys";
 import Sessions, { SessionsDeleteAllButton } from "@/pages/admin/sessions";
+import LastSignInMethodDialog from "@/components/admin/LastSignInMethodDialog";
+import { remainingSignInMethods } from "@/lib/signInMethods";
 import SignOnSettings from "@/pages/admin/settings/sign-on";
 import {
   clampAvatarPreviewOffset,
@@ -296,7 +299,10 @@ export default function AccountSecuritySettings() {
                 borderColor: "divider",
                 borderRadius: "50%",
                 color: "primary.main",
-                boxShadow: "0 0 0 1px rgba(255,255,255,0.8)",
+                boxShadow: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? `0 0 0 2px ${theme.palette.background.paper}`
+                    : "0 0 0 1px rgba(255,255,255,0.8)",
               }}
             >
               <PhotoCameraOutlined sx={{ fontSize: 14 }} />
@@ -454,7 +460,13 @@ export default function AccountSecuritySettings() {
         title={t("settings.sign_on.title")}
         actions={<SettingsSheetActions onConfirm={closePanel} confirmLabel={t("common.done", "完成")} />}
       >
-        <SignOnSettings embedded hideApi />
+        <SignOnSettings
+          embedded
+          hideApi
+          hasPassword={account?.has_password !== false}
+          ssoBound={Boolean(account?.sso_id)}
+          passkeyCount={passkeyCount ?? 0}
+        />
       </SettingsSheetDialog>
       <SettingsSheetDialog
         open={panel === "sessions"}
@@ -472,6 +484,9 @@ export default function AccountSecuritySettings() {
         account={account}
         refresh={refresh}
         oauthProvider={String(settings.o_auth_provider || "")}
+        passwordDisabled={Boolean(settings.disable_password_login)}
+        oauthEnabled={Boolean(settings.o_auth_enabled)}
+        passkeyCount={passkeyCount ?? 0}
       />
       <PasskeysPanel
         open={panel === "passkeys"}
@@ -479,6 +494,8 @@ export default function AccountSecuritySettings() {
         onClose={closePanel}
         account={account}
         onCount={setPasskeyCount}
+        passwordDisabled={Boolean(settings.disable_password_login)}
+        oauthEnabled={Boolean(settings.o_auth_enabled)}
       />
       <TwoFactorPanel
         open={panel === "security"}
@@ -1231,13 +1248,19 @@ function GithubPanel({
   account,
   refresh,
   oauthProvider,
+  passwordDisabled,
+  oauthEnabled,
+  passkeyCount,
 }: {
   open: boolean;
   hideBackdrop?: boolean;
   onClose: () => void;
-  account: { sso_id?: string; username?: string } | null;
+  account: { sso_id?: string; username?: string; has_password?: boolean } | null;
   refresh: () => Promise<void>;
   oauthProvider: string;
+  passwordDisabled: boolean;
+  oauthEnabled: boolean;
+  passkeyCount: number;
 }) {
   const { t } = useTranslation();
   const params = new URLSearchParams(window.location.search);
@@ -1247,6 +1270,7 @@ function GithubPanel({
   const provider = ssoProviderLabel(providerKey);
   const uniqueId = ssoExternalId(account?.sso_id);
   const [confirmUnbind, setConfirmUnbind] = useState(false);
+  const [keepOneOpen, setKeepOneOpen] = useState(false);
   const providerIcon = providerKey === "github" ? <Github size={21} /> : <Globe size={21} />;
   const providerHeroIcon = providerKey === "github" ? <Github size={30} /> : <Globe size={30} />;
 
@@ -1269,7 +1293,22 @@ function GithubPanel({
           <SettingsSheetActions
             onCancel={() => setConfirmUnbind(false)}
             onConfirm={async () => {
+              const remaining = remainingSignInMethods({
+                passwordDisabled,
+                hasPassword: account?.has_password !== false,
+                oauthEnabled,
+                ssoBound: false,
+                passkeyCount,
+              });
+              if (remaining === 0) {
+                setKeepOneOpen(true);
+                return;
+              }
               const response = await fetch("/api/admin/oauth2/unbind", { method: "POST" });
+              if (response.status === 409) {
+                setKeepOneOpen(true);
+                return;
+              }
               if (response.ok) {
                 toast.success(t("account_settings.unbind_sso_success", { provider }));
                 await refresh();
@@ -1371,6 +1410,7 @@ function GithubPanel({
           />
         </>
       )}
+      <LastSignInMethodDialog open={keepOneOpen} onClose={() => setKeepOneOpen(false)} />
     </SettingsSheetDialog>
   );
 }
@@ -1875,12 +1915,16 @@ function PasskeysPanel({
   onClose,
   account,
   onCount,
+  passwordDisabled,
+  oauthEnabled,
 }: {
   open: boolean;
   hideBackdrop?: boolean;
   onClose: () => void;
   account: { "2fa_enabled"?: boolean; sso_id?: string; has_password?: boolean; username?: string } | null;
   onCount?: (count: number) => void;
+  passwordDisabled: boolean;
+  oauthEnabled: boolean;
 }) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -1898,6 +1942,7 @@ function PasskeysPanel({
   const [renamingId, setRenamingId] = useState("");
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [keepOneOpen, setKeepOneOpen] = useState(false);
   const [saveTarget, setSaveTarget] = useState<"" | "platform" | "password-manager">("");
   const ceremonyAbort = useRef<AbortController | null>(null);
   const windowsHelloAvailable = UserAgentHelper.isWindows(
@@ -2038,7 +2083,6 @@ function PasskeysPanel({
       const publicKey = toPasskeyCreateOptions(
         optionsBody.data?.publicKey || optionsBody.publicKey,
         prefer,
-        { windows: windowsHelloAvailable },
       );
       abortCeremony();
       const controller = new AbortController();
@@ -2058,7 +2102,12 @@ function PasskeysPanel({
       });
       const verifyBody = await verifyRes.json();
       if (!verifyRes.ok) throw new Error(verifyBody.message || "failed");
-      const created = (verifyBody.data ?? verifyBody) as { id?: string; name?: string; created_at?: string };
+      const created = (verifyBody.data ?? verifyBody) as {
+        id?: string;
+        name?: string;
+        created_at?: string;
+        aaguid?: string;
+      };
       setName("");
       setPassword("");
       setTwoFa("");
@@ -2068,7 +2117,15 @@ function PasskeysPanel({
         const next = id
           ? current.some((row) => row.id === id)
             ? current
-            : [...current, { id, name: created.name || nextName, created_at: created.created_at }]
+            : [
+                ...current,
+                {
+                  id,
+                  name: created.name || nextName,
+                  created_at: created.created_at,
+                  aaguid: created.aaguid,
+                },
+              ]
           : current;
         const count = id ? next.length : current.length + 1;
         rememberAccountPasskeys(id ? next : current);
@@ -2199,6 +2256,7 @@ function PasskeysPanel({
       }
     >
       {error ? <SettingsAlert severity="error">{error}</SettingsAlert> : null}
+      <LastSignInMethodDialog open={keepOneOpen} onClose={() => setKeepOneOpen(false)} />
       {ipHost ? <SettingsAlert severity="warning">{t("account.passkey_ip_host")}</SettingsAlert> : null}
       {adding ? (
         <>
@@ -2408,7 +2466,13 @@ function PasskeysPanel({
             {items.map((item, index) => (
               <SettingsDetailRow
                 key={item.id}
-                icon={index === 0 ? <Devices size={21} /> : <KeyRound size={21} />}
+                icon={
+                  isWindowsHelloPasskey(item.aaguid) ? (
+                    <Devices size={21} />
+                  ) : (
+                    <KeyRound size={21} />
+                  )
+                }
                 title={
                   renamingId === item.id ? (
                     <TextField
@@ -2437,12 +2501,24 @@ function PasskeysPanel({
                       <SettingsTextButton
                         danger
                         onClick={async () => {
+                          const remaining = remainingSignInMethods({
+                            passwordDisabled,
+                            hasPassword: account?.has_password !== false,
+                            oauthEnabled,
+                            ssoBound: Boolean(account?.sso_id),
+                            passkeyCount: items.length - 1,
+                          });
+                          if (remaining === 0) {
+                            setKeepOneOpen(true);
+                            setDeletingId("");
+                            return;
+                          }
                           const response = await fetch(`/api/admin/account/passkeys/${item.id}`, {
                             method: "DELETE",
                           });
                           const body = await response.json().catch(() => ({}));
                           if (response.status === 409) {
-                            setError(t("account.passkey_last_method"));
+                            setKeepOneOpen(true);
                             setDeletingId("");
                             return;
                           }

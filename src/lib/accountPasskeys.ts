@@ -2,7 +2,18 @@ export type AccountPasskeySummary = {
   id: string;
   name: string;
   created_at?: string;
+  aaguid?: string;
 };
+
+const windowsHelloAAGUIDs = new Set([
+  "08987058-cadc-4b81-b6e1-30de50dcbe96",
+  "9ddd1817-af5a-4672-a2b9-3e3dd95000a9",
+  "6028b017-b1d4-4c02-b4b3-afcdafc96bb2",
+]);
+
+export function isWindowsHelloPasskey(aaguid?: string) {
+  return windowsHelloAAGUIDs.has((aaguid || "").trim().toLowerCase());
+}
 
 let accountPasskeysSnapshot: AccountPasskeySummary[] | null = null;
 let accountPasskeysPending: Promise<AccountPasskeySummary[]> | null = null;
