@@ -2,12 +2,14 @@ import { Badge, Flex } from "@/components/admin/ui";
 import { useTranslation } from "react-i18next";
 import { currencyForDisplay } from "@/lib/currency";
 import { remainingExpiryDays } from "@/utils/billing";
+import { formatExpiryLocalDisplay } from "@/lib/expiryDateTime";
 
 const PriceTags = ({
   price = 0,
   billing_cycle = 30,
   currency = "￥",
   expired_at,
+  expiry_timezone,
   tags = "",
   ip4 = "",
   ip6 = "",
@@ -15,6 +17,7 @@ const PriceTags = ({
   ...props
 }: {
   expired_at?: string | number | null;
+  expiry_timezone?: string | null;
   price?: number;
   billing_cycle?: number;
   currency?: string;
@@ -100,7 +103,14 @@ const PriceTags = ({
         variant="soft"
         className="text-sm"
       >
-        <label className="text-xs">
+        <label
+          className="text-xs"
+          title={
+            expirationDays === null
+              ? undefined
+              : formatExpiryLocalDisplay(expired_at, expiry_timezone) || undefined
+          }
+        >
           {(() => {
             if (expirationDays === null) {
               return t("common.long_term");

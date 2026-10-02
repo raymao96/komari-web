@@ -346,7 +346,7 @@ const LogPage = () => {
                                   <label className="font-bold">{t("logs.id", "ID")}</label>
                                   <label className="text-sm">{log.id}</label>
                                   <label className="font-bold">{t("logs.ip", "IP")}</label>
-                                  <label className="text-sm">{log.ip}</label>
+                                  <label className="text-sm break-all">{log.ip}</label>
                                   <label className="font-bold">{t("logs.uuid", "UUID")}</label>
                                   <label className="text-sm">{log.uuid}</label>
                                   <label className="font-bold">{t("logs.type", "类型")}</label>
@@ -366,7 +366,9 @@ const LogPage = () => {
                               </AppDialogContent>
                             </Dialog.Root>
                           </TableCell>
-                          <TableCell className="km-log-col-ip">{log.ip}</TableCell>
+                          <TableCell className="km-log-col-ip whitespace-normal break-all">
+                            {log.ip}
+                          </TableCell>
                           <TableCell className="km-log-col-type">
                             <LogTypeBadge value={log.msg_type} />
                           </TableCell>

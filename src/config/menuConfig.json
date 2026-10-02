@@ -82,7 +82,7 @@
         {
           "labelKey": "notification.ping_loss.title",
           "path": "/admin/notification/ping-loss",
-          "icon": "WifiOff"
+          "icon": "Gauge"
         },
         {
           "labelKey": "settings.general.title",

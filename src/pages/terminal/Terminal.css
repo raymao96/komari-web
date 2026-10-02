@@ -1851,6 +1851,7 @@ html.remote-terminal-open.dark .remote-metric-bar {
     cursor: pointer;
     font: inherit;
     font-size: 10px;
+    white-space: nowrap;
   }
 
   .remote-terminal-tools button:disabled {

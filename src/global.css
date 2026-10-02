@@ -775,10 +775,142 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
 }
 
 .km-traffic-reset-day {
-  flex: 0 0 4.75rem;
-  width: 4.75rem;
-  min-width: 4.75rem;
-  max-width: 4.75rem;
+  flex: 0 0 3rem;
+  width: 3rem;
+  min-width: 3rem;
+  max-width: 3rem;
+}
+
+.km-traffic-reset-day .MuiOutlinedInput-input {
+  padding-inline: 6px;
+  text-align: center;
+}
+
+.km-expiry-date {
+  flex: 0 0 10.5rem;
+  width: 10.5rem;
+  min-width: 10.5rem;
+  max-width: 10.5rem;
+}
+
+/* Billing dialog panes are ~half of 820px even on desktop, so timezone + date +
+   time cannot share one row. Stack timezone, then date/time. */
+.km-node-billing-dialog .km-traffic-reset-clock-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+}
+
+.km-node-billing-dialog .km-traffic-reset-timezone {
+  grid-column: 1 / -1;
+  flex: none;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.km-node-billing-dialog .km-expiry-date,
+.km-node-billing-dialog .km-traffic-reset-time {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
+
+@media (max-width: 1023px) {
+  .km-node-billing-dialog .km-traffic-reset-clock-row {
+    grid-template-columns: minmax(0, 1fr) minmax(9.25rem, 1.15fr);
+  }
+}
+
+.km-expiry-date input[type="date"]::-webkit-calendar-picker-indicator,
+.km-traffic-reset-time input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.km-expiry-date-picker {
+  position: relative;
+}
+
+.km-expiry-calendar {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: min(280px, calc(100vw - 48px));
+  padding: 12px;
+  border: 1px solid var(--gray-a5);
+  border-radius: 12px;
+  background: var(--color-panel-solid);
+  color: var(--gray-12);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.km-expiry-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.km-expiry-calendar-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.km-expiry-calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.km-expiry-calendar-nav:hover {
+  background: rgba(145, 158, 171, 0.16);
+}
+
+.km-expiry-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+}
+
+.km-expiry-calendar-dow {
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--gray-9);
+}
+
+.km-expiry-calendar-day {
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.km-expiry-calendar-day:hover {
+  background: rgba(145, 158, 171, 0.16);
+}
+
+.km-expiry-calendar-day[data-selected="true"] {
+  background: var(--accent-9);
+  color: #fff;
 }
 
 .km-traffic-reset-time {
@@ -840,6 +972,13 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
     min-width: 8.75rem;
     max-width: none;
   }
+
+  .km-expiry-date {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 9.5rem;
+    max-width: none;
+  }
 }
 
 .km-traffic-reset-clock-row .MuiAutocomplete-root,
@@ -865,6 +1004,15 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
   .km-node-dialog-pane + .km-node-dialog-pane {
     border-top: 1px solid var(--gray-a5);
     border-left: 0;
+  }
+
+  .km-node-billing-dialog .km-node-dialog-pane:first-child {
+    padding-bottom: 0;
+  }
+
+  .km-node-billing-dialog .km-node-dialog-pane + .km-node-dialog-pane {
+    border-top: 0;
+    padding-top: 14px;
   }
 
   .km-node-dialog-pane {
@@ -1069,6 +1217,18 @@ html.dark .km-node-deploy-dialog .km-admin-sheet-tabs {
 
   .admin-responsive-table tbody td:last-child::before {
     text-align: left;
+  }
+
+  .admin-calibration-history tbody tr {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-calibration-history tbody td:nth-child(odd):not(:last-child) {
+    border-right: 0 !important;
+  }
+
+  .admin-calibration-history tbody td:last-child {
+    grid-column: auto;
   }
 
   .admin-responsive-table tbody td:last-child:has(.admin-card-actions)::before {
@@ -1669,6 +1829,15 @@ html[data-admin-shell-active="true"] .km-log-col-id {
 [data-admin-shell] .km-log-col-ip,
 html[data-admin-shell-active="true"] .km-log-col-ip {
   width: 148px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+[data-admin-shell] .km-log-table td.km-log-col-ip,
+html[data-admin-shell-active="true"] .km-log-table td.km-log-col-ip {
+  height: auto;
+  min-height: 56px;
 }
 
 [data-admin-shell] .km-log-col-type,
@@ -1815,6 +1984,10 @@ html[data-admin-shell-active="true"] .km-settings-alert .MuiAlert-icon {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+[data-admin-shell] .km-billing-expiry {
+  white-space: normal;
 }
 
 [data-admin-shell] .km-billing-averages {
@@ -2189,7 +2362,106 @@ html.dark .km-admin-sheet-tabs .MuiTab-root.Mui-selected::after {
   background: #48a9ee;
 }
 
+.admin-ping-loss-sheets .km-admin-sheet-tabs-actions {
+  align-self: center;
+  padding-bottom: 0;
+}
+
+.admin-ping-loss-sheets .km-admin-sheet-tabs-actions > * {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tablist"] {
+  display: flex;
+  width: auto;
+  min-height: 40px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(145, 158, 171, 0.16);
+}
+
+.admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tab"] {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  height: 34px;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: transparent;
+  transition: color 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tab"][aria-selected="true"] {
+  background: #fff;
+  color: #212b36;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+html.dark .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tablist"] {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tab"] {
+  color: #c4cdd5;
+}
+
+html.dark .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tab"][aria-selected="true"] {
+  background: #f4f6f8;
+  color: #212b36;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
 @media (max-width: 1023px) {
+  html.dark .admin-ping-loss-sheets > [role="tablist"] {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .admin-ping-loss-sheets.km-admin-sheet-tabs.has-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .admin-ping-loss-sheets > [role="tablist"] {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    border-bottom: 1px solid rgba(145, 158, 171, 0.2);
+  }
+
+  .admin-ping-loss-sheets > [role="tablist"] > [role="tab"] {
+    flex: 1 1 0;
+    height: 44px;
+    min-height: 44px;
+    margin-right: 0;
+  }
+
+  .admin-ping-loss-sheets .km-admin-sheet-tabs-actions {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .admin-ping-loss-sheets .km-admin-sheet-tabs-actions > * {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tablist"] {
+    width: 100%;
+  }
+
+  .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tab"] {
+    flex: 1 1 0;
+    padding: 0;
+  }
+
   .km-admin-sheet-tabs.has-actions {
     flex-wrap: wrap;
     padding-right: 0;
@@ -2374,6 +2646,38 @@ html[data-admin-shell-active="true"] .admin-select-or-input-content:not([data-st
 
 [data-admin-shell] .km-admin-sheet-tabs .MuiTab-root:active {
   transform: none;
+}
+
+[data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [role="tab"][aria-selected="true"]::after,
+[data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions .MuiTab-root.Mui-selected::after {
+  content: none;
+}
+
+[data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"]::after {
+  content: "";
+  z-index: 0;
+  top: 3px;
+  bottom: auto;
+  height: 34px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+[data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"] [role="tab"][aria-selected="true"],
+[data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"] .MuiTab-root.Mui-selected,
+[data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"] .MuiTab-root.Mui-selected:hover,
+html.dark [data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"] [role="tab"][aria-selected="true"],
+html.dark [data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"] .MuiTab-root.Mui-selected,
+html.dark [data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"] .MuiTab-root.Mui-selected:hover {
+  background-color: transparent;
+  box-shadow: none;
+  color: #212b36;
+}
+
+html.dark [data-admin-shell] .admin-ping-loss-sheets .km-admin-sheet-tabs-actions [data-admin-tab-motion-ready="true"]::after {
+  background: #f4f6f8;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 html[data-reduce-motion="true"] [data-admin-shell] [data-admin-tab-motion-ready="true"]::after {

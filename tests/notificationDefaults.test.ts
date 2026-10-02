@@ -44,6 +44,10 @@ test("notification pages expose future-server defaults through their edit fields
   assert.match(pingLossSource, /\/api\/admin\/notification\/ping-loss\/default/);
   assert.match(pingLossSource, /PingLossConfigurationFields/);
   assert.match(pingLossSource, /default_config_description/);
+  assert.match(pingLossSource, /\/api\/admin\/notification\/ping-loss\/latency-default/);
+  assert.match(pingLossSource, /default_latency_config_enabled/);
+  assert.match(pingLossSource, /adaptiveBaselineEnabled \?/);
+  assert.match(pingLossSource, /isRuleAlerting/);
   assert.match(trafficReportSource, /Settings2/);
   assert.match(
     trafficReportSource,
@@ -84,5 +88,53 @@ test("notification default controls are localized in every supported locale", ()
       assert.equal(typeof section.default_config_enabled, "string");
       assert.notEqual(section.default_config_enabled.trim(), "");
     }
+    assert.equal(typeof locale.notification.ping_loss.default_latency_config_enabled, "string");
+    assert.equal(typeof locale.notification.ping_loss.latency_anomaly, "string");
+    assert.equal(typeof locale.notification.ping_loss.loss_anomaly, "string");
+    assert.equal(typeof locale.notification.ping_loss.adaptive_baseline_enabled, "string");
+    assert.equal(typeof locale.notification.ping_loss.fixed_baseline_ms, "string");
+    assert.equal(typeof locale.notification.ping_loss.empty_active, "string");
+    assert.notEqual(locale.notification.ping_loss.fixed_baseline_ms.trim(), "");
+    assert.notEqual(locale.notification.ping_loss.empty_active.trim(), "");
   }
+  const requiredPingLossKeys = Object.keys(locales[0].notification.ping_loss).sort();
+  for (const locale of locales) {
+    assert.deepEqual(Object.keys(locale.notification.ping_loss).sort(), requiredPingLossKeys);
+    for (const key of requiredPingLossKeys) {
+      assert.equal(typeof locale.notification.ping_loss[key], "string");
+      assert.notEqual(locale.notification.ping_loss[key].trim(), "");
+    }
+  }
+});
+
+test("latency default dialog stays adaptive-only and the target editor hides the inactive mode", () => {
+  assert.match(pingLossSource, /latency-default/);
+  assert.match(pingLossSource, /adaptiveBaselineEnabled \?/);
+  assert.match(pingLossSource, /low_latency_threshold_ms/);
+  assert.match(pingLossSource, /fixed_baseline_ms/);
+  assert.match(pingLossSource, /isRuleAlerting/);
+  const defaultDialog = pingLossSource.slice(
+    pingLossSource.indexOf("const PingLossDefaultDialog"),
+    pingLossSource.indexOf("const ConfigurationDialog"),
+  );
+  assert.match(defaultDialog, /default_latency_config_enabled/);
+  assert.doesNotMatch(defaultDialog, /low_latency_threshold_ms/);
+  assert.doesNotMatch(defaultDialog, /fixed_baseline_ms/);
+  assert.doesNotMatch(defaultDialog, /adaptive_baseline_enabled/);
+  const editor = pingLossSource.slice(
+    pingLossSource.indexOf("const PingLossConfigurationFields"),
+    pingLossSource.indexOf("const PingLossDefaultDialog"),
+  );
+  assert.ok(
+    editor.indexOf('t("notification.ping_loss.high_latency_threshold_ms")') <
+      editor.indexOf('t("notification.ping_loss.low_latency_threshold_ms")'),
+  );
+  assert.ok(
+    editor.indexOf('t("notification.ping_loss.upper_deviation_percent")') <
+      editor.indexOf('t("notification.ping_loss.lower_deviation_percent")'),
+  );
+  assert.ok(
+    defaultDialog.indexOf('t("notification.ping_loss.upper_deviation_percent")') <
+      defaultDialog.indexOf('t("notification.ping_loss.lower_deviation_percent")'),
+  );
 });

@@ -284,6 +284,11 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
     if (pending) setMobileCommand("");
   }, [mobileCommand, sendTerminalText]);
 
+  const sendTerminalInterrupt = useCallback(() => {
+    if (mobileComposing.current) return;
+    sendTerminalText("\u0003");
+  }, [sendTerminalText]);
+
   const submitMobileCommand = useCallback(() => {
     if (mobileComposing.current) return;
     if (!sendTerminalText(`${mobileCommand}\r`)) return;
@@ -864,6 +869,14 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
                 >
                   <KeyboardTab size={13} />
                   Tab
+                </button>
+                <button
+                  type="button"
+                  disabled={!remoteReady}
+                  aria-label={t("terminal.session.send_ctrl_c")}
+                  onClick={sendTerminalInterrupt}
+                >
+                  Ctrl+C
                 </button>
               </div>
             ) : null}

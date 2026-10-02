@@ -1,5 +1,5 @@
-export const LITE_AGENT_GITHUB_REPO = "nuomiiiii/Lite-agent";
-export const LITE_AGENT_DOCKER_IMAGE = "ghcr.io/nuomiiiii/Lite-agent:latest";
+export const LITE_AGENT_GITHUB_REPO = "raymao96/komari-agent";
+export const LITE_AGENT_DOCKER_IMAGE = "ghcr.io/raymao96/komari-agent:latest";
 
 export function liteAgentInstallScriptUrl(
   scriptFile: "install.sh" | "install.ps1",

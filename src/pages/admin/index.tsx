@@ -141,14 +141,20 @@ import {
 } from "@/components/admin/SettingCard";
 import { useSettings } from "@/lib/api";
 import {
-  dateInputToISOString,
-  timestampToDateInput,
-} from "@/lib/dateInput";
+  DEFAULT_EXPIRY_TIMEZONE,
+  billingSaveFollowUp,
+  expiryFieldsIfChanged,
+  expiryTimezoneOptions,
+  formatInstantInTimezone,
+  normalizeExpiryTimezone,
+  toExpiryLocalDateTime,
+} from "@/lib/expiryDateTime";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
 import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate";
 import { SelectOrInput } from "@/components/ui/select-or-input";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import ExpiryDateField from "@/components/admin/ExpiryDateField";
 import TrafficResetTimeField from "@/components/admin/TrafficResetTimeField";
 import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
 import AdminNodeListFilters, {
@@ -798,6 +804,7 @@ const SortableRowCells = React.memo(function SortableRowCells({
             price={node.price}
             billing_cycle={node.billing_cycle}
             expired_at={node.expired_at}
+            expiry_timezone={node.expiry_timezone}
             currency={node.currency}
           />
         )}
@@ -873,6 +880,7 @@ const SortableMobileCard = React.memo(function SortableMobileCard({
         price={node.price}
         billing_cycle={node.billing_cycle}
         expired_at={node.expired_at}
+        expiry_timezone={node.expiry_timezone}
         currency={node.currency}
       />
     );
@@ -1688,7 +1696,7 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
                   </Text>
                   {snapshot.history?.length ? (
                     <div className="admin-responsive-table-wrap overflow-hidden rounded-md border border-[var(--gray-a5)]">
-                      <Table container={false} className="admin-responsive-table min-w-[560px] text-left text-sm">
+                      <Table container={false} className="admin-responsive-table admin-calibration-history min-w-[560px] text-left text-sm">
                         <TableHeader>
                           <TableRow>
                             <TableHead>{t("admin.nodeTable.trafficCalibration.time")}</TableHead>
@@ -1700,10 +1708,10 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
                         <TableBody>
                           {snapshot.history.map((item) => (
                             <TableRow key={item.calibration_id}>
-                              <TableCell>{new Date(item.created_at).toLocaleString()}</TableCell>
-                              <TableCell>{formatBytes(item.target.up)}</TableCell>
-                              <TableCell>{formatBytes(item.target.down)}</TableCell>
-                              <TableCell>↑ {formatSignedTraffic(item.adjustment.up)} / ↓ {formatSignedTraffic(item.adjustment.down)}</TableCell>
+                              <TableCell data-label={t("admin.nodeTable.trafficCalibration.time")}>{new Date(item.created_at).toLocaleString()}</TableCell>
+                              <TableCell data-label={t("admin.nodeTable.trafficCalibration.targetUp")}>{formatBytes(item.target.up)}</TableCell>
+                              <TableCell data-label={t("admin.nodeTable.trafficCalibration.targetDown")}>{formatBytes(item.target.down)}</TableCell>
+                              <TableCell data-label={t("admin.nodeTable.trafficCalibration.change")}>↑ {formatSignedTraffic(item.adjustment.up)} / ↓ {formatSignedTraffic(item.adjustment.down)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -3741,12 +3749,12 @@ function EditButton({ node }: { node: NodeDetail }) {
             </p>
           </div>
           <div>
-            <label className="mb-1 text-sm font-medium text-muted-foreground flex items-center">
+            <label className="mb-1 flex items-center gap-1 text-sm font-medium leading-5 text-muted-foreground">
               {t("common.tags")}
-              <label className="text-muted-foreground ml-1 text-xs self-end">
+              <span className="text-xs font-normal leading-none text-muted-foreground">
                 {t("common.tagsDescription")}
-              </label>
-              <Tips>
+              </span>
+              <Tips size="14">
                 <span
                   dangerouslySetInnerHTML={{ __html: t("common.tagsTips") }}
                 />
@@ -4032,15 +4040,40 @@ function BillingButton({ node }: { node: NodeDetail }) {
   const { refresh } = useNodeDetails();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [billingCycle, setBillingCycle] = React.useState<string>(
-    node.billing_cycle.toString()
+  const [formEpoch, setFormEpoch] = useState(0);
+  const [billingCycle, setBillingCycle] = React.useState("");
+  const [autoRenewal, setAutoRenewal] = React.useState(false);
+  const [currency, setCurrency] = React.useState("");
+  const [expiryTimezone, setExpiryTimezone] = React.useState(
+    DEFAULT_EXPIRY_TIMEZONE,
   );
-  const [autoRenewal, setAutoRenewal] = React.useState<boolean>(
-    node.auto_renewal || false
+  const [expiryDate, setExpiryDate] = React.useState("0001-01-01");
+  const [expiryTime, setExpiryTime] = React.useState("00:00:00");
+  const openedExpiryRef = React.useRef({
+    timezone: DEFAULT_EXPIRY_TIMEZONE,
+    local: "",
+  });
+  const timezoneOptions = React.useMemo(
+    () => expiryTimezoneOptions(expiryDate),
+    [expiryDate],
   );
-  const [currency, setCurrency] = React.useState<string>(
-    currencyForDisplay(node.currency || "$")
-  );
+  const hydrateBillingForm = (source: NodeDetail) => {
+    const timezone = normalizeExpiryTimezone(source.expiry_timezone);
+    const parts = formatInstantInTimezone(source.expired_at, timezone);
+    const date = parts?.date || "0001-01-01";
+    const time = parts?.time || "00:00:00";
+    setBillingCycle(source.billing_cycle.toString());
+    setAutoRenewal(source.auto_renewal || false);
+    setCurrency(currencyForDisplay(source.currency || "$"));
+    setExpiryTimezone(timezone);
+    setExpiryDate(date);
+    setExpiryTime(time);
+    openedExpiryRef.current = {
+      timezone,
+      local: toExpiryLocalDateTime(date, time) || `${date}T${time}`,
+    };
+    setFormEpoch((value) => value + 1);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4058,36 +4091,72 @@ function BillingButton({ node }: { node: NodeDetail }) {
       const billingCycleValue = parseInt(
         (formData.get("billingCycle") as string) || "30"
       );
-      const expiredAtValue = (formData.get("expiredAt") as string) || "";
-      const expiredAt = dateInputToISOString(expiredAtValue);
       const rawCurrency = (formData.get("currency") as string) || "$";
       const currencyValue = currencyForStorage(rawCurrency);
+      const payload: Record<string, unknown> = {
+        price,
+        billing_cycle: billingCycleValue,
+        currency: currencyValue,
+        auto_renewal: autoRenewal,
+      };
+      const expiryFields = expiryFieldsIfChanged({
+        timezone: expiryTimezone,
+        localDateTime: toExpiryLocalDateTime(expiryDate, expiryTime),
+        openedTimezone: openedExpiryRef.current.timezone,
+        openedLocal: openedExpiryRef.current.local,
+      });
+      if (expiryFields === "invalid") {
+        toast.error(t("admin.nodeTable.invalidExpiry", "到期时间无效"));
+        return;
+      }
+      if (expiryFields) {
+        Object.assign(payload, expiryFields);
+      }
 
-      await fetch(`/api/admin/client/${node.uuid}/edit`, {
+      const response = await fetch(`/api/admin/client/${node.uuid}/edit`, {
         method: "POST",
-        body: JSON.stringify({
-          price,
-          billing_cycle: billingCycleValue,
-          expired_at: expiredAt,
-          currency: currencyValue,
-          auto_renewal: autoRenewal,
-        }),
+        body: JSON.stringify(payload),
         headers: {
           "Content-Type": "application/json",
         },
       });
-      setCurrency(currencyForDisplay(currencyValue));
-      refresh();
-      setOpen(false);
+      const text = await response.text();
+      let body: { message?: string } | null = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        body = null;
+      }
+      const followUp = billingSaveFollowUp(response.ok);
+      if (!followUp.ok) {
+        throw new Error(body?.message || text || `HTTP ${response.status}`);
+      }
+      if (followUp.refresh) {
+        setCurrency(currencyForDisplay(currencyValue));
+        refresh();
+      }
+      if (followUp.close) {
+        setOpen(false);
+      }
     } catch (error) {
-      toast.error("Failed to save billing information:" + error);
+      toast.error(
+        `${t("admin.nodeEdit.saveError", "保存失败")}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next && !open) hydrateBillingForm(node);
+        setOpen(next);
+      }}
+    >
       <Dialog.Trigger>
         <IconButton
           variant="ghost"
@@ -4109,7 +4178,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
             "设置价格、计费周期与到期续费策略。",
           )}
         </Dialog.Description>
-        <form onSubmit={handleSave}>
+        <form key={formEpoch} onSubmit={handleSave}>
           <div className="km-node-dialog-grid">
             <section className="km-node-dialog-pane km-node-dialog-fields">
             <label className="font-bold">
@@ -4133,8 +4202,6 @@ function BillingButton({ node }: { node: NodeDetail }) {
               onChange={(value) => setCurrency(value)}
               allowCustomInput
             />
-            </section>
-            <section className="km-node-dialog-pane km-node-dialog-fields">
             <label className="font-bold flex items-center gap-1">
               {t("admin.nodeTable.billingCycle")} <Tips><span dangerouslySetInnerHTML={{ __html: t("admin.nodeTable.billingCycleTips") }}></span></Tips>
             </label>
@@ -4159,46 +4226,60 @@ function BillingButton({ node }: { node: NodeDetail }) {
                 <Select.Item value="-1">{t("common.once")}</Select.Item>
               </Select.Content>
             </Select.Root>
-
+            </section>
+            <section className="km-node-dialog-pane km-node-dialog-fields">
             <Flex gap="2" align="center">
               <label className="font-bold">
                 {t("admin.nodeTable.expiredAt")}
               </label>
             </Flex>
-            <TextField.Root
-              name="expiredAt"
-              defaultValue={
-                node.expired_at
-                  ? timestampToDateInput(node.expired_at)
-                  : "0001-01-01"
-              }
-              type="date"
-            >
-              <TextField.Slot side="right">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    const dateInput = document.querySelector(
-                      'input[name="expiredAt"]'
-                    ) as HTMLInputElement;
-                    if (dateInput) {
-                      const futureDate = new Date();
-                      futureDate.setFullYear(futureDate.getFullYear() + 200);
-                      dateInput.value = timestampToDateInput(futureDate);
-                    }
-                  }}
-                >
-                  {t("admin.nodeTable.setToLongTerm", "设置为长期")}
-                </Button>
-              </TextField.Slot>
-            </TextField.Root>
-            <Flex gap="2" align="center"></Flex>
+            <div className="km-traffic-reset-clock-row">
+              <div className="km-traffic-reset-timezone">
+                <SelectOrInput
+                  options={timezoneOptions}
+                  value={expiryTimezone}
+                  allowCustomInput
+                  onChange={setExpiryTimezone}
+                  placeholder={DEFAULT_EXPIRY_TIMEZONE}
+                  aria-label={t("admin.nodeTable.expiryTimezone", "到期时区")}
+                />
+              </div>
+              <div className="km-expiry-date">
+                <ExpiryDateField
+                  ariaLabel={t("admin.nodeTable.expiredAt")}
+                  value={expiryDate}
+                  onChange={setExpiryDate}
+                />
+              </div>
+              <div className="km-traffic-reset-time">
+                <TrafficResetTimeField
+                  ariaLabel={t("admin.nodeTable.expiryTime", "到期时刻")}
+                  value={expiryTime}
+                  onChange={setExpiryTime}
+                />
+              </div>
+            </div>
+            <Flex gap="2" align="center" justify="end">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  const future = new Date();
+                  future.setFullYear(future.getFullYear() + 200);
+                  const parts = formatInstantInTimezone(future, expiryTimezone);
+                  if (!parts) return;
+                  setExpiryDate(parts.date);
+                  setExpiryTime("00:00:00");
+                }}
+              >
+                {t("admin.nodeTable.setToLongTerm", "设置为长期")}
+              </Button>
+            </Flex>
             <SettingCardSwitch
               bordless
               title={t("admin.nodeTable.autoRenewal")}
               description={t("admin.nodeTable.autoRenewalDescription")}
-              defaultChecked={node.auto_renewal || false}
+              defaultChecked={autoRenewal}
               onChange={setAutoRenewal}
             />
             </section>

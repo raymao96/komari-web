@@ -52,6 +52,10 @@ import { formatBytes } from "@/utils/unitHelper";
 
 type DailyChartPoint = DashboardChartsData["traffic"]["daily"][number] & { label: string };
 
+function serverUsageStatsPath(uuid: string) {
+  return `/admin/servers/${encodeURIComponent(uuid)}?tab=metrics`;
+}
+
 export function BillingTrendPanel({
   charts,
   error,
@@ -313,8 +317,8 @@ export function BillingTrendPanel({
                         <AdminMobileListCard
                           key={item.uuid}
                           title={
-                            item.detail_url ? (
-                              <Link to={item.detail_url} className="text-inherit hover:underline">
+                            item.uuid ? (
+                              <Link to={serverUsageStatsPath(item.uuid)} className="text-inherit hover:underline">
                                 {item.name}
                               </Link>
                             ) : item.name
@@ -372,8 +376,8 @@ export function BillingTrendPanel({
                       {pageItems.map((item) => (
                         <TableRow key={item.uuid}>
                           <TableCell data-label={t("admin.nodeTable.name")} className="max-w-0 truncate font-medium">
-                            {item.detail_url ? (
-                              <Link to={item.detail_url} className="text-inherit hover:underline">
+                            {item.uuid ? (
+                              <Link to={serverUsageStatsPath(item.uuid)} className="text-inherit hover:underline">
                                 {item.name}
                               </Link>
                             ) : item.name}

@@ -39,6 +39,7 @@ export type NodeDetail = {
   tags?: string;
   billing_cycle: number;
   expired_at: string;
+  expiry_timezone?: string;
   created_at: string;
   updated_at: string;
   [key: string]: any; 

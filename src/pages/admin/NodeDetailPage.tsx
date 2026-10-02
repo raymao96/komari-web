@@ -53,8 +53,13 @@ import {
   useAdminNodeLiveData,
 } from "@/hooks/use-admin-node-live-data";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
-import { dateInputToISOString, timestampToDateInput } from "@/lib/dateInput";
-import { advanceBillingExpiry } from "@/lib/renewalDate";
+import {
+  billingSaveFollowUp,
+  earlyRenewPayload,
+  formatExpiryLocalDisplay,
+  normalizeExpiryTimezone,
+} from "@/lib/expiryDateTime";
+import { billingRequest, isLongTermExpiry } from "@/utils/billing";
 import NodeUsageStats from "@/pages/admin/NodeUsageStats";
 import {
   EMPTY_DISPLAY,
@@ -67,7 +72,6 @@ import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate";
 import { nodeTrafficType, trafficUsed } from "@/utils/trafficAccounting";
 import { formatBytes, stringToBytes } from "@/utils/unitHelper";
-import { billingRequest } from "@/utils/billing";
 import { billingSaveFailedToast } from "@/utils/billingI18n";
 import { createRandomId } from "@/utils/randomId";
 import { LITE_BLUE, LITE_BLUE_SOFT_STRONG } from "@/theme/brand";
@@ -893,15 +897,15 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
     currencyForDisplay(node.currency || ""),
   );
   const [billingCycle, setBillingCycle] = useState(String(node.billing_cycle || 30));
-  const [expiredAt, setExpiredAt] = useState(
-    node.expired_at ? timestampToDateInput(node.expired_at) : "",
-  );
   const [autoRenewal, setAutoRenewal] = useState(Boolean(node.auto_renewal));
+  const expiryTimezone = normalizeExpiryTimezone(node.expiry_timezone);
   const displayPrice = node.price;
   const hasPrice = !isEmptyValue(displayPrice);
   const displayCycle = Number(node.billing_cycle) || 0;
   const hasCycle = !isEmptyValue(displayCycle);
-  const displayExpired = expiredAt;
+  const displayExpired = isLongTermExpiry(node.expired_at)
+    ? t("common.long_term")
+    : formatExpiryLocalDisplay(node.expired_at, expiryTimezone) || EMPTY_DISPLAY;
   const renewPriceLabel = hasPrice
     ? `${currency}${Number(displayPrice).toFixed(2)}${
         hasCycle ? ` / ${cycleLabel(Number(displayCycle || billingCycle), t)}` : ""
@@ -922,31 +926,63 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
 
   const save = async (next?: {
     billing_cycle?: number;
-    expired_at?: string | null;
+    expiry_local_datetime?: string;
+    expiry_timezone?: string;
     auto_renewal?: boolean;
+    renew_expiry?: boolean;
+    _match_expired_at?: string;
   }) => {
     setSaving(true);
     try {
-      await fetch(`/api/admin/client/${node.uuid}/edit`, {
+      const payload: Record<string, unknown> = next?.renew_expiry
+        ? {
+            renew_expiry: true,
+            _match_expired_at: next._match_expired_at,
+          }
+        : {
+            price: node.price ?? 0,
+            billing_cycle: next?.billing_cycle ?? parseInt(billingCycle || "30", 10),
+            currency: currencyForStorage(currency),
+            auto_renewal: next?.auto_renewal ?? autoRenewal,
+          };
+      if (!next?.renew_expiry && next && "expiry_local_datetime" in next && next.expiry_local_datetime) {
+        payload.expiry_local_datetime = next.expiry_local_datetime;
+        payload.expiry_timezone = next.expiry_timezone || expiryTimezone;
+      }
+      const response = await fetch(`/api/admin/client/${node.uuid}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price: node.price ?? 0,
-          billing_cycle: next?.billing_cycle ?? parseInt(billingCycle || "30", 10),
-          expired_at:
-            next && "expired_at" in next
-              ? next.expired_at
-              : expiredAt
-                ? dateInputToISOString(expiredAt)
-                : null,
-          currency: currencyForStorage(currency),
-          auto_renewal: next?.auto_renewal ?? autoRenewal,
-        }),
+        body: JSON.stringify(payload),
       });
-      toast.success(t("admin.nodeEdit.saveSuccess", "保存成功"));
-      onSaved();
+      const text = await response.text();
+      let body: { message?: string } | null = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        body = null;
+      }
+      const followUp = billingSaveFollowUp(response.ok);
+      if (!followUp.ok) {
+        throw new Error(body?.message || text || `HTTP ${response.status}`);
+      }
+      if (followUp.toastSuccess) {
+        toast.success(t("admin.nodeEdit.saveSuccess", "保存成功"));
+      }
+      if (followUp.refresh) {
+        if (next?.billing_cycle !== undefined) {
+          setBillingCycle(String(next.billing_cycle));
+        }
+        if (next?.auto_renewal !== undefined) {
+          setAutoRenewal(next.auto_renewal);
+        }
+        onSaved();
+      }
     } catch (error) {
-      toast.error(`${t("admin.nodeEdit.saveError", "保存失败")}: ${error}`);
+      toast.error(
+        `${t("admin.nodeEdit.saveError", "保存失败")}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     } finally {
       setSaving(false);
     }
@@ -1018,15 +1054,14 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
               {t("admin.nodeDetail.changeCycle", "变更周期")}
             </Button>
             <Button
-              disabled={saving || !(parseInt(billingCycle || "30", 10) > 0)}
+              disabled={
+                saving ||
+                isLongTermExpiry(node.expired_at) ||
+                !(parseInt(billingCycle || "30", 10) > 0)
+              }
               startIcon={<RefreshCw size={17} />}
               onClick={() => {
-                const cycle = parseInt(billingCycle || "30", 10);
-                const base = expiredAt || timestampToDateInput(new Date());
-                const next = advanceBillingExpiry(base, cycle);
-                if (!next) return;
-                setExpiredAt(next);
-                void save({ expired_at: dateInputToISOString(next) });
+                void save(earlyRenewPayload(node.expired_at));
               }}
               sx={actionSx("rgba(34, 197, 94, 0.16)", "#118D57")}
             >
@@ -1043,9 +1078,7 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
               disabled={saving}
               startIcon={<CheckCircle2 size={17} />}
               onClick={() => {
-                const next = !autoRenewal;
-                setAutoRenewal(next);
-                void save({ auto_renewal: next });
+                void save({ auto_renewal: !autoRenewal });
               }}
               sx={actionSx("rgba(34, 197, 94, 0.16)", "#118D57")}
             >
@@ -1077,7 +1110,6 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
                 key={option.value}
                 selected={option.value === billingCycle}
                 onClick={() => {
-                  setBillingCycle(option.value);
                   setCycleEl(null);
                   void save({ billing_cycle: parseInt(option.value, 10) });
                 }}

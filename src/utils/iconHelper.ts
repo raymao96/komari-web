@@ -22,6 +22,7 @@ import PowerOffOutlined from "@mui/icons-material/PowerOffOutlined";
 import PublicOutlined from "@mui/icons-material/PublicOutlined";
 import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import ShowChartOutlined from "@mui/icons-material/ShowChartOutlined";
+import SpeedOutlined from "@mui/icons-material/SpeedOutlined";
 import StorageOutlined from "@mui/icons-material/StorageOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
 import TerminalOutlined from "@mui/icons-material/TerminalOutlined";
@@ -77,6 +78,7 @@ export const iconMap: Record<string, ReturnType<typeof wrapMuiIcon>> = {
   Hub: wrapMuiIcon(HubOutlined),
   Database: wrapMuiIcon(StorageOutlined),
   WifiOff: wrapMuiIcon(WifiOffOutlined),
+  Gauge: wrapMuiIcon(SpeedOutlined),
   Store: wrapMuiIcon(StorefrontOutlined),
   Route: wrapMuiIcon(AltRouteOutlined),
   LayoutDashboard: wrapMuiIcon(DashboardOutlined),
