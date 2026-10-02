@@ -131,6 +131,9 @@ test("daily billable chart inspects a day in a dialog instead of expanding the c
   assert.match(dashboardTraffic30dSource, /AdminMobileListCard/);
   assert.match(dashboardTraffic30dSource, /toggleSort/);
   assert.match(dashboardTraffic30dSource, /max-h-\[min\(56vh,32rem\)\]/);
+  assert.equal(dashboardTraffic30dSource.match(/serverUsageStatsPath\(item\.uuid\)/g)?.length, 2);
+  assert.match(dashboardTraffic30dSource, /tab=metrics/);
+  assert.doesNotMatch(dashboardTraffic30dSource, /to=\{item\.detail_url\}/);
   assert.doesNotMatch(
     dashboardTraffic30dSource,
     /\{selectedDay \? \(\s*<div className="mt-4/,

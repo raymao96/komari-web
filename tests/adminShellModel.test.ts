@@ -34,7 +34,7 @@ test("hides both Lite and Komari version-hash comments from release notes", () =
 test("treats same version with a different hash as newer", () => {
   const release: GithubReleaseInfo = {
     tag_name: "2.2.4",
-    html_url: "https://github.com/nuomiiiii/Lite/releases/tag/2.2.4",
+    html_url: "https://github.com/raymao96/komari/releases/tag/2.2.4",
     body: "<!-- lite-version-hash: newhash -->",
   };
   assert.equal(isReleaseNewer(release, "2.2.4", "oldhash"), true);

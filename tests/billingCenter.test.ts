@@ -27,14 +27,15 @@ test("treats stored long-term expiry as long term in the server list", () => {
   assert.equal(isLongTermExpiry(null), true);
   assert.equal(isLongTermExpiry("2027-05-14T00:00:00.000Z"), false);
   assert.equal(formatBillingMoney(null, "CNY"), "--");
-  assert.match(pageSource, /isLongTermExpiry\(expiredAt\)/);
+  assert.match(pageSource, /isLongTermExpiry\(server\.expired_at\)/);
   assert.match(pageSource, /common\.long_term/);
 });
 
-test("remaining expiry days match the theme nearest-day rounding", () => {
+test("remaining expiry days match ceil remaining so sub-day still counts", () => {
   const day = 24 * 60 * 60 * 1000;
   const expire = Date.parse("2027-05-14T00:00:00.000Z");
-  assert.equal(remainingExpiryDays(new Date(expire).toISOString(), expire - 251.4 * day), 251);
+  assert.equal(remainingExpiryDays(new Date(expire).toISOString(), expire - 23 * 60 * 60 * 1000), 1);
+  assert.equal(remainingExpiryDays(new Date(expire).toISOString(), expire - 251.4 * day), 252);
   assert.equal(remainingExpiryDays(new Date(expire).toISOString(), expire - 251.6 * day), 252);
   assert.equal(remainingExpiryDays("2226-05-14T00:00:00.000Z", expire), null);
   assert.equal(remainingExpiryDays(null, expire), null);
@@ -208,6 +209,13 @@ test("restores base fees in details and defaults yearly bills to the current yea
 test("aligns converted averages and treats other costs as IP changes", () => {
   assert.match(pageSource, /km-billing-averages/);
   assert.match(pageSource, /billing\.common\.dailyAverage/);
+  assert.match(pageSource, /km-billing-server-table/);
+  assert.match(pageSource, /km-billing-expiry/);
+  assert.match(pageSource, /w-\[190px\]/);
+  assert.match(pageSource, /w-\[360px\]/);
+  assert.match(pageSource, /w-\[150px\]/);
+  assert.match(pageSource, /min-w-\[1300px\]/);
+  assert.match(pageSource, /formatInstantInTimezone/);
   assert.match(
     readFileSync("src/global.css", "utf8"),
     /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,

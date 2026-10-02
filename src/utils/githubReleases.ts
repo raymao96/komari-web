@@ -1,7 +1,7 @@
 import type { GithubReleaseInfo } from "@/components/admin/shell/adminShellModel";
 
 export const GITHUB_RELEASES_URL =
-  "https://api.github.com/repos/nuomiiiii/Lite/releases?per_page=20";
+  "https://api.github.com/repos/raymao96/komari/releases?per_page=20";
 export const GITHUB_RELEASES_CACHE_KEY = "lite:admin:github-releases:v1";
 export const GITHUB_RELEASES_CACHE_TTL_MS = 30 * 60 * 1000;
 export const GITHUB_RELEASES_IDLE_DELAY_MS = 2500;

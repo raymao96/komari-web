@@ -32,7 +32,7 @@ const Tips: React.FC<TipsProps & React.HTMLAttributes<HTMLDivElement>> = ({
 
   if (isDialog) {
     return (
-      <div className="relative inline-block" {...props}>
+      <div className="relative inline-flex items-center leading-none" {...props}>
         <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
           <Dialog.Trigger aria-label={ariaLabel}>
             <div className="flex cursor-pointer items-center justify-center rounded-full font-bold">
@@ -50,7 +50,7 @@ const Tips: React.FC<TipsProps & React.HTMLAttributes<HTMLDivElement>> = ({
   }
 
   return (
-    <div className="relative inline-block" {...props}>
+    <div className="relative inline-flex items-center leading-none" {...props}>
       <Tooltip title={<Box sx={{ fontSize: 13 }}>{children}</Box>} placement={side}>
         <span
           className="inline-flex cursor-pointer items-center justify-center rounded-full font-bold"

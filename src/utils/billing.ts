@@ -66,6 +66,7 @@ export type BillingServer = {
   month_extra: string;
   month_total: string;
   expired_at?: string | null;
+  expiry_timezone?: string | null;
   remaining_days?: number | null;
   remaining_value?: string | null;
 };
@@ -277,7 +278,9 @@ export function remainingExpiryDays(
   const expired =
     expiredAt instanceof Date ? expiredAt : new Date(expiredAt as string | number);
   if (Number.isNaN(expired.getTime())) return null;
-  return Math.round((expired.getTime() - nowMs) / MS_PER_DAY);
+  const remaining = expired.getTime() - nowMs;
+  if (remaining <= 0) return 0;
+  return Math.ceil(remaining / MS_PER_DAY - 1e-12);
 }
 
 export function formatBillingMoney(

@@ -23,6 +23,7 @@ test("logs page uses type and time dropdowns and searches ip plus message", () =
   assert.match(logSource, /t\("logs\.time"/);
   assert.match(logSource, /Tooltip/);
   assert.match(logSource, /admin-cell-clip km-log-message/);
+  assert.match(logSource, /km-log-col-ip whitespace-normal break-all/);
   assert.match(logSource, /resolvedTypeOptions/);
   assert.match(logSource, /resolvedDayOptions/);
   assert.match(logSource, /AdminActiveFilters/);

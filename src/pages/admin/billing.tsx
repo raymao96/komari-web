@@ -89,6 +89,11 @@ import {
   type BillingServerPage,
 } from "@/utils/billing";
 import { localizeBillingError } from "@/utils/billingI18n";
+import {
+  DEFAULT_EXPIRY_TIMEZONE,
+  formatInstantInTimezone,
+  normalizeExpiryTimezone,
+} from "@/lib/expiryDateTime";
 import { getRegionCode, getRegionDisplayName } from "@/utils/regionHelper";
 
 type BillingTab = "overview" | "monthly" | "yearly";
@@ -581,11 +586,6 @@ function periodStatusColor(status: string) {
   return "green";
 }
 
-function billingExpiryPrimary(t: TFunction, expiredAt?: string | null) {
-  if (isLongTermExpiry(expiredAt)) return t("common.long_term");
-  return billingDate(expiredAt);
-}
-
 function billingExpiryCaption(t: TFunction, server: BillingServer) {
   if (isLongTermExpiry(server.expired_at)) return null;
   if (server.remaining_days == null) return t("billing.status.noExpiry");
@@ -593,17 +593,41 @@ function billingExpiryCaption(t: TFunction, server: BillingServer) {
   return t("billing.status.remainingDays", { count: server.remaining_days });
 }
 
-function ExpiryCell({ server }: { server: BillingServer }) {
+function ExpiryDisplay({ server }: { server: BillingServer }) {
   const { t } = useTranslation();
   const caption = billingExpiryCaption(t, server);
+  if (isLongTermExpiry(server.expired_at)) {
+    return <Typography component="div" sx={{ fontSize: 13 }}>{t("common.long_term")}</Typography>;
+  }
+  const zone = normalizeExpiryTimezone(server.expiry_timezone || DEFAULT_EXPIRY_TIMEZONE);
+  const parts = formatInstantInTimezone(server.expired_at, zone);
   return (
-    <TableCell>
-      <Typography sx={{ fontSize: 13 }}>{billingExpiryPrimary(t, server.expired_at)}</Typography>
+    <>
+      <Typography component="div" sx={{ fontSize: 13, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        {parts ? `${parts.date} ${parts.time}` : billingDate(server.expired_at)}
+      </Typography>
+      {parts ? (
+        <Typography component="div" color="text.secondary" title={zone} sx={{ fontSize: 11.5 }}>
+          {zone}
+        </Typography>
+      ) : null}
       {caption ? (
-        <Typography color={server.remaining_days != null && server.remaining_days <= 30 ? "warning.main" : "text.secondary"} sx={{ fontSize: 11.5 }}>
+        <Typography
+          component="div"
+          color={server.remaining_days != null && server.remaining_days <= 30 ? "warning.main" : "text.secondary"}
+          sx={{ fontSize: 11.5 }}
+        >
           {caption}
         </Typography>
       ) : null}
+    </>
+  );
+}
+
+function ExpiryCell({ server }: { server: BillingServer }) {
+  return (
+    <TableCell className="km-billing-expiry">
+      <ExpiryDisplay server={server} />
     </TableCell>
   );
 }
@@ -633,7 +657,7 @@ function ServerList({
   return (
     <>
       <Box sx={{ display: { xs: "none", md: "block" } }} className="admin-responsive-table-wrap overflow-x-auto">
-        <Table container={false} className="admin-responsive-table min-w-[1300px] table-fixed">
+        <Table container={false} className="admin-responsive-table km-billing-server-table min-w-[1300px] table-fixed">
           <TableHeader><TableRow>
             <TableHead className="w-[190px]">{t("billing.table.server")}</TableHead><TableHead className="w-[130px]">{t("billing.table.nativePrice")}</TableHead><TableHead className="w-[360px]">{t("billing.table.averages")}</TableHead><TableHead className="w-[120px]">{t("billing.table.monthExtra")}</TableHead><TableHead className="w-[130px]">{t("billing.table.monthTotal")}</TableHead><TableHead className="w-[150px]">{t("billing.table.expiry")}</TableHead><TableHead className="w-[120px]">{t("billing.table.remainingValue")}</TableHead><BillingActionHead>{t("billing.table.actions")}</BillingActionHead>
           </TableRow></TableHeader>
@@ -661,7 +685,7 @@ function ServerList({
       <Stack spacing={1.25} sx={{ display: { xs: "flex", md: "none" }, p: 1.25 }}>
         {data.items.map((server) => <Paper key={server.client} variant="outlined" sx={{ borderRadius: "8px", overflow: "hidden", borderColor: "divider" }}>
           <Stack direction="row" spacing={1.25} sx={{ p: 1.5, alignItems: "center", bgcolor: "action.hover" }}><Box sx={{ minWidth: 0, flex: 1 }}><BillingServerIdentity server={server} groupFallback={t("billing.status.noGroup")} /></Box><DetailsButton onClick={() => onDetails(server)} /></Stack>
-          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>{[[t("billing.table.nativePrice"), server.billing_status === "recurring" ? formatBillingMoney(server.original_amount, server.original_currency) : server.billing_status === "free" ? t("billing.status.free") : server.billing_status === "one_time" ? t("billing.status.oneTime") : t("billing.status.unconfigured")], [t("billing.common.monthlyAverage"), formatBillingMoney(server.monthly_average, currency)], [t("billing.table.monthExtra"), formatBillingMoney(server.month_extra, currency)], [t("billing.table.monthTotal"), formatBillingMoney(server.month_total, currency)], [t("billing.table.expiry"), billingExpiryPrimary(t, server.expired_at)], [t("billing.table.remainingValue"), formatBillingMoney(server.remaining_value, currency)]].map(([label, value]) => <Box key={label} sx={{ p: 1.35, borderTop: 1, borderRight: 1, borderColor: "divider", "&:nth-of-type(2n)": { borderRight: 0 } }}><Typography color="text.secondary" sx={{ mb: 0.4, fontSize: 11.5 }}>{label}</Typography><Typography sx={{ fontSize: 13.5, fontWeight: 400 }}>{value}</Typography></Box>)}</Box>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>{[[t("billing.table.nativePrice"), server.billing_status === "recurring" ? formatBillingMoney(server.original_amount, server.original_currency) : server.billing_status === "free" ? t("billing.status.free") : server.billing_status === "one_time" ? t("billing.status.oneTime") : t("billing.status.unconfigured")], [t("billing.common.monthlyAverage"), formatBillingMoney(server.monthly_average, currency)], [t("billing.table.monthExtra"), formatBillingMoney(server.month_extra, currency)], [t("billing.table.monthTotal"), formatBillingMoney(server.month_total, currency)], [t("billing.table.expiry"), <ExpiryDisplay key="expiry" server={server} />], [t("billing.table.remainingValue"), formatBillingMoney(server.remaining_value, currency)]].map(([label, value]) => <Box key={String(label)} sx={{ p: 1.35, borderTop: 1, borderRight: 1, borderColor: "divider", minWidth: 0, "&:nth-of-type(2n)": { borderRight: 0 } }}><Typography color="text.secondary" sx={{ mb: 0.4, fontSize: 11.5 }}>{label}</Typography><Typography component="div" sx={{ fontSize: 13.5, fontWeight: 400, minWidth: 0 }}>{value}</Typography></Box>)}</Box>
         </Paper>)}
       </Stack>
       <AdminPagination page={page} total={data.pagination.total} pageSize={pageSize} onPageChange={onPage} onPageSizeChange={onPageSize} showSummary={false} />
