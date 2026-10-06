@@ -14,6 +14,7 @@ export const DASHBOARD_MODULE_IDS = [
   "billing_trend",
   "return_route",
   "alerts",
+  "renewal_calendar",
   "storage_detail",
 ] as const;
 
@@ -70,6 +71,7 @@ export const FORMAL_DASHBOARD_MODULES: readonly DashboardModuleId[] = [
   "billing_trend",
   "return_route",
   "alerts",
+  "renewal_calendar",
 ];
 
 export const DASHBOARD_PRESETS: readonly DashboardPresetDefinition[] = [
@@ -222,6 +224,7 @@ const DASHBOARD_BASE_SPANS: Record<DashboardModuleId, DashboardModuleSpan> = {
   billing_trend: 6,
   return_route: 6,
   alerts: 6,
+  renewal_calendar: 4,
   storage_detail: 6,
 };
 
@@ -309,7 +312,11 @@ export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
         });
         continue;
       }
-      modules.push({ id, enabled: false, span: DASHBOARD_BASE_SPANS[id] });
+      modules.push({
+        id,
+        enabled: id === "renewal_calendar",
+        span: DASHBOARD_BASE_SPANS[id],
+      });
     }
   }
   const costCenter = modules.find((module) => module.id === "cost_center");

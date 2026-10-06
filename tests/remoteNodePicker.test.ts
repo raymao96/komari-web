@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   displayRemoteAddress,
   filterRemoteNodes,
+  nextRemotePickerPageSize,
   orderRemoteNodes,
   paginateRemoteNodes,
   remoteNodeSearchText,
@@ -88,6 +89,13 @@ test("uses independent page sizes and clamps stale page numbers", () => {
   assert.equal(terminalPage.currentPage, 6);
   assert.equal(terminalPage.totalPages, 6);
   assert.equal(terminalPage.nodes.length, 5);
+});
+
+test("keeps the full page size after a short last page is measured", () => {
+  assert.equal(nextRemotePickerPageSize(2, 6, 1), 6);
+  assert.equal(nextRemotePickerPageSize(2, 6, 2), 6);
+  assert.equal(nextRemotePickerPageSize(6, 6, 6), 6);
+  assert.equal(nextRemotePickerPageSize(4, 6, 6), 4);
 });
 
 test("keeps the terminal portal aligned with the dashboard visual language", () => {

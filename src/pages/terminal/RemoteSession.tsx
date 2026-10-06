@@ -8,7 +8,6 @@ import BottomNavigation from "@mui/material/BottomNavigation";
 import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -17,7 +16,6 @@ import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
@@ -61,7 +59,8 @@ import { attachRemoteTerminalHighlight } from "./remoteTerminalHighlight";
 import Flag from "@/components/Flag";
 import { usageMetricCardSx } from "@/pages/admin/nodeDetailCardStyles";
 import { displayRemoteAddress } from "@/utils/remoteNodePicker";
-import { firstNodeTag, REMOTE_COMPACT_QUERY, UNREPORTED_ADDRESS, remoteConfirmDialogProps } from "./remoteChrome";
+import { terminalControlByte } from "@/utils/terminalCtrl";
+import { REMOTE_COMPACT_QUERY, UNREPORTED_ADDRESS, remoteConfirmDialogProps } from "./remoteChrome";
 import { useTranslation } from "react-i18next";
 import { getAdminMenuProps } from "@/components/admin/adminMenu";
 
@@ -381,6 +380,18 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
         // HTTP deployments where navigator.clipboard.readText is unavailable.
         return false;
       }
+      // xterm only turns Ctrl+A..Z into a C0 byte when keyCode is 65–90.
+      // A Chinese IME reports 229, so Ctrl+X never reaches nano.
+      const control = terminalControlByte(event);
+      if (control !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        const ws = socket.current;
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(new Uint8Array([control]));
+        }
+        return false;
+      }
       return true;
     });
     const resizeObserver = new ResizeObserver(() => resizeTerminal());
@@ -575,6 +586,7 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
         ws.onmessage = (event) => {
           if (disposed) return;
           if (event.data instanceof ArrayBuffer) {
+            if (fileManager.current?.handleBinary(event.data)) return;
             terminal.current?.write(new Uint8Array(event.data));
             return;
           }
@@ -585,7 +597,7 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
               setConnectionState("connected");
               remoteReadyRef.current = true;
               setRemoteReady(true);
-              fileManager.current?.initialize(message.roots || [], message.home || message.roots?.[0], message.separator || "/");
+              fileManager.current?.initialize(message.roots || [], message.home || message.roots?.[0], message.separator || "/", message.file_transfer || 1);
               resizeTerminal();
               if (activeRef.current && !isEditableElement(document.activeElement)) {
                 window.requestAnimationFrame(() => terminal.current?.focus());
@@ -677,6 +689,13 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
     return true;
   }, []);
 
+  const sendBinary = useCallback((payload: Uint8Array) => {
+    const ws = socket.current;
+    if (ws?.readyState !== WebSocket.OPEN || !remoteReadyRef.current) return false;
+    ws.send(payload);
+    return true;
+  }, []);
+
   const sendCommand = useCallback((command: string) => {
     const ws = socket.current;
     if (ws?.readyState === WebSocket.OPEN) {
@@ -694,7 +713,6 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
   };
   const flag = node.region_override?.trim() || node.region?.trim() || "UN";
   const address = displayRemoteAddress(node.ipv4) || displayRemoteAddress(node.ipv6) || UNREPORTED_ADDRESS;
-  const tag = firstNodeTag(node.tags);
   const cpuUsed = live?.cpu.usage || 0;
   const ramUsed = usagePercent(live?.ram.used, node.mem_total);
   const diskUsed = usagePercent(live?.disk.used, node.disk_total);
@@ -740,12 +758,9 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
             <Flag flag={flag} width={40} height={30} />
           </Box>
           <Box className="remote-identity-copy">
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
-              <Typography component="h1" variant="h5" noWrap title={node.name} sx={{ m: 0, fontSize: "inherit", fontWeight: 700, lineHeight: 1.25 }}>
-                {node.name}
-              </Typography>
-              {tag ? <Chip size="small" label={tag} sx={{ height: 20, fontSize: 10, flex: "0 0 auto" }} /> : null}
-            </Stack>
+            <Typography component="h1" variant="h5" noWrap title={node.name} sx={{ m: 0, fontSize: "inherit", fontWeight: 700, lineHeight: 1.25 }}>
+              {node.name}
+            </Typography>
             <Box className="remote-identity-meta">
               <span className={`remote-identity-address${address === UNREPORTED_ADDRESS ? "" : " is-ip"}`}>{address}</span>
               <span className={`remote-status is-${connectionState}`}><i />{stateLabel(connectionState, t)}</span>
@@ -830,7 +845,6 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
               <span className="remote-terminal-head-title">
                 <TerminalIcon size={16} />
                 {t("terminal.session.terminal")}
-                {tag ? <Chip size="small" label={tag} sx={{ height: 18, fontSize: 10, bgcolor: "rgba(34,197,94,.16)", color: "#86efac" }} /> : null}
               </span>
               <span className="remote-terminal-head-actions">
                 <IconButton size="small" aria-label={t("terminal.session.copy_selection")} onClick={() => void copyTerminalSelection()}>
@@ -954,7 +968,7 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
               ) : null}
             </Box>
             <Box sx={{ display: sidePanel === "files" ? "block" : "none", minHeight: 0, flex: 1, height: "100%" }}>
-              <FileManager ref={fileManager} send={send} connected={remoteReady} />
+              <FileManager ref={fileManager} send={send} sendBinary={sendBinary} connected={remoteReady} />
             </Box>
             <Box sx={{ display: sidePanel === "commands" ? "block" : "none", minHeight: 0, flex: 1, height: "100%" }}>
               <div className="remote-command-panel"><CommandClipboardPanel className="h-full w-full" /></div>

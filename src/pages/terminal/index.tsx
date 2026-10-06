@@ -63,7 +63,7 @@ import LiteBrand from "@/components/LiteBrand";
 import { AppearanceSegment, ThemeMenu } from "@/components/admin/shell/ChromeActions";
 import AuthStandAlonePage, { authCancelButtonSx, authFieldSx, authPrimaryButtonSx } from "@/components/admin/shell/AuthStandAlonePage";
 import { useTranslation } from "react-i18next";
-import { clearRemoteVisualViewport, firstNodeTag, REMOTE_COMPACT_QUERY, SiteFavicon, remoteConfirmDialogProps, syncRemoteVisualViewport } from "./remoteChrome";
+import { clearRemoteVisualViewport, REMOTE_COMPACT_QUERY, SiteFavicon, remoteConfirmDialogProps, syncRemoteVisualViewport } from "./remoteChrome";
 import "./Terminal.css";
 
 type RemoteTab = {
@@ -839,17 +839,13 @@ function TerminalWorkspaceInner() {
           {tabs.map((tab, index) => {
             const node = nodeMap.get(tab.uuid);
             const connection = connectionByTab[tab.id];
-            const tag = firstNodeTag(node?.tags);
-            const detail = [
-              connection === "connected"
-                ? t("terminal.session.connected")
-                : connection === "waiting"
-                  ? t("terminal.session.waiting_agent")
-                  : connection === "connecting"
-                    ? t("terminal.session.connecting")
-                    : t("terminal.files.not_connected"),
-              tag,
-            ].filter(Boolean).join(" · ");
+            const detail = connection === "connected"
+              ? t("terminal.session.connected")
+              : connection === "waiting"
+                ? t("terminal.session.waiting_agent")
+                : connection === "connecting"
+                  ? t("terminal.session.connecting")
+                  : t("terminal.files.not_connected");
             return (
               <SortableRemoteTab
                 key={tab.id}

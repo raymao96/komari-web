@@ -69,7 +69,13 @@ test("theme tabs switch only the content below the stable page heading", () => {
   assert.doesNotMatch(tabsSource, /scrollIntoView/);
   assert.match(globalStyles, /overscroll-behavior-x:\s*contain/);
   assert.match(globalStyles, /min-height:\s*48px/);
-  assert.doesNotMatch(globalStyles, /width:\s*max-content/);
+  const themeTabStyles = globalStyles.slice(
+    globalStyles.indexOf(".km-page-admin-theme-managed,"),
+    globalStyles.indexOf(".dashboard-alert-grid {"),
+  );
+  assert.ok(themeTabStyles.includes(".km-theme-config-tabs-list"));
+  assert.match(themeTabStyles, /\.km-theme-config-tabs-list\s*\{[^}]*width:\s*100%/);
+  assert.doesNotMatch(themeTabStyles, /width:\s*max-content/);
   assert.match(globalStyles, /\.km-page-admin-theme-managed,[\s\S]*min-width:\s*0/);
   assert.match(tabsSource, /list\.scrollWidth - list\.clientWidth/);
   assert.match(tabsSource, /new ResizeObserver\(updateScrollEdges\)/);
@@ -88,6 +94,18 @@ test("theme tabs switch only the content below the stable page heading", () => {
   assert.match(tabsSource, /NodeSelectorDialog/);
   assert.match(tabsSource, /case "pingtasks"/);
   assert.match(tabsSource, /PingTaskSelectorDialog/);
+});
+
+test("managed themes can pick homepage probe tasks per server", () => {
+  assert.match(tabsSource, /case "serverpingtasks"/);
+  assert.match(tabsSource, /ServerPingTaskOverridesField/);
+  assert.match(
+    readFileSync(
+      new URL("../src/utils/themeConfigTabs.ts", import.meta.url),
+      "utf8",
+    ),
+    /"serverpingtasks"/,
+  );
 });
 
 test("installed themes resolve localized manifest text consistently", () => {

@@ -136,6 +136,7 @@ type MCPLease = {
   target_uuids: string[];
   created_at: string;
   expires_at: string;
+  long_term?: boolean;
   max_concurrency: number;
   running: number;
 };
@@ -1090,9 +1091,12 @@ function CompactLeaseRow({
           {(lease.client_name || "AI").slice(0, 1).toUpperCase()}
         </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: "24px" }}>
-            {lease.client_name || t("mcp.unknown_client")}
-          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ minWidth: 0, alignItems: "center" }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: "24px" }} noWrap>
+              {lease.client_name || t("mcp.unknown_client")}
+            </Typography>
+            {lease.long_term ? <Badge color="blue">{t("mcp.long_term_authorization")}</Badge> : null}
+          </Stack>
           {lease.note ? (
             <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
               {lease.note}
@@ -1117,7 +1121,9 @@ function CompactLeaseRow({
       >
         <Clock size={16} />
         <Box component="span" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          {t("mcp.remaining", { time: leaseRemainingText(lease, now) })}
+          {lease.long_term
+            ? leaseRemainingText(lease, now, t)
+            : t("mcp.remaining", { time: leaseRemainingText(lease, now, t) })}
         </Box>
       </Stack>
       {lease.status === "active" ? (
@@ -1157,6 +1163,13 @@ function durationText(minutes: number, t: Translate) {
   }
   if (formatted.hours) return t("mcp.hours_n", { count: formatted.hours });
   return t("mcp.minutes_n", { count: formatted.minutes });
+}
+
+function formatLeaseExpiry(iso: string) {
+  const clock = formatClock(iso);
+  const date = new Date(iso);
+  if (clock === "—" || !Number.isFinite(date.getTime())) return "—";
+  return `${date.getFullYear()}-${clock}`;
 }
 
 function formatClock(iso: string) {
@@ -1200,8 +1213,9 @@ function leaseStatusColor(status: string, running: number) {
   return "gray";
 }
 
-function leaseRemainingText(lease: MCPLease, now: number) {
+function leaseRemainingText(lease: MCPLease, now: number, t: Translate) {
   if (lease.status !== "active") return "—";
+  if (lease.long_term) return t("mcp.long_term_authorization");
   return formatRemaining(lease.expires_at, now);
 }
 
@@ -1537,9 +1551,12 @@ function MCPLeasesTab({
                           {(lease.client_name || "AI").slice(0, 1).toUpperCase()}
                         </Box>
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: "24px" }} noWrap>
-                            {lease.client_name || t("mcp.unknown_client")}
-                          </Typography>
+                          <Stack direction="row" spacing={0.75} sx={{ minWidth: 0, alignItems: "center" }}>
+                            <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: "24px" }} noWrap>
+                              {lease.client_name || t("mcp.unknown_client")}
+                            </Typography>
+                            {lease.long_term ? <Badge color="blue">{t("mcp.long_term_authorization")}</Badge> : null}
+                          </Stack>
                           {lease.note ? (
                             <Typography variant="caption" color="text.secondary" noWrap>
                               {lease.note}
@@ -1551,7 +1568,7 @@ function MCPLeasesTab({
                     cells={[
                       [t("mcp.col_servers"), nodeNames(lease.target_uuids, nodes)],
                       [t("mcp.col_mode"), <Badge key="mode" color="blue">{t("mcp.full_mode_short")}</Badge>],
-                      [t("mcp.col_remaining"), leaseRemainingText(lease, now)],
+                      [t("mcp.col_remaining"), leaseRemainingText(lease, now, t)],
                       [
                         t("mcp.col_status"),
                         <Badge key="status" color={leaseStatusColor(lease.status, running)}>
@@ -1618,9 +1635,12 @@ function MCPLeasesTab({
                               {(lease.client_name || "AI").slice(0, 1).toUpperCase()}
                             </Box>
                             <Box sx={{ minWidth: 0 }}>
-                              <Typography noWrap sx={{ fontWeight: 600 }}>
-                                {lease.client_name || t("mcp.unknown_client")}
-                              </Typography>
+                              <Stack direction="row" spacing={0.75} sx={{ minWidth: 0, alignItems: "center" }}>
+                                <Typography noWrap sx={{ fontWeight: 600 }}>
+                                  {lease.client_name || t("mcp.unknown_client")}
+                                </Typography>
+                                {lease.long_term ? <Badge color="blue">{t("mcp.long_term_authorization")}</Badge> : null}
+                              </Stack>
                               {lease.note ? (
                                 <Typography variant="caption" color="text.secondary" noWrap>
                                   {lease.note}
@@ -1637,7 +1657,7 @@ function MCPLeasesTab({
                         </TableCell>
                         <TableCell data-label={t("mcp.col_remaining")}>
                           <Typography sx={{ fontVariantNumeric: "tabular-nums" }}>
-                            {leaseRemainingText(lease, now)}
+                            {leaseRemainingText(lease, now, t)}
                           </Typography>
                         </TableCell>
                         <TableCell data-label={t("mcp.col_status")}>
@@ -1715,9 +1735,10 @@ function MCPLeasesTab({
                   name: selected.client_name || t("mcp.unknown_client"),
                 })}
               </Typography>
-              <Box sx={{ ml: "auto", flexShrink: 0 }}>
+              <Stack direction="row" spacing={0.75} sx={{ ml: "auto", flexShrink: 0 }}>
+                {selected.long_term ? <Badge color="blue">{t("mcp.long_term_authorization")}</Badge> : null}
                 <Badge color="blue">{t("mcp.full_mode_short")}</Badge>
-              </Box>
+              </Stack>
             </Stack>
             <Box
               sx={{
@@ -1729,7 +1750,7 @@ function MCPLeasesTab({
             >
               <LeaseDetailItem label={t("mcp.granted_by")} value={selected.owner_username || "—"} />
               <LeaseDetailItem label={t("mcp.granted_at")} value={formatClock(selected.created_at)} />
-              <LeaseDetailItem label={t("mcp.expires_label")} value={formatClock(selected.expires_at)} />
+              <LeaseDetailItem label={t("mcp.expires_label")} value={selected.long_term ? formatLeaseExpiry(selected.expires_at) : formatClock(selected.expires_at)} />
               <LeaseDetailItem
                 label={t("mcp.current_ops")}
                 value={t("mcp.concurrency_running", {
@@ -1743,10 +1764,12 @@ function MCPLeasesTab({
               />
               <LeaseDetailItem
                 label={t("mcp.access_window")}
-                value={durationText(
-                  Math.round((Date.parse(selected.expires_at) - Date.parse(selected.created_at)) / 60_000),
-                  t,
-                )}
+                value={selected.long_term
+                  ? t("mcp.long_term_authorization")
+                  : durationText(
+                    Math.round((Date.parse(selected.expires_at) - Date.parse(selected.created_at)) / 60_000),
+                    t,
+                  )}
               />
             </Box>
             <Typography sx={{ mt: "auto", pt: 2, fontSize: 12, color: "text.secondary", lineHeight: "20px" }}>
@@ -2388,6 +2411,7 @@ function MCPAuthorizeDialog({
     { id: string; client_name?: string; client_id?: string; redirect_uri?: string; ready?: boolean }[]
   >([]);
   const [selected, setSelected] = useState<string[]>(prefillNodes);
+  const [longTerm, setLongTerm] = useState(false);
   const [preset, setPreset] = useState<number | "custom">(settings.mcp_default_duration_minutes);
   const [customUnit, setCustomUnit] = useState<DurationUnit>("minutes");
   const [customValue, setCustomValue] = useState("90");
@@ -2409,6 +2433,7 @@ function MCPAuthorizeDialog({
       setPasskeyAvailable(false);
       return;
     }
+    setLongTerm(false);
     fetch("/api/admin/account/passkeys")
       .then((response) => response.json())
       .then((body) => {
@@ -2514,14 +2539,19 @@ function MCPAuthorizeDialog({
     });
   };
 
-  const durationMinutes = preset === "custom"
-    ? parseDurationInput(customValue, customUnit, settings.mcp_max_duration_minutes).minutes
-    : preset;
-  const durationError = preset === "custom"
-    ? parseDurationInput(customValue, customUnit, settings.mcp_max_duration_minutes).error
-    : durationMinutes != null && durationMinutes > settings.mcp_max_duration_minutes
-      ? "range"
-      : null;
+  const useLongTerm = longTerm;
+  const durationMinutes = useLongTerm
+    ? settings.mcp_default_duration_minutes
+    : preset === "custom"
+      ? parseDurationInput(customValue, customUnit, settings.mcp_max_duration_minutes).minutes
+      : preset;
+  const durationError = useLongTerm
+    ? null
+    : preset === "custom"
+      ? parseDurationInput(customValue, customUnit, settings.mcp_max_duration_minutes).error
+      : durationMinutes != null && durationMinutes > settings.mcp_max_duration_minutes
+        ? "range"
+        : null;
   const canApproveBase = Boolean(requestID && !missingClient && requestReady && selected.length && durationMinutes && !durationError && !submitting && !denyingID);
   const canSubmit = Boolean(canApproveBase && secret);
 
@@ -2561,6 +2591,7 @@ function MCPAuthorizeDialog({
         body: JSON.stringify({
           target_uuids: selected,
           duration_minutes: durationMinutes,
+          long_term: useLongTerm,
           note,
           password: usePasskey || twoFaEnabled ? undefined : secret,
           otp: usePasskey || !twoFaEnabled ? undefined : secret,
@@ -2958,6 +2989,22 @@ function MCPAuthorizeDialog({
             </Typography>
           </Stack>
         </Box>
+        <Box sx={{ mt: 2.5 }}>
+            <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}>
+              <Checkbox
+                checked={longTerm}
+                onChange={(_event, checked) => setLongTerm(checked)}
+                size="small"
+                slotProps={{ input: { "aria-describedby": "mcp-long-term-hint" } }}
+                sx={{ p: 0 }}
+              />
+              <Typography sx={{ fontSize: 13 }}>{t("mcp.long_term_authorization")}</Typography>
+            </Box>
+            <Typography id="mcp-long-term-hint" sx={{ mt: 1, fontSize: 12, color: "text.secondary", lineHeight: "20px" }}>
+              {t("mcp.long_term_authorization_hint")}
+            </Typography>
+          </Box>
+        <Box hidden={useLongTerm}>
         <Typography sx={{ display: "block", fontSize: 13, mt: 2.5, mb: 1 }}>{t("mcp.duration_label")}</Typography>
         <Box
           sx={{
@@ -3026,6 +3073,7 @@ function MCPAuthorizeDialog({
                 max: durationText(settings.mcp_max_duration_minutes, t),
               })}
         </Typography>
+        </Box>
         <Box sx={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 2, mt: 2.5 }}>
           <Box>
             <Typography sx={{ display: "block", fontSize: 13, mb: 1 }}>

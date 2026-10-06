@@ -12,7 +12,8 @@ export interface ThemeConfigTabField {
     | "string"
     | "richtext"
     | "nodes"
-    | "pingtasks";
+    | "pingtasks"
+    | "serverpingtasks";
   default?: unknown;
   options?: string;
   optionLabels?: Record<string, I18nText>;

@@ -20,6 +20,7 @@ import {
 } from "@/components/admin/SettingCard";
 import NodeSelectorDialog from "@/components/NodeSelectorDialog";
 import PingTaskSelectorDialog from "@/components/PingTaskSelectorDialog";
+import ServerPingTaskOverridesField from "@/components/admin/ServerPingTaskOverridesField";
 import type { I18nText } from "@/utils/i18nText";
 import {
   groupThemeConfigFields,
@@ -187,6 +188,17 @@ const ThemeConfigTabs = ({
           </Box>
         );
       }
+      case "serverpingtasks":
+        return (
+          <Box key={key} id={key}>
+            <ServerPingTaskOverridesField
+              title={title}
+              description={description}
+              value={value}
+              onChange={(next) => onValueChange(key, next)}
+            />
+          </Box>
+        );
       case "switch":
         return (
           <Box key={key} id={key}>

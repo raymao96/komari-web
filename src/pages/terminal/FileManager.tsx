@@ -45,6 +45,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatBytes } from "@/utils/unitHelper";
+import { encodeUploadFrame, parseDownloadFrame } from "@/utils/fileTransferFrame";
+import { createSha256, sha256File } from "@/utils/sha256";
 import { createRandomId } from "@/utils/randomId";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -76,6 +78,7 @@ type FileResponse = {
   data?: any;
   name?: string;
   size?: number;
+  sha256?: string;
 };
 
 type PendingRequest = {
@@ -89,6 +92,7 @@ type DownloadState = {
   size: number;
   received: number;
   chunks: Uint8Array[];
+  hasher: ReturnType<typeof createSha256>;
 };
 
 type FileContextMenuState = {
@@ -115,17 +119,23 @@ type SelectionDragState = {
 
 export type FileManagerHandle = {
   handleMessage: (message: FileResponse) => void;
-  initialize: (roots: string[], home: string, separator: string) => void;
+  handleBinary: (payload: ArrayBuffer) => boolean;
+  initialize: (roots: string[], home: string, separator: string, fileTransfer?: number) => void;
   refresh: () => void;
 };
 
 type Props = {
   send: (message: Record<string, unknown>) => boolean;
+  sendBinary: (payload: Uint8Array) => boolean;
   connected: boolean;
 };
 
 const requestTimeout = 30_000;
-const uploadChunkSize = 256 * 1024;
+const uploadChunkTimeout = 120_000;
+const legacyUploadChunkSize = 256 * 1024;
+const fastUploadChunkSize = 1024 * 1024;
+const fastUploadWindow = 4;
+const fastFileTransferVersion = 2;
 
 function joinRemotePath(base: string, name: string, separator: string) {
   if (!base) return name;
@@ -133,7 +143,7 @@ function joinRemotePath(base: string, name: string, separator: string) {
   return `${base}${separator}${name}`;
 }
 
-function toBase64(buffer: ArrayBuffer) {
+function legacyBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
   let binary = "";
   for (let offset = 0; offset < bytes.length; offset += 0x8000) {
@@ -179,7 +189,7 @@ function nextCopyName(entry: FileEntry, reservedNames: Set<string>, t: TFunction
   return `${stem}${t("terminal.files.copy_suffix_fallback")}${Date.now()}${extension}`;
 }
 
-const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, ref) => {
+const FileManager = forwardRef<FileManagerHandle, Props>(({ send, sendBinary, connected }, ref) => {
   const { t } = useTranslation();
   const pending = useRef(new Map<string, PendingRequest>());
   const downloads = useRef(new Map<string, DownloadState>());
@@ -217,23 +227,33 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
   const suppressClick = useRef(false);
   const uploadCancelled = useRef(false);
   const activeUploadId = useRef("");
+  const fastTransfer = useRef(false);
+
+  const trackRequest = (id: string, timeoutMs = requestTimeout) => new Promise<any>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      const waiting = pending.current.get(id);
+      if (!waiting) return;
+      pending.current.delete(id);
+      waiting.reject(new Error(t("terminal.files.timeout")));
+    }, timeoutMs);
+    pending.current.set(id, { resolve, reject, timeout });
+  });
+
+  const failRequest = (id: string, error: Error) => {
+    const waiting = pending.current.get(id);
+    if (!waiting) return;
+    pending.current.delete(id);
+    window.clearTimeout(waiting.timeout);
+    waiting.reject(error);
+  };
 
   const request = (type: string, payload: Record<string, unknown> = {}) => {
     const id = createRandomId();
-    return new Promise<any>((resolve, reject) => {
-      if (!send({ type, id, ...payload })) {
-        reject(new Error(t("terminal.files.not_ready")));
-        return;
-      }
-      const timeout = window.setTimeout(() => {
-        const waiting = pending.current.get(id);
-        if (waiting) {
-          pending.current.delete(id);
-          waiting.reject(new Error(t("terminal.files.timeout")));
-        }
-      }, requestTimeout);
-      pending.current.set(id, { resolve, reject, timeout });
-    });
+    const waiter = trackRequest(id);
+    if (!send({ type, id, ...payload })) {
+      failRequest(id, new Error(t("terminal.files.not_ready")));
+    }
+    return waiter;
   };
 
   const load = async (path = currentPath) => {
@@ -273,6 +293,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
           size: message.size || 0,
           received: 0,
           chunks: [],
+          hasher: createSha256(),
         });
         setTransferLabel(t("terminal.files.download_begin", { name: message.name || t("terminal.files.file") }));
         return;
@@ -282,6 +303,7 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         if (!download || typeof (message as any).data !== "string") return;
         const chunk = fromBase64((message as any).data);
         download.chunks.push(chunk);
+        download.hasher.update(chunk);
         download.received += chunk.byteLength;
         setTransferLabel(t("terminal.files.download_progress", {
           name: download.name,
@@ -293,6 +315,12 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         const download = downloads.current.get(message.id);
         if (!download) return;
         downloads.current.delete(message.id);
+        const checksum = String(message.sha256 || "").toLowerCase();
+        if (!checksum || download.hasher.hex() !== checksum) {
+          setTransferLabel("");
+          toast.error(t("terminal.files.download_checksum_mismatch", "下载文件校验不一致"));
+          return;
+        }
         const blob = new Blob(download.chunks as BlobPart[]);
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -310,7 +338,22 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         toast.error((message as any).error || t("terminal.files.download_failed"));
       }
     },
-    initialize(nextRoots, home, nextSeparator) {
+    handleBinary(payload) {
+      const frame = parseDownloadFrame(new Uint8Array(payload));
+      if (!frame) return false;
+      const download = downloads.current.get(frame.id);
+      if (!download) return false;
+      download.chunks.push(frame.payload);
+      download.hasher.update(frame.payload);
+      download.received += frame.payload.byteLength;
+      setTransferLabel(t("terminal.files.download_progress", {
+        name: download.name,
+        percent: Math.round((download.received / Math.max(1, download.size)) * 100),
+      }));
+      return true;
+    },
+    initialize(nextRoots, home, nextSeparator, fileTransfer = 1) {
+      fastTransfer.current = fileTransfer >= fastFileTransferVersion;
       const nextHome = home || nextRoots[0] || "";
       setRoots(nextRoots);
       setHomePath(nextHome);
@@ -519,7 +562,12 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     setContextMenu(null);
     for (const entry of actionableEntries.filter((item) => !item.directory && !item.symlink)) {
       const id = createRandomId();
-      if (!send({ type: "file.download", id, path: entry.path })) {
+      if (!send({
+        type: "file.download",
+        id,
+        path: entry.path,
+        binary: fastTransfer.current,
+      })) {
         toast.error(t("terminal.files.not_ready"));
         return;
       }
@@ -531,6 +579,63 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
     const uploadID = activeUploadId.current;
     if (uploadID) {
       void request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
+    }
+  };
+
+  const uploadFileBinary = async (file: File, uploadID: string) => {
+    const starts: number[] = [];
+    for (let offset = 0; offset < file.size; offset += fastUploadChunkSize) starts.push(offset);
+    let confirmed = 0;
+    let cursor = 0;
+    let failed = false;
+    const sendChunk = async (start: number) => {
+      const end = Math.min(file.size, start + fastUploadChunkSize);
+      const bytes = new Uint8Array(await file.slice(start, end).arrayBuffer());
+      if (uploadCancelled.current) return;
+      const id = createRandomId();
+      const waiter = trackRequest(id, uploadChunkTimeout);
+      let frame: Uint8Array;
+      try {
+        frame = encodeUploadFrame(id, uploadID, start, bytes);
+      } catch (error) {
+        failRequest(id, error instanceof Error ? error : new Error(t("terminal.files.upload_failed")));
+        throw error;
+      }
+      if (!sendBinary(frame)) {
+        const error = new Error(t("terminal.files.not_ready"));
+        failRequest(id, error);
+        throw error;
+      }
+      await waiter;
+      confirmed += bytes.byteLength;
+      setTransferLabel(t("terminal.files.upload_progress", {
+        name: file.name,
+        percent: Math.round((confirmed / Math.max(1, file.size)) * 100),
+      }));
+    };
+    const workers = Array.from({
+      length: Math.min(fastUploadWindow, Math.max(starts.length, 1)),
+    }, async () => {
+      while (!uploadCancelled.current && !failed) {
+        const index = cursor;
+        cursor += 1;
+        if (index >= starts.length) return;
+        try {
+          await sendChunk(starts[index]);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    });
+    try {
+      await Promise.all(workers);
+    } catch (error) {
+      await request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
+      throw error;
+    }
+    if (uploadCancelled.current) {
+      await request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
     }
   };
 
@@ -555,26 +660,36 @@ const FileManager = forwardRef<FileManagerHandle, Props>(({ send, connected }, r
         }
         const uploadID = start.upload_id;
         activeUploadId.current = uploadID;
-        let sent = 0;
-        while (sent < file.size) {
-          if (uploadCancelled.current) {
-            await request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
-            break;
+        const checksum = sha256File(file);
+        void checksum.catch(() => undefined);
+        if (fastTransfer.current) {
+          await uploadFileBinary(file, uploadID);
+        } else {
+          let sent = 0;
+          while (sent < file.size) {
+            if (uploadCancelled.current) {
+              await request("file.upload.cancel", { upload_id: uploadID }).catch(() => undefined);
+              break;
+            }
+            const buffer = await file.slice(sent, sent + legacyUploadChunkSize).arrayBuffer();
+            await request("file.upload.chunk", {
+              upload_id: uploadID,
+              offset: sent,
+              data: legacyBase64(buffer),
+            });
+            sent += buffer.byteLength;
+            setTransferLabel(t("terminal.files.upload_progress", {
+              name: file.name,
+              percent: Math.round((sent / Math.max(1, file.size)) * 100),
+            }));
           }
-          const buffer = await file.slice(sent, sent + uploadChunkSize).arrayBuffer();
-          await request("file.upload.chunk", {
-            upload_id: uploadID,
-            offset: sent,
-            data: toBase64(buffer),
-          });
-          sent += buffer.byteLength;
-          setTransferLabel(t("terminal.files.upload_progress", {
-            name: file.name,
-            percent: Math.round((sent / Math.max(1, file.size)) * 100),
-          }));
         }
         if (uploadCancelled.current) break;
-        await request("file.upload.finish", { upload_id: uploadID });
+        const sha256 = await checksum;
+        const finished = await request("file.upload.finish", { upload_id: uploadID, sha256 });
+        if (String(finished?.sha256 || "").toLowerCase() !== sha256) {
+          throw new Error(t("terminal.files.upload_checksum_mismatch", "上传文件校验不一致"));
+        }
         toast.success(t("terminal.files.upload_done", { name: file.name }));
       }
       if (uploadCancelled.current) {

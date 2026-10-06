@@ -39,6 +39,10 @@ export interface SelectorProps<T> {
   headerLabel?: React.ReactNode;
   /** 是否在标题行显示全选框 */
   showHeaderSelectAll?: boolean;
+  /** 最多可选数量；达到上限后不能再勾选新项 */
+  maxCount?: number;
+  /** 试图超过上限时回调 */
+  onMaxReached?: () => void;
 }
 
 function SelectorInner<T>(props: SelectorProps<T>) {
@@ -55,6 +59,8 @@ function SelectorInner<T>(props: SelectorProps<T>) {
     searchPlaceholder,
     headerLabel,
     showHeaderSelectAll = true,
+    maxCount,
+    onMaxReached,
   } = props;
   const { t } = useTranslation();
 
@@ -93,6 +99,7 @@ function SelectorInner<T>(props: SelectorProps<T>) {
   const resolvedHeaderLabel = headerLabel ?? t("common.content");
 
   const handleCheckAll = (checked: boolean) => {
+    if (maxCount && maxCount > 0) return;
     if (checked) {
       onChange(Array.from(new Set([...value, ...allIds])));
     } else {
@@ -102,10 +109,15 @@ function SelectorInner<T>(props: SelectorProps<T>) {
 
   const handleCheck = (id: string, checked: boolean) => {
     if (checked) {
-      onChange(Array.from(new Set([...value, id])));
-    } else {
-      onChange(value.filter((v) => v !== id));
+      if (value.includes(id)) return;
+      if (maxCount && maxCount > 0 && value.length >= maxCount) {
+        onMaxReached?.();
+        return;
+      }
+      onChange([...value, id]);
+      return;
     }
+    onChange(value.filter((v) => v !== id));
   };
 
   return (
@@ -129,7 +141,7 @@ function SelectorInner<T>(props: SelectorProps<T>) {
           <TableHeader>
             <TableRow>
               <TableHead>
-                {showHeaderSelectAll ? (
+                {showHeaderSelectAll && !maxCount ? (
                   <Checkbox
                     checked={checkAllState}
                     onClick={(event) => event.stopPropagation()}

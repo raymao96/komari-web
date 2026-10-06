@@ -15,6 +15,53 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+test("uploads the next archive chunk before the previous one finishes", async () => {
+  const originalFetch = globalThis.fetch;
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let overlapped = false;
+  let markOverlap: () => void = () => {};
+  const overlap = new Promise<void>((resolve) => {
+    markOverlap = resolve;
+  });
+  let chunkCalls = 0;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/init")) {
+      return jsonResponse({
+        status: "success",
+        data: { upload_id: "upload-window", chunk_size: 4, chunks: 2 },
+      });
+    }
+    if (url.endsWith("/merge")) {
+      return jsonResponse({ status: "success", data: {} });
+    }
+    chunkCalls += 1;
+    if (chunkCalls >= 2) markOverlap();
+    await gate;
+    return jsonResponse({ status: "success", data: { received: true } });
+  };
+
+  try {
+    const pending = uploadArchive({
+      basePath: "/api/admin/upload",
+      purpose: "theme",
+      file: new File(["abcdefgh"], "theme.zip"),
+    });
+    await overlap;
+    assert.equal(chunkCalls, 2);
+    overlapped = true;
+    release();
+    await pending;
+    assert.equal(overlapped, true);
+  } finally {
+    release();
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("uploads backup archives in server-sized chunks and merges last", async () => {
   const originalFetch = globalThis.fetch;
   const calls: FetchCall[] = [];

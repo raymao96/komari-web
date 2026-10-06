@@ -28,6 +28,7 @@ import {
   displayRemoteAddress,
   filterRemoteNodes,
   orderRemoteNodes,
+  nextRemotePickerPageSize,
   paginateRemoteNodes,
   type RemoteNodePickerItem,
   type RemoteNodeStatusFilter,
@@ -69,6 +70,7 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
   const [status, setStatus] = useState<RemoteNodeStatusFilter>("all");
   const [page, setPage] = useState(1);
   const [responsivePageSize, setResponsivePageSize] = useState(pageSize);
+  const pageSizeRef = useRef(pageSize);
   const searchRef = useRef<HTMLInputElement>(null);
   const resultsGridRef = useRef<HTMLDivElement>(null);
   const resultsAreaRef = useRef<HTMLDivElement>(null);
@@ -117,7 +119,10 @@ export default function RemoteNodePicker<T extends RemoteNodePickerItem>({
       const gap = grid ? Number.parseFloat(window.getComputedStyle(grid).rowGap || "10") || 10 : 10;
       const rowHeight = (firstCard?.getBoundingClientRect().height || (compact ? 76 : 126)) + gap;
       const rows = rowsPerPage ?? Math.max(1, Math.floor((area.clientHeight + gap) / Math.max(rowHeight, 1)));
-      const nextPageSize = Math.max(1, columnCount || 1) * Math.max(1, rows);
+      const measured = Math.max(1, columnCount || 1) * Math.max(1, rows);
+      const rendered = grid?.querySelectorAll(".remote-node-picker-card").length ?? 0;
+      const nextPageSize = nextRemotePickerPageSize(measured, pageSizeRef.current, rendered);
+      pageSizeRef.current = nextPageSize;
       setResponsivePageSize((current) => (current === nextPageSize ? current : nextPageSize));
     };
 

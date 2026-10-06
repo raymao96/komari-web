@@ -57,6 +57,7 @@ test("overview preset exactly matches the default dashboard modules", () => {
     "billing_trend",
     "return_route",
     "alerts",
+    "renewal_calendar",
   ]);
   assert.deepEqual(
     settings.modules.filter((module) => module.enabled).map((module) => module.id),
@@ -66,6 +67,7 @@ test("overview preset exactly matches the default dashboard modules", () => {
   assert.equal(settings.chart_refresh_seconds, 30);
   assert.equal(settings.modules.find((module) => module.id === "storage_detail")?.enabled, false);
   assert.equal(settings.modules.find((module) => module.id === "traffic_30d_summary")?.enabled, false);
+  assert.equal(settings.modules.find((module) => module.id === "renewal_calendar")?.span, 4);
 });
 
 test("dashboard preview stacks on phones and restores the desktop grid", () => {
@@ -390,7 +392,10 @@ test("custom layout preserves a half-width trailing module without stretching it
   });
   assert.deepEqual(
     packDashboardModules(enabledDashboardModules(settings), dashboardModuleSpans(settings), false),
-    [{ id: "latency_trend", span: 6 }],
+    [
+      { id: "latency_trend", span: 6 },
+      { id: "renewal_calendar", span: 4 },
+    ],
   );
 });
 
@@ -473,6 +478,23 @@ test("legacy six-column spans migrate to the twelve-column grid", () => {
   assert.equal(settings.modules.find((module) => module.id === "server_status")?.span, 4);
   assert.equal(settings.modules.find((module) => module.id === "latency_trend")?.span, 6);
   assert.equal(settings.layout_columns, 12);
+});
+
+test("a saved dashboard gains the renewal calendar until it is turned off", () => {
+  const settings = sanitizeDashboardSettings({
+    preset: "custom",
+    modules: [{ id: "server_status", enabled: true, span: 3 }],
+  });
+  const calendar = settings.modules.find((module) => module.id === "renewal_calendar");
+  assert.equal(calendar?.enabled, true);
+  assert.equal(calendar?.span, 4);
+  const turnedOff = sanitizeDashboardSettings({
+    ...settings,
+    modules: settings.modules.map((module) => (
+      module.id === "renewal_calendar" ? { ...module, enabled: false } : module
+    )),
+  });
+  assert.equal(turnedOff.modules.find((module) => module.id === "renewal_calendar")?.enabled, false);
 });
 
 test("sanitizer preserves module order and rejects unsafe refresh values", () => {

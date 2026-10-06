@@ -68,6 +68,7 @@ import { toast } from "sonner";
 import MenuItem from "@mui/material/MenuItem";
 import MuiButton from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
+import { applyPingLossSheet } from "@/pages/admin/notification/pingLossSheet";
 
 type PingLossNotification = {
   id: number;
@@ -147,7 +148,7 @@ type ViewMode = "task" | "server";
 type AlertSheet = "loss" | "latency";
 
 const PING_LOSS_VIEWS = ["task", "server"] as const;
-const PING_LOSS_SHEETS = ["loss", "latency"] as const;
+const PING_LOSS_SHEETS = ["latency", "loss"] as const;
 
 const defaultForm: FormState = {
   enable: true,
@@ -415,7 +416,7 @@ const PingLossContent = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [view, setView] = useAdminTabParam(PING_LOSS_VIEWS, "task");
-  const [sheet, setSheet] = useAdminTabParam(PING_LOSS_SHEETS, "loss", { param: "sheet" });
+  const [sheet, setSheet] = useAdminTabParam(PING_LOSS_SHEETS, "latency", { param: "sheet" });
   const [selected, setSelected] = React.useState<string[]>([]);
   const [alertState, setAlertState] = React.useState(
     () => searchParams.get("state")?.trim() === "active" ? "active" : "",
@@ -547,11 +548,11 @@ const PingLossContent = () => {
           }
         >
           <Tabs.List>
-            <Tabs.Trigger value="loss">
-              <AdminTabLabel icon={<WifiOff size={18} />}>{t("notification.ping_loss.loss_anomaly")}</AdminTabLabel>
-            </Tabs.Trigger>
             <Tabs.Trigger value="latency">
               <AdminTabLabel icon={<Timer size={18} />}>{t("notification.ping_loss.latency_anomaly")}</AdminTabLabel>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="loss">
+              <AdminTabLabel icon={<WifiOff size={18} />}>{t("notification.ping_loss.loss_anomaly")}</AdminTabLabel>
             </Tabs.Trigger>
           </Tabs.List>
         </AdminSheetTabs>
@@ -1518,12 +1519,15 @@ const ConfigurationDialog = ({
       toast.error(t("notification.ping_loss.select_required"));
       return;
     }
-    if (!isPingLossFormValid(form)) {
+    const forms = activeTargets.map((target) =>
+      applyPingLossSheet(formForSheet(target.rule, section), form, section),
+    );
+    if (forms.some((item) => !isPingLossFormValid(item))) {
       toast.error(t("notification.ping_loss.invalid_form"));
       return;
     }
 
-    const notifications = activeTargets.map((target) => formToPayload(form, target));
+    const notifications = forms.map((item, index) => formToPayload(item, activeTargets[index]));
 
     setSaving(true);
     try {

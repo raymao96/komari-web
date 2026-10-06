@@ -58,6 +58,17 @@ export function filterRemoteNodes<T extends RemoteNodePickerItem>(
   });
 }
 
+export function nextRemotePickerPageSize(
+  measured: number,
+  current: number,
+  renderedCount: number,
+) {
+  const safeMeasured = Math.max(1, Math.floor(measured) || 1);
+  const safeCurrent = Math.max(1, Math.floor(current) || safeMeasured);
+  if (renderedCount > 0 && renderedCount < safeCurrent) return safeCurrent;
+  return safeMeasured;
+}
+
 export function paginateRemoteNodes<T>(
   nodes: readonly T[],
   page: number,

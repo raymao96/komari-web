@@ -10,6 +10,8 @@ import {
 
 export type ArchiveUploadPurpose = "backup" | "theme";
 
+const archiveUploadWindow = 2;
+
 type APIResponse<T> = {
   status: "success" | "error";
   message?: string;
@@ -239,6 +241,103 @@ async function uploadChunkAttempt(
   });
 }
 
+function linkAbort(parent: AbortSignal | undefined, controller: AbortController) {
+  if (!parent) return () => {};
+  const onAbort = () => controller.abort(parent.reason);
+  if (parent.aborted) {
+    onAbort();
+    return () => {};
+  }
+  parent.addEventListener("abort", onAbort, { once: true });
+  return () => parent.removeEventListener("abort", onAbort);
+}
+
+async function uploadChunksInWindow({
+  basePath,
+  uploadID,
+  file,
+  chunkSize,
+  chunkCount,
+  signal,
+  maxChunkAttempts,
+  onState,
+}: {
+  basePath: string;
+  uploadID: string;
+  file: File;
+  chunkSize: number;
+  chunkCount: number;
+  signal?: AbortSignal;
+  maxChunkAttempts: number;
+  onState: (uploadedBytes: number, uploadedChunks: number) => void;
+}) {
+  const flight = new AbortController();
+  const unlink = linkAbort(signal, flight);
+  const chunkSignal = flight.signal;
+  const received = new Array<number>(chunkCount).fill(0);
+  const finished = new Array<boolean>(chunkCount).fill(false);
+  const report = () => {
+    let uploadedBytes = 0;
+    let uploadedChunks = 0;
+    for (let index = 0; index < chunkCount; index += 1) {
+      const start = index * chunkSize;
+      const size = Math.min(file.size, start + chunkSize) - start;
+      if (finished[index]) {
+        uploadedBytes += size;
+        uploadedChunks += 1;
+        continue;
+      }
+      uploadedBytes += Math.min(Math.max(0, size - 1), received[index]);
+    }
+    onState(Math.min(file.size, uploadedBytes), uploadedChunks);
+  };
+
+  let nextIndex = 0;
+  let failure: unknown;
+  const worker = async () => {
+    while (failure == null && !chunkSignal.aborted) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= chunkCount) return;
+      const start = index * chunkSize;
+      const end = Math.min(file.size, start + chunkSize);
+      try {
+        await uploadChunk(
+          `${basePath}/chunk`,
+          uploadID,
+          index,
+          file.slice(start, end),
+          chunkSignal,
+          maxChunkAttempts,
+          (loadedBytes) => {
+            received[index] = Math.max(0, loadedBytes);
+            report();
+          },
+        );
+        finished[index] = true;
+        report();
+      } catch (reason) {
+        if (failure == null) {
+          failure = reason;
+          flight.abort();
+        }
+        return;
+      }
+    }
+  };
+
+  try {
+    const workers = Math.min(archiveUploadWindow, Math.max(chunkCount, 1));
+    await Promise.all(Array.from({ length: workers }, () => worker()));
+    if (failure) throw failure;
+    if (chunkSignal.aborted) {
+      throw new DOMException("Upload cancelled", "AbortError");
+    }
+  } finally {
+    unlink();
+  }
+}
+
 async function cancelUpload(basePath: string, uploadID: string): Promise<void> {
   try {
     await requestJSON(`${basePath}/cancel`, { upload_id: uploadID });
@@ -286,34 +385,24 @@ export async function uploadArchive({
       uploadedChunks: 0,
     });
     emitUploadState(currentState, onStateChange, onProgress);
-    for (let index = 0; index < chunkCount; index += 1) {
-      const start = index * chunkSize;
-      const end = Math.min(file.size, start + chunkSize);
-      await uploadChunk(
-        `${basePath}/chunk`,
-        uploadID,
-        index,
-        file.slice(start, end),
-        signal,
-        Math.max(1, maxChunkAttempts),
-        (loadedBytes) => {
-          currentState = createUploadingUploadState({
-            totalBytes: file.size,
-            uploadedBytes: Math.min(end, start + loadedBytes),
-            totalChunks: chunkCount,
-            uploadedChunks: index,
-          });
-          emitUploadState(currentState, onStateChange, onProgress);
-        },
-      );
-      currentState = createUploadingUploadState({
-        totalBytes: file.size,
-        uploadedBytes: end,
-        totalChunks: chunkCount,
-        uploadedChunks: index + 1,
-      });
-      emitUploadState(currentState, onStateChange, onProgress);
-    }
+    await uploadChunksInWindow({
+      basePath,
+      uploadID,
+      file,
+      chunkSize,
+      chunkCount,
+      signal,
+      maxChunkAttempts: Math.max(1, maxChunkAttempts),
+      onState: (uploadedBytes, uploadedChunks) => {
+        currentState = createUploadingUploadState({
+          totalBytes: file.size,
+          uploadedBytes,
+          totalChunks: chunkCount,
+          uploadedChunks,
+        });
+        emitUploadState(currentState, onStateChange, onProgress);
+      },
+    });
 
     if (onStateChange || onProgress) {
       await delay(UPLOAD_FINAL_PROGRESS_VISIBLE_MS);

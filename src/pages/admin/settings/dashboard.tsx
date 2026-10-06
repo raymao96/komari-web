@@ -529,6 +529,10 @@ export default function DashboardSettingsPage() {
                     {(["return_route", "alerts"] as const)
                       .map((id) => previewModule(id))}
                   </div>
+                  {previewModule(
+                    "renewal_calendar",
+                    previewSpan[draft.modules.find((module) => module.id === "renewal_calendar")?.span ?? 4],
+                  )}
                 </>
               ) : packedPreview.map(({ id, span }) => previewModule(id, previewSpan[span]))}
             </div>

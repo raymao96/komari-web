@@ -1,4 +1,4 @@
-export const MCP_HARD_MAX_MINUTES = 1440;
+export const MCP_HARD_MAX_MINUTES = 72 * 60;
 export const MCP_MIN_MINUTES = 1;
 
 export type DurationUnit = "minutes" | "hours";
@@ -14,7 +14,7 @@ export function parseDurationInput(raw: string, unit: DurationUnit, siteMax = MC
   if (!Number.isInteger(value) || value < 1) return { minutes: null, error: "invalid" };
   const minutes = unit === "hours" ? value * 60 : value;
   const max = Math.min(Math.max(siteMax, MCP_MIN_MINUTES), MCP_HARD_MAX_MINUTES);
-  if (unit === "hours" && value > 24) return { minutes: null, error: "range" };
+  if (unit === "hours" && value > MCP_HARD_MAX_MINUTES / 60) return { minutes: null, error: "range" };
   if (minutes < MCP_MIN_MINUTES || minutes > max) return { minutes: null, error: "range" };
   return { minutes, error: null };
 }
@@ -32,4 +32,4 @@ export function formatDurationLabel(minutes: number): { hours: number; minutes: 
   return { hours: Math.floor(minutes / 60), minutes: minutes % 60 };
 }
 
-export const MCP_DURATION_PRESETS = [15, 30, 60, 1440] as const;
+export const MCP_DURATION_PRESETS = [15, 30, 60, 1440, 72 * 60] as const;

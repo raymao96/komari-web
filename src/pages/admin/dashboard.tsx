@@ -39,6 +39,7 @@ import {
   TrafficTrendPanel,
   useSyncedSummaryFooters,
 } from "@/components/admin/DashboardPanels";
+import { RenewalCalendarPanel } from "@/components/admin/DashboardRenewalCalendar";
 import { useDashboardSettings } from "@/hooks/useDashboardSettings";
 import {
   dashboardLocalStorageTotal,
@@ -543,6 +544,8 @@ export default function AdminDashboard() {
         return data
           ? <AlertOverviewPanel data={data} locale={locale} accountKey={accountKey} />
           : <Skeleton className="h-[210px] w-full" />;
+      case "renewal_calendar":
+        return <RenewalCalendarPanel />;
       case "storage_detail":
         return data
           ? <StoragePanel data={data} locale={locale} />
@@ -584,6 +587,15 @@ export default function AdminDashboard() {
             {renderModule(module)}
           </div>
         ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+        <div
+          data-dashboard-module="renewal_calendar"
+          data-dashboard-span={moduleSpans.renewal_calendar ?? 4}
+          className={`min-w-0 [&>*]:h-full ${moduleGridClass[moduleSpans.renewal_calendar ?? 4]}`}
+        >
+          {renderModule("renewal_calendar")}
+        </div>
       </div>
     </>
   );
