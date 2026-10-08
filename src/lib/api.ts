@@ -224,7 +224,7 @@ function useSettingsController() {
   }, [accountLoading, hasAccountContext, loggedIn]);
 
   // Update a single setting
-  const updateSetting = async <K extends keyof SettingsResponse>(
+  const updateSetting = React.useCallback(async <K extends keyof SettingsResponse>(
     key: K,
     value: SettingsResponse[K]
   ) => {
@@ -237,10 +237,10 @@ function useSettingsController() {
       );
       throw err;
     }
-  };
+  }, [settings]);
 
   // Update multiple settings
-  const updateMultipleSettings = async (
+  const updateMultipleSettings = React.useCallback(async (
     newSettings: Partial<SettingsResponse>
   ) => {
     try {
@@ -253,7 +253,7 @@ function useSettingsController() {
       );
       throw err;
     }
-  };
+  }, [settings]);
 
   const refetch = React.useCallback(async () => {
     const data = await getSettings();
@@ -265,7 +265,7 @@ function useSettingsController() {
     void refetch().catch(() => undefined);
   }), [refetch]);
 
-  return {
+  return React.useMemo(() => ({
     settings,
     loading,
     error,
@@ -273,7 +273,14 @@ function useSettingsController() {
     updateSetting,
     updateMultipleSettings,
     refetch,
-  };
+  }), [
+    settings,
+    loading,
+    error,
+    updateSetting,
+    updateMultipleSettings,
+    refetch,
+  ]);
 }
 
 type SettingsContextValue = ReturnType<typeof useSettingsController>;

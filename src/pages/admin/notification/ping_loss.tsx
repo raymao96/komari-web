@@ -68,7 +68,11 @@ import { toast } from "sonner";
 import MenuItem from "@mui/material/MenuItem";
 import MuiButton from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
-import { applyPingLossSheet } from "@/pages/admin/notification/pingLossSheet";
+import {
+  alertEnableAfterSectionChange,
+  applyPingLossSheet,
+  settlePingLossForm,
+} from "@/pages/admin/notification/pingLossSheet";
 
 type PingLossNotification = {
   id: number;
@@ -556,7 +560,8 @@ const PingLossContent = () => {
             </Tabs.Trigger>
           </Tabs.List>
         </AdminSheetTabs>
-        <AdminListShell className="mt-3">
+        <Tabs.Content value={sheet} className="admin-tab-panel pt-3">
+        <AdminListShell>
           <AdminListFiltersBar>
             <Stack
               direction="row"
@@ -648,6 +653,7 @@ const PingLossContent = () => {
             }
           />
         </AdminListShell>
+        </Tabs.Content>
       </Tabs.Root>
     </div>
   );
@@ -994,7 +1000,16 @@ const PingLossConfigurationFields = ({
             id={lossId}
             checked={form.lossEnabled}
             onCheckedChange={(lossEnabled) =>
-              onChange((current) => ({ ...current, lossEnabled }))
+              onChange((current) => ({
+                ...current,
+                lossEnabled,
+                enable: alertEnableAfterSectionChange(
+                  lossEnabled,
+                  current.latencyEnabled,
+                  lossEnabled,
+                  current.enable,
+                ),
+              }))
             }
           />
         </Flex>
@@ -1050,7 +1065,16 @@ const PingLossConfigurationFields = ({
             id={latencyId}
             checked={form.latencyEnabled}
             onCheckedChange={(latencyEnabled) =>
-              onChange((current) => ({ ...current, latencyEnabled }))
+              onChange((current) => ({
+                ...current,
+                latencyEnabled,
+                enable: alertEnableAfterSectionChange(
+                  current.lossEnabled,
+                  latencyEnabled,
+                  latencyEnabled,
+                  current.enable,
+                ),
+              }))
             }
           />
         </Flex>
@@ -1520,7 +1544,7 @@ const ConfigurationDialog = ({
       return;
     }
     const forms = activeTargets.map((target) =>
-      applyPingLossSheet(formForSheet(target.rule, section), form, section),
+      settlePingLossForm(applyPingLossSheet(formForSheet(target.rule, section), form, section)),
     );
     if (forms.some((item) => !isPingLossFormValid(item))) {
       toast.error(t("notification.ping_loss.invalid_form"));

@@ -283,6 +283,35 @@ export function remainingExpiryDays(
   return Math.ceil(remaining / MS_PER_DAY - 1e-12);
 }
 
+// displayedRemainingDays keeps a finite expiry visible even when residual value
+// is omitted. Free servers send a date without a remaining-value amount.
+export function displayedRemainingDays(
+  expiredAt?: string | number | Date | null,
+  remainingDays?: number | null,
+  nowMs = Date.now(),
+): number | null {
+  if (isLongTermExpiry(expiredAt)) return null;
+  if (remainingDays != null && Number.isFinite(remainingDays)) return remainingDays;
+  return remainingExpiryDays(expiredAt, nowMs);
+}
+
+// formatNodeRenewPrice renders the server billing tile. -1 is the free sentinel
+// stored on the client, shown as "免费 / 月付" rather than a currency amount.
+export function formatNodeRenewPrice(input: {
+  price: unknown;
+  currency: string;
+  cycleLabel?: string;
+  freeLabel: string;
+  emptyLabel?: string;
+}): string {
+  const empty = input.emptyLabel ?? "—";
+  const price = typeof input.price === "number" ? input.price : Number(input.price);
+  if (!Number.isFinite(price) || price === 0) return empty;
+  const cycle = input.cycleLabel ? ` / ${input.cycleLabel}` : "";
+  if (price === -1) return `${input.freeLabel}${cycle}`;
+  return `${input.currency}${price.toFixed(2)}${cycle}`;
+}
+
 export function formatBillingMoney(
   amount: string | null | undefined,
   currency: string,

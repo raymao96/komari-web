@@ -59,7 +59,7 @@ import {
   formatExpiryLocalDisplay,
   normalizeExpiryTimezone,
 } from "@/lib/expiryDateTime";
-import { billingRequest, isLongTermExpiry } from "@/utils/billing";
+import { billingRequest, formatNodeRenewPrice, isLongTermExpiry } from "@/utils/billing";
 import NodeUsageStats from "@/pages/admin/NodeUsageStats";
 import {
   EMPTY_DISPLAY,
@@ -900,17 +900,18 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
   const [autoRenewal, setAutoRenewal] = useState(Boolean(node.auto_renewal));
   const expiryTimezone = normalizeExpiryTimezone(node.expiry_timezone);
   const displayPrice = node.price;
-  const hasPrice = !isEmptyValue(displayPrice);
   const displayCycle = Number(node.billing_cycle) || 0;
   const hasCycle = !isEmptyValue(displayCycle);
   const displayExpired = isLongTermExpiry(node.expired_at)
     ? t("common.long_term")
     : formatExpiryLocalDisplay(node.expired_at, expiryTimezone) || EMPTY_DISPLAY;
-  const renewPriceLabel = hasPrice
-    ? `${currency}${Number(displayPrice).toFixed(2)}${
-        hasCycle ? ` / ${cycleLabel(Number(displayCycle || billingCycle), t)}` : ""
-      }`
-    : EMPTY_DISPLAY;
+  const renewPriceLabel = formatNodeRenewPrice({
+    price: displayPrice,
+    currency,
+    cycleLabel: hasCycle ? cycleLabel(Number(displayCycle || billingCycle), t) : "",
+    freeLabel: t("common.free", "免费"),
+    emptyLabel: EMPTY_DISPLAY,
+  });
 
   const cycleOptions = useMemo(
     () => [
@@ -1021,7 +1022,7 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
               icon={<RefreshCw size={19} />}
               label={t("admin.nodeDetail.renewPrice", "续费价格")}
               value={renewPriceLabel}
-              muted={!hasPrice}
+              muted={renewPriceLabel === EMPTY_DISPLAY}
             />
             <DetailValueTile
               icon={<Clock size={19} />}

@@ -22,6 +22,8 @@ export function isRemoteManagementPath(pathname: string): boolean {
   const path = pathname.replace(/\/$/, "") || "/";
   return (
     path === "/admin/exec" ||
+    path === "/admin/remote-management/schedules" ||
+    path.startsWith("/admin/remote-management/schedules/") ||
     isMCPManagementPath(path) ||
     path === "/admin/settings/xtermjs" ||
     path === "/terminal"

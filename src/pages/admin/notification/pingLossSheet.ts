@@ -21,6 +21,26 @@ export type PingLossSheetForm = {
   baselineMinimumSamples: number;
 };
 
+// Turning off the last anomaly leaves the rule disabled. The master switch
+// stays on in the editor until this is applied, which used to fail validation.
+export const settlePingLossForm = <T extends PingLossSheetForm>(form: T): T => {
+  if (!form.lossEnabled && !form.latencyEnabled) {
+    return { ...form, enable: false };
+  }
+  return form;
+};
+
+export const alertEnableAfterSectionChange = (
+  lossEnabled: boolean,
+  latencyEnabled: boolean,
+  sectionTurnedOn: boolean,
+  currentEnable: boolean,
+) => {
+  if (!lossEnabled && !latencyEnabled) return false;
+  if (sectionTurnedOn) return true;
+  return currentEnable;
+};
+
 export const applyPingLossSheet = <T extends PingLossSheetForm>(
   base: T,
   form: PingLossSheetForm,

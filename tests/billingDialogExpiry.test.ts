@@ -28,6 +28,7 @@ const billingButtonSource = indexSource.slice(
 test("billing dialog hydrates from the latest node when opened", () => {
   assert.match(billingButtonSource, /hydrateBillingForm/);
   assert.match(billingButtonSource, /if \(next && !open\) hydrateBillingForm\(node\)/);
+  assert.match(billingButtonSource, /if \(open\) hydrateBillingForm\(node\)/);
   assert.match(billingButtonSource, /openedExpiryRef/);
   assert.match(billingButtonSource, /key=\{formEpoch\}/);
   assert.match(billingButtonSource, /defaultChecked=\{autoRenewal\}/);

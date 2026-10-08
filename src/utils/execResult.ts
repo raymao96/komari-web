@@ -5,6 +5,7 @@ const execResultKeys: Record<string, string> = {
   "execution status unknown": "exec.output.execution_unknown",
   "remote control unavailable": "exec.output.remote_unavailable",
   "远程管理已关闭，任务未投递/已取消": "exec.output.remote_closed",
+  "定时任务已停用，命令未投递/已取消": "exec.output.scheduled_stopped",
   "执行超时": "exec.output.timeout",
 };
 

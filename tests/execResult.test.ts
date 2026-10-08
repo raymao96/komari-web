@@ -24,6 +24,10 @@ test("canned exec results map to locale keys instead of English", () => {
     execResultI18nKey("远程管理已关闭，任务未投递/已取消"),
     "exec.output.remote_closed",
   );
+  assert.equal(
+    execResultI18nKey("定时任务已停用，命令未投递/已取消"),
+    "exec.output.scheduled_stopped",
+  );
   assert.equal(execResultI18nKey("执行超时"), "exec.output.timeout");
   assert.equal(execResultI18nKey("whoami\nliteadmin"), "");
   assert.equal(isExecTimeoutResult("delivery timeout"), true);

@@ -1039,7 +1039,7 @@ const NodeTable = ({
   const activeWidths = columnWidths ?? defaultLayout;
   const activeSort = columnWidths ? sortColumnWidth : NODE_SORT_COLUMN_WIDTH;
 
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     if (isMobile) return;
     const root = tableWrapRef.current;
     if (!root) return;
@@ -1062,7 +1062,7 @@ const NodeTable = ({
     return () => observer.disconnect();
   }, [isMobile, sortColumnWidth, layoutMode]);
 
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     if (isMobile) return;
     const root = tableWrapRef.current;
     if (!root) return;
@@ -1457,9 +1457,13 @@ function formatSignedTraffic(value: number): string {
 const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) => {
   const { t } = useTranslation();
   const { ensureEnabled } = useRemoteManagementGate();
+  const [dialog, setDialog] = React.useState<"install" | "edit" | "billing" | "traffic" | "token" | "delete" | null>(null);
+  const closeDialog = () => setDialog(null);
   return (
     <div className="flex h-10 items-center justify-start gap-1 admin-node-actions max-md:w-full">
-      <GenerateCommandButton node={node} settings={settings} />
+      <IconButton variant="ghost" title={t("admin.nodeTable.installCommand")} onClick={() => setDialog("install")}>
+        <Download size="18" />
+      </IconButton>
       <IconButton
         title={t("terminal.title")}
         variant="ghost"
@@ -1470,18 +1474,34 @@ const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) 
       >
         <Terminal size="18" />
       </IconButton>
-      <EditButton node={node} />
-      <BillingButton node={node} />
-      <TrafficCalibrationButton node={node} />
-      <RotateTokenButton node={node} />
-      <DeleteButton node={node} />
+      <IconButton variant="ghost" title={t("admin.nodeEdit.editInfo", "编辑信息")} onClick={() => setDialog("edit")}>
+        <Pencil size="18" />
+      </IconButton>
+      <IconButton variant="ghost" title={t("admin.nodeTable.billing", "账单")} onClick={() => setDialog("billing")}>
+        <CircleDollarSign size="18" />
+      </IconButton>
+      <IconButton variant="ghost" title={t("admin.nodeTable.trafficCalibration.title")} onClick={() => setDialog("traffic")}>
+        <Gauge size="18" />
+      </IconButton>
+      <IconButton variant="ghost" title={t("admin.nodeTable.rotateToken")} onClick={() => setDialog("token")}>
+        <RefreshCw size="18" />
+      </IconButton>
+      <IconButton variant="ghost" color="red" title={t("delete")} onClick={() => setDialog("delete")}>
+        <Trash2Icon size="18" />
+      </IconButton>
+      {dialog === "install" ? <GenerateCommandButton node={node} settings={settings} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "edit" ? <EditButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "billing" ? <BillingButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "traffic" ? <TrafficCalibrationButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "token" ? <RotateTokenButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "delete" ? <DeleteButton node={node} initiallyOpen onClose={closeDialog} /> : null}
     </div>
   );
 };
 
-function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
+function TrafficCalibrationButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t, i18n } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [available, setAvailable] = useState(true);
@@ -1579,6 +1599,10 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
     }
   };
 
+  useEffect(() => {
+    if (initiallyOpen) void prepareCalibration();
+  }, [initiallyOpen]);
+
   const summaryItems = snapshot
     ? [
         [t("admin.nodeTable.trafficCalibration.raw"), snapshot.raw],
@@ -1600,10 +1624,13 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
       open={open}
       onOpenChange={(nextOpen) => {
         if (nextOpen) void prepareCalibration();
-        else setOpen(false);
+        else {
+          setOpen(false);
+          onClose?.();
+        }
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton
           variant="ghost"
           disabled={loading}
@@ -1611,8 +1638,8 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
         >
           <Gauge size="18" className={loading ? "animate-pulse" : undefined} />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
         <Dialog.Title>{t("admin.nodeTable.trafficCalibration.title")}</Dialog.Title>
         <Dialog.Description>
           <Trans
@@ -1734,16 +1761,16 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
             </Flex>
           </Flex>
         )}
-      </AppDialogContent>
+      </AppDialogContent> : null}
     </Dialog.Root>
   );
 }
 
 export default NodeDetailsPage;
-function DeleteButton({ node }: { node: NodeDetail }) {
+function DeleteButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initiallyOpen);
   const [deleting, setDeleting] = React.useState(false);
   const handleDelete = async () => {
     try {
@@ -1753,6 +1780,7 @@ function DeleteButton({ node }: { node: NodeDetail }) {
       });
       toast.success(t("admin.nodeTable.deleteSuccess", { name: node.name }));
       setOpen(false);
+      onClose?.();
       refresh();
     } catch (error) {
       toast.error(
@@ -1765,12 +1793,15 @@ function DeleteButton({ node }: { node: NodeDetail }) {
     }
   };
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger>
+    <Dialog.Root open={open} onOpenChange={(next) => {
+      setOpen(next);
+      if (!next) onClose?.();
+    }}>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton variant="ghost" color="red" title={t("delete")}>
           <Trash2Icon size="18" />
         </IconButton>
-      </Dialog.Trigger>
+      </Dialog.Trigger>}
       <AppDialogContent className="admin-install-dialog">
         <Dialog.Title>{t("delete")}</Dialog.Title>
         <Dialog.Description>
@@ -1919,9 +1950,9 @@ function NodeIdentityAuthDialog({
   );
 }
 
-function RotateTokenButton({ node }: { node: NodeDetail }) {
+function RotateTokenButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initiallyOpen);
   const [rotating, setRotating] = React.useState(false);
   const [needTwoFactor, setNeedTwoFactor] = React.useState(false);
   const [twoFactorInvalid, setTwoFactorInvalid] = React.useState(false);
@@ -1938,6 +1969,7 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
     setOpen(false);
     setRotating(false);
     resetTwoFactor();
+    onClose?.();
   };
 
   React.useEffect(() => {
@@ -1992,11 +2024,11 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
         closeDialog();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton variant="ghost" title={t("admin.nodeTable.rotateToken")}>
           <RefreshCw size="18" />
         </IconButton>
-      </Dialog.Trigger>
+      </Dialog.Trigger>}
       <AppDialogContent className="admin-install-dialog">
         <Dialog.Title>{t("admin.nodeTable.rotateToken")}</Dialog.Title>
         <Dialog.Description>
@@ -2120,7 +2152,7 @@ type DeploymentDeliveryState = {
   finished_at?: string;
 };
 
-function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings: any }) {
+function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose }: { node: NodeDetail; settings: any; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
   const isMobile = useIsMobile();
@@ -2166,7 +2198,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   const [enableMonthRotate, setEnableMonthRotate] = React.useState(
     initialResetDay !== "",
   );
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initiallyOpen);
   const [dialogTab, setDialogTab] = React.useState<"online" | "install">("online");
   const [loadingProfile, setLoadingProfile] = React.useState(false);
   const [profileAction, setProfileAction] = React.useState<"dispatch" | "copy" | null>(null);
@@ -2244,13 +2276,25 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   }, [installToken]);
 
   const revertTrafficResetClock = () => {
-    setEnableMonthRotate(initialResetDay !== "");
-    setInstallOptions((previous) => ({
-      ...previous,
-      monthRotate: initialResetDay,
-      monthRotateTime: initialResetTime,
-      monthRotateTimezone: initialResetTimezone,
-    }));
+    setEnableMonthRotate((current) => {
+      const next = initialResetDay !== "";
+      return current === next ? current : next;
+    });
+    setInstallOptions((previous) => {
+      if (
+        previous.monthRotate === initialResetDay &&
+        previous.monthRotateTime === initialResetTime &&
+        previous.monthRotateTimezone === initialResetTimezone
+      ) {
+        return previous;
+      }
+      return {
+        ...previous,
+        monthRotate: initialResetDay,
+        monthRotateTime: initialResetTime,
+        monthRotateTimezone: initialResetTimezone,
+      };
+    });
   };
 
   React.useLayoutEffect(() => {
@@ -2703,14 +2747,15 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         tokenSessionRef.current?.closeDialog();
         setOtpInput("");
         setDialogTab("online");
+        onClose?.();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton variant="ghost" title={t("admin.nodeTable.installCommand")}>
           <Download size="18" />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent
         maxWidth="720px"
         className="km-node-dialog km-node-deploy-dialog"
       >
@@ -3473,7 +3518,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           </Tabs.Content>
         </div>
         </Tabs.Root>
-      </AppDialogContent>
+      </AppDialogContent> : null}
       {needTwoFactor ? (
         <NodeIdentityAuthDialog
           otpFieldId="admin-node-deploy-otp"
@@ -3511,9 +3556,9 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   );
 }
 
-function EditButton({ node }: { node: NodeDetail }) {
+function EditButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t, i18n } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const { refresh } = useNodeDetails();
   const nameRef = React.useRef<HTMLInputElement>(null);
   const groupRef = React.useRef<HTMLInputElement>(null);
@@ -3521,10 +3566,10 @@ function EditButton({ node }: { node: NodeDetail }) {
   const bandwidthRef = React.useRef<HTMLInputElement>(null);
   const privateRemarkRef = React.useRef<HTMLInputElement>(null);
   const publicRemarkRef = React.useRef<HTMLInputElement>(null);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(node.hidden);
   const [saving, setSaving] = useState(false);
-  const [traffic_limit, setTrafficLimit] = useState(0);
-  const [traffic_limit_type, setTrafficLimitType] = useState("sum");
+  const [traffic_limit, setTrafficLimit] = useState(node.traffic_limit || 0);
+  const [traffic_limit_type, setTrafficLimitType] = useState(node.traffic_limit_type || "sum");
   const [trafficResetDay, setTrafficResetDay] = useState(node.traffic_reset_day ?? 0);
   const [trafficResetTime, setTrafficResetTime] = useState(() =>
     normalizeTrafficResetTime(node.traffic_reset_time),
@@ -3532,8 +3577,10 @@ function EditButton({ node }: { node: NodeDetail }) {
   const [trafficResetTimezone, setTrafficResetTimezone] = useState(() =>
     normalizeTrafficResetTimezone(node.traffic_reset_timezone),
   );
-  const [regionOverride, setRegionOverride] = useState("");
-  const [trafficResetAllowance, setTrafficResetAllowance] = useState(0);
+  const [regionOverride, setRegionOverride] = useState(() =>
+    node.region_override ? getRegionCode(node.region_override) : "",
+  );
+  const [trafficResetAllowance, setTrafficResetAllowance] = useState(node.traffic_reset_allowance ?? 0);
   const pendingSavedEditRef = React.useRef<{
     hidden: boolean;
     traffic_limit: number;
@@ -3546,21 +3593,24 @@ function EditButton({ node }: { node: NodeDetail }) {
   } | null>(null);
 
   const regionOptions = React.useMemo(
-    () => [
-      {
-        label: t("admin.nodeEdit.regionAuto", "自动识别"),
-        value: "",
-      },
-      ...getSupportedRegions().map((region) => {
-        const code = getRegionCode(region);
-        return {
-          label: `${code} ${getRegionDisplayName(region, i18n.language.startsWith("zh") ? "zh" : "en")}`,
-          value: code,
-          icon: <Flag flag={code} compact />,
-        };
-      }),
-    ],
-    [i18n.language, t],
+    () => {
+      if (!open) return [];
+      return [
+        {
+          label: t("admin.nodeEdit.regionAuto", "自动识别"),
+          value: "",
+        },
+        ...getSupportedRegions().map((region) => {
+          const code = getRegionCode(region);
+          return {
+            label: `${code} ${getRegionDisplayName(region, i18n.language.startsWith("zh") ? "zh" : "en")}`,
+            value: code,
+            icon: <Flag flag={code} compact />,
+          };
+        }),
+      ];
+    },
+    [open, i18n.language, t],
   );
 
   const editFormFromNode = () => ({
@@ -3695,17 +3745,18 @@ function EditButton({ node }: { node: NodeDetail }) {
       onOpenChange={(next) => {
         if (next || !pendingSavedEditRef.current) hydrateEditForm();
         setOpen(next);
+        if (!next) onClose?.();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton
           variant="ghost"
           title={t("admin.nodeEdit.editInfo", "编辑信息")}
         >
           <Pencil size="18" />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent
         maxWidth={920}
         className="km-node-dialog km-node-edit-dialog"
       >
@@ -3968,7 +4019,7 @@ function EditButton({ node }: { node: NodeDetail }) {
               : t("save", "保存")}
           </Button>
         </Flex>
-      </AppDialogContent>
+      </AppDialogContent> : null}
     </Dialog.Root>
   );
 }
@@ -4035,10 +4086,10 @@ function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | nu
   );
 }
 
-function BillingButton({ node }: { node: NodeDetail }) {
+function BillingButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [saving, setSaving] = useState(false);
   const [formEpoch, setFormEpoch] = useState(0);
   const [billingCycle, setBillingCycle] = React.useState("");
@@ -4074,6 +4125,13 @@ function BillingButton({ node }: { node: NodeDetail }) {
     };
     setFormEpoch((value) => value + 1);
   };
+
+  React.useLayoutEffect(() => {
+    if (open) hydrateBillingForm(node);
+    // Mounted already open, so the close-to-open handler never runs.
+    // A later list refresh must not wipe a draft that is already on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4155,17 +4213,18 @@ function BillingButton({ node }: { node: NodeDetail }) {
       onOpenChange={(next) => {
         if (next && !open) hydrateBillingForm(node);
         setOpen(next);
+        if (!next) onClose?.();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton
           variant="ghost"
           title={t("admin.nodeTable.billing", "账单")}
         >
           <CircleDollarSign size="18" />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent
         maxWidth={820}
         className="km-node-dialog km-node-billing-dialog"
       >
@@ -4295,7 +4354,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
             </Button>
           </Flex>
         </form>
-      </AppDialogContent>
+      </AppDialogContent> : null}
     </Dialog.Root>
   );
 }

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyPingLossSheet, type PingLossSheetForm } from "../src/pages/admin/notification/pingLossSheet.ts";
+import {
+  alertEnableAfterSectionChange,
+  applyPingLossSheet,
+  settlePingLossForm,
+  type PingLossSheetForm,
+} from "../src/pages/admin/notification/pingLossSheet.ts";
 
 const lossForm: PingLossSheetForm = {
   enable: true,
@@ -40,6 +45,27 @@ const savedLatency: PingLossSheetForm = {
   baselineWindowHours: 48,
   baselineMinimumSamples: 80,
 };
+
+test("turning off the last anomaly disables the rule instead of rejecting the form", () => {
+  const bothOn: PingLossSheetForm = { ...lossForm, lossEnabled: true, latencyEnabled: true, enable: true };
+  assert.equal(alertEnableAfterSectionChange(false, true, false, true), true);
+  assert.equal(alertEnableAfterSectionChange(false, false, false, true), false);
+  assert.equal(alertEnableAfterSectionChange(true, false, true, false), true);
+
+  const saved = { ...bothOn, latencyEnabled: false };
+  const closingLoss: PingLossSheetForm = { ...saved, lossEnabled: false, enable: true };
+  const settled = settlePingLossForm(applyPingLossSheet(saved, closingLoss, "loss"));
+  assert.equal(settled.lossEnabled, false);
+  assert.equal(settled.latencyEnabled, false);
+  assert.equal(settled.enable, false);
+
+  const closingLatency = settlePingLossForm(
+    applyPingLossSheet({ ...bothOn, lossEnabled: false }, { ...bothOn, latencyEnabled: false, enable: true }, "latency"),
+  );
+  assert.equal(closingLatency.lossEnabled, false);
+  assert.equal(closingLatency.latencyEnabled, false);
+  assert.equal(closingLatency.enable, false);
+});
 
 test("saving packet loss keeps each server's existing latency configuration", () => {
   const merged = applyPingLossSheet(savedLatency, lossForm, "loss");
