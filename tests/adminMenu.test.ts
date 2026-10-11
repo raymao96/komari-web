@@ -105,6 +105,7 @@ test("keeps the admin navigation in the intended groups", () => {
     remoteManagement?.children?.map((item) => item.path),
     [
       "/admin/exec",
+      "/admin/remote-management/schedules",
       "/admin/remote-management/mcp",
       "/admin/settings/xtermjs",
     ],

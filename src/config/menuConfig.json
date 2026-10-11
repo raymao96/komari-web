@@ -43,6 +43,11 @@
           "icon": "Code"
         },
         {
+          "labelKey": "scheduled_exec.title",
+          "path": "/admin/remote-management/schedules",
+          "icon": "Schedule"
+        },
+        {
           "labelKey": "mcp.title",
           "path": "/admin/remote-management/mcp",
           "icon": "Hub"

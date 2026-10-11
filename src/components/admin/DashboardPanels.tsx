@@ -618,7 +618,7 @@ export function LatencyPanel({
       <div className="grid min-h-[78px] grid-cols-1 items-center gap-3 md:grid-cols-[17rem_minmax(0,1fr)]">
         <div className="grid grid-cols-3 divide-x">
           {[
-            [charts ? `${charts.latency.average.toFixed(0)} ms` : "-", t("admin_dashboard.average_latency"), "text-foreground"],
+            [charts ? `${charts.latency.average.toFixed(2)} ms` : "-", t("admin_dashboard.average_latency"), "text-foreground"],
             [charts?.latency.targets ?? "-", t("admin_dashboard.monitor_targets"), "text-[var(--accent-11)]"],
             [warningCount, t("admin_dashboard.packet_loss_alerts"), "text-[var(--orange-11)]"],
           ].map(([value, label, color], index) => (
@@ -645,7 +645,7 @@ export function LatencyPanel({
                 content={({ active, payload, label }) => active && payload?.length ? (
                   <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
                     <div className="text-muted-foreground">{label}</div>
-                    <div className="mt-1 font-medium">{Number(payload[0]?.value ?? 0).toFixed(1)} ms</div>
+                    <div className="mt-1 font-medium">{Number(payload[0]?.value ?? 0).toFixed(2)} ms</div>
                   </div>
                 ) : null}
               />
@@ -1289,7 +1289,7 @@ function LatencyRankingBody({
           <DashboardRankingItem
             index={indexOffset + index}
             name={item.name}
-            value={`${item.average.toFixed(1)} ms`}
+            value={`${item.average.toFixed(2)} ms`}
             progress={(
               <div
                 className="h-full rounded-full bg-[var(--orange-9)]"
@@ -1416,7 +1416,7 @@ function LatencyJitterRankingBody({
             <DashboardRankingItem
               index={indexOffset + index}
               name={item.name}
-              value={`${item.delta > 0 ? "+" : ""}${item.delta.toFixed(1)} ms`}
+              value={`${item.delta > 0 ? "+" : ""}${item.delta.toFixed(2)} ms`}
               valueClassName={increased ? "text-[var(--orange-11)]" : item.delta < 0 ? "text-[var(--green-11)]" : ""}
               progress={(
                 <div
@@ -1428,9 +1428,9 @@ function LatencyJitterRankingBody({
                 <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <span className="min-w-0 truncate">{item.task_name}</span>
                   <span className="flex shrink-0 items-center justify-end gap-1 tabular-nums">
-                    <span>{t("admin_dashboard.previous_minute")} {item.previous.toFixed(1)} ms</span>
+                    <span>{t("admin_dashboard.previous_minute")} {item.previous.toFixed(2)} ms</span>
                     <ArrowRight size={11} aria-hidden="true" />
-                    <span>{t("admin_dashboard.current_minute")} {item.current.toFixed(1)} ms</span>
+                    <span>{t("admin_dashboard.current_minute")} {item.current.toFixed(2)} ms</span>
                   </span>
                 </div>
               )}

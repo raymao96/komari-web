@@ -5,7 +5,9 @@ import test from "node:test";
 import {
   BILLING_CURRENCY_STORAGE_KEY,
   billingQuery,
+  displayedRemainingDays,
   formatBillingMoney,
+  formatNodeRenewPrice,
   isLongTermExpiry,
   remainingExpiryDays,
 } from "../src/utils/billing.ts";
@@ -29,6 +31,41 @@ test("treats stored long-term expiry as long term in the server list", () => {
   assert.equal(formatBillingMoney(null, "CNY"), "--");
   assert.match(pageSource, /isLongTermExpiry\(server\.expired_at\)/);
   assert.match(pageSource, /common\.long_term/);
+});
+
+test("free servers keep a finite expiry and show free plus the billing cycle", () => {
+  const expire = "2026-10-28T10:48:41.000Z";
+  const now = Date.parse("2026-10-07T00:00:00.000Z");
+  assert.equal(displayedRemainingDays(expire, null, now), remainingExpiryDays(expire, now));
+  assert.equal(displayedRemainingDays(expire, 21, now), 21);
+  assert.equal(displayedRemainingDays(null, null, now), null);
+  assert.equal(
+    formatNodeRenewPrice({
+      price: -1,
+      currency: "$",
+      cycleLabel: "月付",
+      freeLabel: "免费",
+    }),
+    "免费 / 月付",
+  );
+  assert.equal(
+    formatNodeRenewPrice({
+      price: 4,
+      currency: "$",
+      cycleLabel: "月付",
+      freeLabel: "免费",
+    }),
+    "$4.00 / 月付",
+  );
+  assert.equal(
+    formatNodeRenewPrice({ price: 0, currency: "$", freeLabel: "免费", emptyLabel: "—" }),
+    "—",
+  );
+  assert.match(pageSource, /displayedRemainingDays\(server\.expired_at, server\.remaining_days\)/);
+  assert.match(
+    readFileSync("src/pages/admin/NodeDetailPage.tsx", "utf8"),
+    /formatNodeRenewPrice\(/,
+  );
 });
 
 test("remaining expiry days match ceil remaining so sub-day still counts", () => {

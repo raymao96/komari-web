@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -56,6 +56,7 @@ export function useAdminShell() {
     null,
   );
   const [updatePhase, setUpdatePhase] = useState<UpdatePhase>("idle");
+  const updateInFlight = useRef(false);
   const [latestRelease, setLatestRelease] = useState<GithubReleaseInfo | null>(
     null,
   );
@@ -403,7 +404,7 @@ export function useAdminShell() {
   );
 
   const startSelfUpdate = useCallback(async () => {
-    if (!latestRelease || updatePhase !== "idle") return;
+    if (!latestRelease || updateInFlight.current) return;
     const targetVersion = latestRelease.tag_name || latestRelease.name || "";
     const targetHash = parseReleaseVersionHash(latestRelease.body);
     if (!targetVersion || !targetHash) {
@@ -415,6 +416,7 @@ export function useAdminShell() {
       );
       return;
     }
+    updateInFlight.current = true;
     setUpdatePhase("preparing");
     try {
       await callViaHTTP(
@@ -426,14 +428,21 @@ export function useAdminShell() {
       toast.info(t("common.self_update_restarting", "更新已校验，服务正在重启"));
       await waitForUpdatedService(targetVersion, targetHash);
     } catch (error) {
-      const message =
+      updateInFlight.current = false;
+      const raw =
         error instanceof Error
           ? error.message
           : t("common.self_update_failed", "自动更新失败");
+      const message = raw.includes("already running")
+        ? t(
+            "common.self_update_already_running",
+            "已经有一次更新在进行，请等这次结束或稍后再试",
+          )
+        : raw;
       toast.error(message);
       setUpdatePhase("idle");
     }
-  }, [callViaHTTP, latestRelease, t, updatePhase, waitForUpdatedService]);
+  }, [callViaHTTP, latestRelease, t, waitForUpdatedService]);
 
   return {
     reduceMotion,

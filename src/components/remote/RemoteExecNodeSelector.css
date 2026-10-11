@@ -6,6 +6,83 @@
   overflow-x: auto;
 }
 
+.scheduled-exec-node-picker .remote-exec-node-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.scheduled-exec-node-picker .remote-exec-node-table-wrap,
+.scheduled-exec-node-picker .remote-exec-node-table-wrap [data-slot="table-container"] {
+  overflow-x: hidden;
+}
+
+.scheduled-exec-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scheduled-exec-choices button {
+  min-width: 72px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--gray-a7);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.scheduled-exec-choices button.is-selected {
+  border-color: #078dee;
+  background: transparent;
+  box-shadow: 0 0 0 3px rgba(7, 141, 238, 0.1);
+}
+
+html.dark .scheduled-exec-choices button.is-selected {
+  box-shadow: 0 0 0 3px rgba(7, 141, 238, 0.16);
+}
+
+.scheduled-exec-interval-input {
+  width: 7rem;
+  flex: 0 0 7rem;
+}
+
+.scheduled-exec-interval input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.scheduled-exec-interval input[type="number"]::-webkit-inner-spin-button,
+.scheduled-exec-interval input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scheduled-exec-time-field {
+  position: relative;
+}
+
+.scheduled-exec-time input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.scheduled-exec-time-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--gray-11);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
 .remote-exec-node-identity {
   display: flex;
   min-width: 0;
