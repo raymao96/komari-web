@@ -21,6 +21,7 @@ export interface SettingsResponse {
   auto_order_new_clients_by_region: boolean;
   allow_remote_management: boolean;
   allow_mcp: boolean;
+  github_proxy: string;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
   o_auth_provider: string;
@@ -40,6 +41,7 @@ const createDefaultSettings = (): SettingsResponse => ({
   auto_order_new_clients_by_region: false,
   allow_remote_management: false,
   allow_mcp: false,
+  github_proxy: "",
   geo_ip_enabled: false,
   geo_ip_provider: "",
   o_auth_provider: "",

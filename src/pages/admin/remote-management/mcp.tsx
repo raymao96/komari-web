@@ -90,6 +90,7 @@ import {
   NODE_ONLINE,
 } from "@/theme/brand";
 import { sameOriginFetchInit } from "@/utils/security";
+import { mcpAuthorizationPolicy } from "@/utils/mcpAuthorization";
 import i18n from "@/i18n/config";
 import {
   MCP_DURATION_PRESETS,
@@ -134,6 +135,7 @@ type MCPLease = {
   note: string;
   mode?: string;
   target_uuids: string[];
+  all_nodes?: boolean;
   created_at: string;
   expires_at: string;
   long_term?: boolean;
@@ -283,6 +285,7 @@ function MCPPageBody() {
   const [error, setError] = useState<string | null>(null);
   const [authorizedOpen, setAuthorizedOpen] = useState(false);
   const [authorizedRedirectURI, setAuthorizedRedirectURI] = useState("");
+  const [editingLease, setEditingLease] = useState<MCPLease | null>(null);
   const authorizeID = params.get("authorize")?.trim() || "";
   const prefillNodes = useMemo(
     () =>
@@ -440,12 +443,16 @@ function MCPPageBody() {
           leases={leases}
           operations={operations}
           onReload={load}
+          onEdit={setEditingLease}
           onOpenOperations={() => setTab("operations")}
-          onReauthorize={(uuids) => {
+          onReauthorize={(uuids, allNodes) => {
             setParams((current) => {
               const next = new URLSearchParams(current);
               next.set("authorize", current.get("authorize") || "new");
               if (uuids.length) next.set("nodes", uuids.join(","));
+              else next.delete("nodes");
+              if (allNodes) next.set("all_nodes", "true");
+              else next.delete("all_nodes");
               return next;
             });
           }}
@@ -460,6 +467,7 @@ function MCPPageBody() {
           open
           requestID={authorizeID === "new" ? "" : authorizeID}
           prefillNodes={prefillNodes}
+          prefillAllNodes={params.get("all_nodes") === "true"}
           settings={settings}
           onClose={() => {
             setParams((current) => {
@@ -467,6 +475,7 @@ function MCPPageBody() {
               next.delete("authorize");
               next.delete("nodes");
               next.delete("uuid");
+              next.delete("all_nodes");
               return next;
             });
           }}
@@ -477,6 +486,20 @@ function MCPPageBody() {
             setAuthorizedRedirectURI(uri);
             setAuthorizedOpen(true);
           }}
+        />
+      ) : null}
+
+      {settings && editingLease ? (
+        <MCPAuthorizeDialog
+          key={editingLease.id}
+          open
+          requestID=""
+          prefillNodes={editingLease.target_uuids}
+          editLease={editingLease}
+          settings={settings}
+          onClose={() => setEditingLease(null)}
+          onApproved={load}
+          onConnected={() => {}}
         />
       ) : null}
 
@@ -1112,7 +1135,7 @@ function CompactLeaseRow({
           gridColumn: { xs: "1", md: "auto" },
         }}
       >
-        <TruncatedText value={nodeNames(lease.target_uuids, nodes)} />
+        <TruncatedText value={leaseNodeNames(lease, nodes)} />
       </Box>
       <Stack
         direction="row"
@@ -1239,6 +1262,10 @@ function nodeNames(uuids: string[], nodes: NodeMap) {
   return uuids.map((uuid) => nodeDisplayName(nodes.get(uuid))).filter(Boolean).join("、");
 }
 
+function leaseNodeNames(lease: MCPLease, nodes: NodeMap) {
+  return lease.all_nodes ? String(i18n.t("mcp.all_servers")) : nodeNames(lease.target_uuids, nodes);
+}
+
 function clientDisplayName(lease: MCPLease | undefined, t: Translate) {
   return lease?.client_name || t("mcp.unknown_client");
 }
@@ -1344,12 +1371,14 @@ function MCPLeasesTab({
   onReload,
   onReauthorize,
   onOpenOperations,
+  onEdit,
 }: {
   leases: MCPLease[];
   operations: MCPOperation[];
   onReload: () => Promise<void>;
-  onReauthorize: (uuids: string[]) => void;
+  onReauthorize: (uuids: string[], allNodes?: boolean) => void;
   onOpenOperations: () => void;
+  onEdit: (lease: MCPLease) => void;
 }) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -1390,6 +1419,7 @@ function MCPLeasesTab({
         lease.client_name,
         lease.note,
         lease.owner_username,
+        lease.all_nodes ? t("mcp.all_servers") : "",
         ...lease.target_uuids.map((uuid) => nodeDisplayName(nodes.get(uuid))),
         ...lease.target_uuids.map((uuid) => nodeDisplayIP(nodes.get(uuid))),
       ]
@@ -1397,7 +1427,7 @@ function MCPLeasesTab({
         .toLowerCase();
       return hay.includes(needle);
     });
-  }, [leases, nodes, query, runningByLease, status]);
+  }, [leases, nodes, query, runningByLease, status, t]);
   const { page, setPage, pageItems, pageSize, setPageSize } = useAdminPagination(
     filtered,
     MCP_LEASES_PAGE_SIZE,
@@ -1566,7 +1596,7 @@ function MCPLeasesTab({
                       </Stack>
                     }
                     cells={[
-                      [t("mcp.col_servers"), nodeNames(lease.target_uuids, nodes)],
+                      [t("mcp.col_servers"), leaseNodeNames(lease, nodes)],
                       [t("mcp.col_mode"), <Badge key="mode" color="blue">{t("mcp.full_mode_short")}</Badge>],
                       [t("mcp.col_remaining"), leaseRemainingText(lease, now, t)],
                       [
@@ -1650,7 +1680,7 @@ function MCPLeasesTab({
                           </Stack>
                         </TableCell>
                         <TableCell data-label={t("mcp.col_servers")} className="overflow-hidden">
-                          <TruncatedText value={nodeNames(lease.target_uuids, nodes)} />
+                          <TruncatedText value={leaseNodeNames(lease, nodes)} />
                         </TableCell>
                         <TableCell data-label={t("mcp.col_mode")}>
                           <Badge color="blue">{t("mcp.full_mode_short")}</Badge>
@@ -1760,7 +1790,7 @@ function MCPLeasesTab({
               />
               <LeaseDetailItem
                 label={t("mcp.servers_label")}
-                value={nodeNames(selected.target_uuids, nodes) || "—"}
+                value={leaseNodeNames(selected, nodes) || "—"}
               />
               <LeaseDetailItem
                 label={t("mcp.access_window")}
@@ -1776,9 +1806,18 @@ function MCPLeasesTab({
               {t("mcp.revoke_hint")}
             </Typography>
             <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 2, flexWrap: "wrap" }}>
+              {selected.status === "active" ? (
+                <Button
+                  variant="contained"
+                  onClick={() => onEdit(selected)}
+                  sx={ADMIN_LIST_ACTION_SX}
+                >
+                  {t("mcp.edit_authorization")}
+                </Button>
+              ) : null}
               <Button
-                variant="contained"
-                onClick={() => onReauthorize(selected.target_uuids)}
+                variant="outlined"
+                onClick={() => onReauthorize(selected.target_uuids, selected.all_nodes)}
                 sx={ADMIN_LIST_ACTION_SX}
               >
                 {t("mcp.reauthorize")}
@@ -2192,7 +2231,7 @@ function MCPOperationsTab({
                       [
                         t("mcp.col_servers"),
                         extra && lease
-                          ? nodeNames(lease.target_uuids, nodes)
+                          ? leaseNodeNames(lease, nodes)
                           : nodeDisplayName(nodes.get(op.agent_uuid)),
                       ],
                       [
@@ -2249,7 +2288,7 @@ function MCPOperationsTab({
                         <TruncatedText
                           value={
                             extra
-                              ? nodeNames(lease.target_uuids, nodes)
+                              ? leaseNodeNames(lease, nodes)
                               : nodeDisplayName(nodes.get(op.agent_uuid))
                           }
                         />
@@ -2388,6 +2427,8 @@ function MCPAuthorizeDialog({
   onClose,
   onApproved,
   onConnected,
+  editLease,
+  prefillAllNodes = false,
 }: {
   open: boolean;
   requestID: string;
@@ -2396,6 +2437,8 @@ function MCPAuthorizeDialog({
   onClose: () => void;
   onApproved: () => Promise<void>;
   onConnected: (redirectURI: string) => void;
+  editLease?: MCPLease;
+  prefillAllNodes?: boolean;
 }) {
   const { t } = useTranslation();
   const compact = useMediaQuery("(max-width:599.95px)", { noSsr: true });
@@ -2411,11 +2454,13 @@ function MCPAuthorizeDialog({
     { id: string; client_name?: string; client_id?: string; redirect_uri?: string; ready?: boolean }[]
   >([]);
   const [selected, setSelected] = useState<string[]>(prefillNodes);
+  const [allNodes, setAllNodes] = useState(editLease?.all_nodes === true || prefillAllNodes);
   const [longTerm, setLongTerm] = useState(false);
+  const [changeDuration, setChangeDuration] = useState(false);
   const [preset, setPreset] = useState<number | "custom">(settings.mcp_default_duration_minutes);
   const [customUnit, setCustomUnit] = useState<DurationUnit>("minutes");
   const [customValue, setCustomValue] = useState("90");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(editLease?.note || "");
   const [secret, setSecret] = useState("");
   const [query, setQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -2429,11 +2474,16 @@ function MCPAuthorizeDialog({
   }, [prefillNodes]);
 
   useEffect(() => {
+    setAllNodes(editLease?.all_nodes === true || prefillAllNodes);
+  }, [editLease, prefillAllNodes]);
+
+  useEffect(() => {
     if (!open) {
       setPasskeyAvailable(false);
       return;
     }
-    setLongTerm(false);
+    if (editLease) setLongTerm(editLease.long_term === true);
+    else setLongTerm(false);
     fetch("/api/admin/account/passkeys")
       .then((response) => response.json())
       .then((body) => {
@@ -2441,10 +2491,10 @@ function MCPAuthorizeDialog({
         setPasskeyAvailable(items.length > 0);
       })
       .catch(() => setPasskeyAvailable(false));
-  }, [open]);
+  }, [open, editLease]);
 
   useEffect(() => {
-    if (!open || !requestID) {
+    if (!open || !requestID || editLease) {
       setMissingClient(!requestID);
       setClientName("");
       setClientID("");
@@ -2483,10 +2533,10 @@ function MCPAuthorizeDialog({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [open, requestID]);
+  }, [open, requestID, editLease]);
 
   useEffect(() => {
-    if (!open || requestID) {
+    if (!open || requestID || editLease) {
       setPendingRequests([]);
       return;
     }
@@ -2509,7 +2559,7 @@ function MCPAuthorizeDialog({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [open, requestID]);
+  }, [open, requestID, editLease]);
 
   const onlineSet = useMemo(
     () => new Set(liveData?.data.online ?? []),
@@ -2552,7 +2602,13 @@ function MCPAuthorizeDialog({
       : durationMinutes != null && durationMinutes > settings.mcp_max_duration_minutes
         ? "range"
         : null;
-  const canApproveBase = Boolean(requestID && !missingClient && requestReady && selected.length && durationMinutes && !durationError && !submitting && !denyingID);
+  const keepExpiry = Boolean(editLease && !changeDuration);
+  const canApproveBase = Boolean(
+    (editLease || (requestID && !missingClient && requestReady))
+    && (allNodes || selected.length)
+    && (keepExpiry || (durationMinutes && !durationError))
+    && !submitting && !denyingID,
+  );
   const canSubmit = Boolean(canApproveBase && secret);
 
   const denyRequest = async (id: string, closeAfter: boolean) => {
@@ -2576,7 +2632,7 @@ function MCPAuthorizeDialog({
   };
 
   const approveRequest = async (usePasskey: boolean) => {
-    if (!requestID) return;
+    if (!requestID && !editLease) return;
     setSubmitting(true);
     try {
       let ceremony_id: string | undefined;
@@ -2586,13 +2642,20 @@ function MCPAuthorizeDialog({
         ceremony_id = assertion.ceremony_id;
         credential = assertion.credential;
       }
-      const result = await mcpFetch<{ redirect_uri: string }>(`/api/admin/mcp/authorization-requests/${requestID}/approve`, {
+      const path = editLease
+        ? `/api/admin/mcp/leases/${editLease.id}`
+        : `/api/admin/mcp/authorization-requests/${requestID}/approve`;
+      const result = await mcpFetch<{ redirect_uri?: string }>(path, {
         method: "POST",
         body: JSON.stringify({
-          target_uuids: selected,
-          duration_minutes: durationMinutes,
-          long_term: useLongTerm,
-          note,
+          ...mcpAuthorizationPolicy({
+            selected,
+            allNodes,
+            keepExpiry,
+            durationMinutes,
+            longTerm: useLongTerm,
+            note,
+          }),
           password: usePasskey || twoFaEnabled ? undefined : secret,
           otp: usePasskey || !twoFaEnabled ? undefined : secret,
           ceremony_id,
@@ -2602,7 +2665,8 @@ function MCPAuthorizeDialog({
       setSecret("");
       await onApproved();
       onClose();
-      onConnected(result.redirect_uri || "");
+      if (editLease) toast.success(t("mcp.authorization_updated"));
+      else onConnected(result.redirect_uri || "");
     } catch (err) {
       const code = passkeyUnavailableMessage(err, "");
       if (code === "cancelled") {
@@ -2626,7 +2690,7 @@ function MCPAuthorizeDialog({
     borderRadius: compact ? 0 : "12px",
   } as const;
 
-  if (!requestID) {
+  if (!requestID && !editLease) {
     return (
       <Dialog
         open={open}
@@ -2756,9 +2820,9 @@ function MCPAuthorizeDialog({
           lineHeight: "28px",
         }}
       >
-        {t("mcp.authorize_title")}
+        {editLease ? t("mcp.edit_authorization") : t("mcp.authorize_title")}
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.625, fontWeight: 400 }}>
-          {t("mcp.authorize_subtitle")}
+          {editLease ? t("mcp.edit_authorization_hint") : t("mcp.authorize_subtitle")}
         </Typography>
         <IconButton onClick={onClose} sx={{ position: "absolute", right: 12, top: 12 }} aria-label={t("common.close")}>
           <X size={18} />
@@ -2808,11 +2872,11 @@ function MCPAuthorizeDialog({
           <Typography sx={{ fontSize: 13, lineHeight: 1.5 }}>{t("mcp.allow_servers")}</Typography>
           <Stack direction="row" spacing={1.25} sx={{ flexShrink: 0, alignItems: "baseline" }}>
             <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.5 }}>
-              {t("mcp.selected_count", { count: selected.length })}
+              {allNodes ? t("mcp.all_servers") : t("mcp.selected_count", { count: selected.length })}
             </Typography>
             <Button
               size="small"
-              disabled={selectableIds.length === 0}
+              disabled={allNodes || selectableIds.length === 0}
               onClick={toggleSelectAll}
               sx={{
                 textTransform: "none",
@@ -2829,6 +2893,21 @@ function MCPAuthorizeDialog({
             </Button>
           </Stack>
         </Stack>
+        <Box sx={{ mt: 1.25 }}>
+          <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}>
+            <Checkbox
+              checked={allNodes}
+              onChange={(_event, checked) => setAllNodes(checked)}
+              size="small"
+              slotProps={{ input: { "aria-label": t("mcp.all_servers"), "aria-describedby": "mcp-all-nodes-hint" } }}
+              sx={{ p: 0 }}
+            />
+            <Typography sx={{ fontSize: 13 }}>{t("mcp.all_servers")}</Typography>
+          </Box>
+          <Typography id="mcp-all-nodes-hint" sx={{ mt: 1, fontSize: 12, color: "text.secondary", lineHeight: "20px" }}>
+            {t("mcp.all_servers_hint")}
+          </Typography>
+        </Box>
         <Box sx={{ mt: 1.25 }}>
           <FieldBox
             icon={<Search size={17} />}
@@ -2853,7 +2932,7 @@ function MCPAuthorizeDialog({
           }}
         >
           {filtered.map((node) => {
-            const checked = selected.includes(node.uuid);
+            const checked = allNodes ? nodeSupportsMCP(node) : selected.includes(node.uuid);
             const region = getRegionCode(node.region);
             const capable = nodeSupportsMCP(node);
             const blocked = nodeMCPUnavailableReason(node);
@@ -2862,7 +2941,7 @@ function MCPAuthorizeDialog({
             return (
               <Box
                 key={node.uuid}
-                onClick={() => capable && setSelected((current) => current.includes(node.uuid) ? current.filter((id) => id !== node.uuid) : [...current, node.uuid])}
+                onClick={() => !allNodes && capable && setSelected((current) => current.includes(node.uuid) ? current.filter((id) => id !== node.uuid) : [...current, node.uuid])}
                 sx={{
                   px: 1.5,
                   py: 1.25,
@@ -2884,7 +2963,7 @@ function MCPAuthorizeDialog({
                 >
                   <Checkbox
                     checked={checked}
-                    disabled={!capable}
+                    disabled={allNodes || !capable}
                     size="small"
                     sx={{ p: 0, gridRow: "1 / 3", alignSelf: "center" }}
                   />
@@ -2989,7 +3068,19 @@ function MCPAuthorizeDialog({
             </Typography>
           </Stack>
         </Box>
-        <Box sx={{ mt: 2.5 }}>
+        {editLease ? (
+          <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 1, mt: 2.5, cursor: "pointer" }}>
+            <Checkbox
+              checked={changeDuration}
+              onChange={(_event, checked) => setChangeDuration(checked)}
+              size="small"
+              slotProps={{ input: { "aria-label": t("mcp.change_duration") } }}
+              sx={{ p: 0 }}
+            />
+            <Typography sx={{ fontSize: 13 }}>{t("mcp.change_duration")}</Typography>
+          </Box>
+        ) : null}
+        <Box hidden={keepExpiry} sx={{ mt: 2.5 }}>
             <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}>
               <Checkbox
                 checked={longTerm}
@@ -3004,7 +3095,7 @@ function MCPAuthorizeDialog({
               {t("mcp.long_term_authorization_hint")}
             </Typography>
           </Box>
-        <Box hidden={useLongTerm}>
+        <Box hidden={keepExpiry || useLongTerm}>
         <Typography sx={{ display: "block", fontSize: 13, mt: 2.5, mb: 1 }}>{t("mcp.duration_label")}</Typography>
         <Box
           sx={{
@@ -3145,21 +3236,21 @@ function MCPAuthorizeDialog({
       >
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button
+          {!editLease ? <Button
             color="error"
             variant="outlined"
             disabled={!requestID || missingClient || Boolean(denyingID) || submitting}
             onClick={() => void denyRequest(requestID, true)}
           >
             {t("mcp.deny")}
-          </Button>
+          </Button> : null}
           <Button
             variant="contained"
             disabled={!canSubmit}
             startIcon={<Check size={16} />}
             onClick={() => void approveRequest(false)}
           >
-            {t("mcp.authorize")}
+            {editLease ? t("common.save") : t("mcp.authorize")}
           </Button>
           {passkeyAvailable ? (
             <Button
@@ -3167,7 +3258,7 @@ function MCPAuthorizeDialog({
               disabled={!canApproveBase}
               onClick={() => void approveRequest(true)}
             >
-              {t("mcp.authorize_passkey")}
+              {editLease ? t("mcp.save_passkey") : t("mcp.authorize_passkey")}
             </Button>
           ) : null}
         </Stack>

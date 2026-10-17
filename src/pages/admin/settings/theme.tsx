@@ -13,6 +13,7 @@ import {
   TextField,
   Callout,
   Separator,
+  Switch,
 } from "@/components/admin/ui";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -26,6 +27,7 @@ import {
   AlertTriangle,
   Loader2,
   Store,
+  Timer,
 } from "@/components/admin/muiIcons";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -71,6 +73,32 @@ interface Theme {
   configuration?: any;
 }
 
+interface ThemeUpdateItem {
+  short: string;
+  name?: I18nText;
+  status: "updated" | "current" | "skipped" | "failed" | string;
+  version?: string;
+  message?: string;
+}
+
+interface ThemeUpdateSummary {
+  results?: ThemeUpdateItem[];
+  updated: number;
+  current: number;
+  skipped: number;
+  failed: number;
+}
+
+interface ThemeAutoUpdateSettings {
+  enabled: boolean;
+  interval_hours: number;
+  next_run_at?: number;
+  last_run_at?: number;
+  last_summary?: ThemeUpdateSummary;
+}
+
+const THEME_AUTO_UPDATE_PRESETS = [6, 12, 24, 72, 168] as const;
+
 const THEME_CHANGE_STORAGE_KEY = "lite-active-theme-changed";
 const LEGACY_THEME_CHANGE_STORAGE_KEY = "komari-active-theme-changed";
 
@@ -109,6 +137,21 @@ const ThemePage = () => {
     exists: boolean;
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [autoUpdate, setAutoUpdate] = useState<ThemeAutoUpdateSettings>({
+    enabled: false,
+    interval_hours: 24,
+  });
+  const [autoUpdateDialogOpen, setAutoUpdateDialogOpen] = useState(false);
+  const [autoUpdateDraftEnabled, setAutoUpdateDraftEnabled] = useState(false);
+  const [autoUpdateIntervalText, setAutoUpdateIntervalText] = useState("24");
+  const [autoUpdateSaving, setAutoUpdateSaving] = useState(false);
+  const [updateAllDialogOpen, setUpdateAllDialogOpen] = useState(false);
+  const [updateAllPhase, setUpdateAllPhase] = useState<
+    "confirm" | "running" | "result"
+  >("confirm");
+  const [updateAllSummary, setUpdateAllSummary] =
+    useState<ThemeUpdateSummary | null>(null);
+  const [updatingAll, setUpdatingAll] = useState(false);
   const {
     settings,
     loading: settingsLoading,
@@ -433,6 +476,128 @@ const ThemePage = () => {
     }
   };
 
+  const formatUnixTime = (value?: number) => {
+    if (!value) return "";
+    return new Date(value * 1000).toLocaleString();
+  };
+
+  const themeUpdateStatusText = (item: ThemeUpdateItem) => {
+    if (item.status === "updated") {
+      return t("theme.update_all_status_updated", {
+        version: item.version || "",
+      });
+    }
+    if (item.status === "current") return t("theme.update_all_status_current");
+    if (item.status === "skipped") return t("theme.update_all_status_skipped");
+    return item.message || t("theme.update_all_status_failed");
+  };
+
+  const parsedAutoUpdateInterval = Number(autoUpdateIntervalText);
+  const autoUpdateIntervalValid =
+    Number.isInteger(parsedAutoUpdateInterval) &&
+    parsedAutoUpdateInterval >= 1 &&
+    parsedAutoUpdateInterval <= 720;
+
+  const openAutoUpdateDialog = () => {
+    setAutoUpdateDraftEnabled(autoUpdate.enabled);
+    setAutoUpdateIntervalText(String(autoUpdate.interval_hours || 24));
+    setAutoUpdateDialogOpen(true);
+  };
+
+  const saveAutoUpdate = async () => {
+    if (!autoUpdateIntervalValid) {
+      toast.error(t("theme.auto_update_invalid_interval"));
+      return;
+    }
+    setAutoUpdateSaving(true);
+    try {
+      const response = await fetch("/api/admin/theme/auto-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: autoUpdateDraftEnabled,
+          interval_hours: parsedAutoUpdateInterval,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.status === "error") {
+        throw new Error(data.message || t("theme.auto_update_save_failed"));
+      }
+      if (data.data) setAutoUpdate(data.data);
+      toast.success(t("theme.auto_update_saved"));
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : t("theme.auto_update_save_failed"),
+      );
+    } finally {
+      setAutoUpdateSaving(false);
+    }
+  };
+
+  const updateAllThemes = async () => {
+    setUpdatingAll(true);
+    setUpdateAllPhase("running");
+    setUpdateAllSummary(null);
+    try {
+      const response = await fetch("/api/admin/theme/update-all", {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok || data.status === "error") {
+        throw new Error(data.message || t("theme.update_failed"));
+      }
+      const summary = (data.data || null) as ThemeUpdateSummary | null;
+      setUpdateAllSummary(summary);
+      setUpdateAllPhase("result");
+      const updatedActive = summary?.results?.some(
+        (item) => item.status === "updated" && item.short === currentTheme,
+      );
+      if (updatedActive) {
+        await clearThemeNavigationCache();
+      }
+      await fetchThemes();
+    } catch (err) {
+      setUpdateAllDialogOpen(false);
+      toast.error(
+        err instanceof Error ? err.message : t("theme.update_failed"),
+      );
+    } finally {
+      setUpdatingAll(false);
+    }
+  };
+
+  const renderThemeUpdateResults = (summary: ThemeUpdateSummary | null) => {
+    if (!summary) return null;
+    return (
+      <Box className="space-y-3">
+        <Text size="2">
+          {t("theme.update_all_summary", {
+            updated: summary.updated || 0,
+            current: summary.current || 0,
+            skipped: summary.skipped || 0,
+            failed: summary.failed || 0,
+          })}
+        </Text>
+        <Box className="max-h-64 space-y-2 overflow-auto">
+          {(summary.results || []).map((item) => (
+            <Flex key={item.short} justify="between" align="start" gap="3">
+              <Text size="2" className="min-w-0">
+                {displayText(item.name) || item.short}
+              </Text>
+              <Text
+                size="1"
+                color={item.status === "failed" ? "red" : "gray"}
+                className="shrink-0 text-right"
+              >
+                {themeUpdateStatusText(item)}
+              </Text>
+            </Flex>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
   // 同步活跃状态
   useEffect(() => {
     refreshInstalledThemes()
@@ -441,6 +606,23 @@ const ThemePage = () => {
         setError(err instanceof Error ? err.message : "Failed to fetch themes");
       })
       .finally(() => setThemesLoading(false));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/theme/auto-update")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled && data?.status === "success" && data.data) {
+          setAutoUpdate(data.data);
+        }
+      })
+      .catch(() => {
+        // The dialog still opens with the default interval when this read fails.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -511,6 +693,32 @@ const ThemePage = () => {
           >
             <Download size={16} />
             {t("theme.import")}
+          </Button>
+          <Button
+            variant="soft"
+            className="w-full justify-center gap-2 whitespace-nowrap sm:w-auto"
+            disabled={themes.length === 0 || updatingAll}
+            onClick={() => {
+              setUpdateAllPhase("confirm");
+              setUpdateAllSummary(null);
+              setUpdateAllDialogOpen(true);
+            }}
+          >
+            {updatingAll ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
+            {t("theme.update_all")}
+          </Button>
+          <Button
+            variant="soft"
+            color={autoUpdate.enabled ? "green" : undefined}
+            className="w-full justify-center gap-2 whitespace-nowrap sm:w-auto"
+            onClick={openAutoUpdateDialog}
+          >
+            <Timer size={16} />
+            {t("theme.auto_update")}
           </Button>
         </div>
       </Flex>
@@ -953,6 +1161,155 @@ const ThemePage = () => {
                 {t("theme.import_confirm")}
               </Button>
             )}
+          </Flex>
+        </AppDialogContent>
+      </Dialog.Root>
+
+      <Dialog.Root
+        open={updateAllDialogOpen}
+        onOpenChange={(open) => {
+          if (updatingAll) return;
+          setUpdateAllDialogOpen(open);
+        }}
+      >
+        <AppDialogContent
+          maxWidth="520px"
+          title={
+            updateAllPhase === "result"
+              ? t("theme.update_all_done")
+              : t("theme.update_all_title")
+          }
+          description={
+            updateAllPhase === "running"
+              ? t("theme.update_all_running_hint")
+              : t("theme.update_all_description")
+          }
+        >
+          <Box className="mt-4">
+            {updateAllPhase === "running" ? (
+              <Flex align="center" gap="2">
+                <Loader2 size={16} className="animate-spin" />
+                <Text size="2">{t("theme.update_all_running")}</Text>
+              </Flex>
+            ) : null}
+            {updateAllPhase === "result"
+              ? renderThemeUpdateResults(updateAllSummary)
+              : null}
+          </Box>
+          <Flex gap="3" mt="4" justify="end">
+            {updateAllPhase === "confirm" ? (
+              <Dialog.Close>
+                <Button variant="soft" color="gray">
+                  {t("common.cancel")}
+                </Button>
+              </Dialog.Close>
+            ) : null}
+            {updateAllPhase === "confirm" ? (
+              <Button disabled={updatingAll} onClick={updateAllThemes}>
+                {t("theme.update_all_confirm")}
+              </Button>
+            ) : null}
+            {updateAllPhase === "result" ? (
+              <Dialog.Close>
+                <Button>{t("common.close")}</Button>
+              </Dialog.Close>
+            ) : null}
+          </Flex>
+        </AppDialogContent>
+      </Dialog.Root>
+
+      <Dialog.Root
+        open={autoUpdateDialogOpen}
+        onOpenChange={setAutoUpdateDialogOpen}
+      >
+        <AppDialogContent
+          maxWidth="520px"
+          title={t("theme.auto_update_title")}
+          description={t("theme.auto_update_description")}
+        >
+          <Box className="mt-4 space-y-4">
+            <Flex align="center" justify="between" gap="3">
+              <Text size="2">{t("theme.auto_update_enable")}</Text>
+              <Switch
+                checked={autoUpdateDraftEnabled}
+                disabled={autoUpdateSaving}
+                onCheckedChange={setAutoUpdateDraftEnabled}
+              />
+            </Flex>
+            <Box className="space-y-2">
+              <Text size="2">{t("theme.auto_update_interval")}</Text>
+              <Flex align="center" gap="2">
+                <Box className="w-28">
+                  <TextField.Root
+                    type="number"
+                    min={1}
+                    max={720}
+                    value={autoUpdateIntervalText}
+                    disabled={autoUpdateSaving}
+                    onChange={(event) =>
+                      setAutoUpdateIntervalText(event.target.value)
+                    }
+                  />
+                </Box>
+                <Text size="2" color="gray">
+                  {t("theme.auto_update_interval_unit")}
+                </Text>
+              </Flex>
+              <Flex gap="2" wrap="wrap">
+                {THEME_AUTO_UPDATE_PRESETS.map((hours) => (
+                  <Button
+                    key={hours}
+                    size="1"
+                    variant={
+                      parsedAutoUpdateInterval === hours ? "solid" : "soft"
+                    }
+                    disabled={autoUpdateSaving}
+                    onClick={() => setAutoUpdateIntervalText(String(hours))}
+                  >
+                    {t(`theme.auto_update_preset_${hours}`)}
+                  </Button>
+                ))}
+              </Flex>
+              <Text size="1" color={autoUpdateIntervalValid ? "gray" : "red"}>
+                {autoUpdateIntervalValid
+                  ? t("theme.auto_update_interval_hint")
+                  : t("theme.auto_update_invalid_interval")}
+              </Text>
+            </Box>
+            {autoUpdate.enabled && autoUpdate.next_run_at ? (
+              <Text size="2" color="gray">
+                {t("theme.auto_update_next", {
+                  time: formatUnixTime(autoUpdate.next_run_at),
+                })}
+              </Text>
+            ) : null}
+            {autoUpdate.last_run_at ? (
+              <Text size="2" color="gray">
+                {t("theme.auto_update_last", {
+                  time: formatUnixTime(autoUpdate.last_run_at),
+                })}
+              </Text>
+            ) : null}
+            {autoUpdate.last_summary
+              ? renderThemeUpdateResults(autoUpdate.last_summary)
+              : null}
+          </Box>
+          <Flex gap="3" mt="4" justify="end">
+            <Dialog.Close>
+              <Button variant="soft" color="gray" disabled={autoUpdateSaving}>
+                {t("common.cancel")}
+              </Button>
+            </Dialog.Close>
+            <Button
+              disabled={!autoUpdateIntervalValid || autoUpdateSaving}
+              onClick={saveAutoUpdate}
+              className="gap-2"
+            >
+              {autoUpdateSaving ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : null}
+              {t("save")}
+            </Button>
           </Flex>
         </AppDialogContent>
       </Dialog.Root>

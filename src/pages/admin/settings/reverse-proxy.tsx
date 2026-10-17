@@ -389,7 +389,7 @@ function HTTPSPanel({ onReady }: { onReady: () => void }) {
         title={t("settings.reverse_proxy.enable_https", "Enable built-in HTTPS")}
         description={t(
           "settings.reverse_proxy.enable_https_description",
-          "When enabled, Lite provides HTTPS access for both the web UI and Agent APIs.",
+          "When enabled, 轻量.Lite provides HTTPS access for both the web UI and Agent APIs.",
         )}
       >
         <SettingCard.Action>
@@ -448,7 +448,7 @@ function HTTPSPanel({ onReady }: { onReady: () => void }) {
         title={t("settings.reverse_proxy.certificate_paths", "Certificate paths")}
         description={t(
           "settings.reverse_proxy.certificate_paths_description",
-          "Lite reads the certificate and private key from the server. Docker users should mount the certificate directory first and enter its path inside the container.",
+          "轻量.Lite reads the certificate and private key from the server. Docker users should mount the certificate directory first and enter its path inside the container.",
         )}
         direction="column"
       >
@@ -702,7 +702,7 @@ function CloudflareTunnelPanel({ onReady }: { onReady: () => void }) {
             <Text size="2" color="gray">
               {t(
                 "settings.reverse_proxy.env_token_hint",
-                "Environment variable `KOMARI_CLOUDFLARED_TOKEN` is present. Lite will try to restore cloudflared automatically on restart."
+                "Environment variable `KOMARI_CLOUDFLARED_TOKEN` is present. 轻量.Lite will try to restore cloudflared automatically on restart."
               )}
             </Text>
           ) : null}
@@ -917,7 +917,7 @@ function CloudflareTunnelPanel({ onReady }: { onReady: () => void }) {
           <Dialog.Description>
             {t(
               "settings.reverse_proxy.stop_dialog_description",
-              "If you are currently accessing Lite through this tunnel, stopping cloudflared may immediately disconnect your session."
+              "If you are currently accessing 轻量.Lite through this tunnel, stopping cloudflared may immediately disconnect your session."
             )}
           </Dialog.Description>
 

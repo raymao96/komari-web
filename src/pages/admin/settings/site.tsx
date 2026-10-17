@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { LITE_NAME } from "@/theme/brand";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import {
   SettingsAlert,
@@ -167,7 +168,7 @@ export default function SiteSettings() {
           sx={{ width: 52, height: 52, objectFit: "contain", flexShrink: 0 }}
         />
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography sx={{ fontSize: 20, fontWeight: 700 }}>{settings.sitename || "Lite"}</Typography>
+          <Typography sx={{ fontSize: 20, fontWeight: 700 }}>{settings.sitename || LITE_NAME}</Typography>
           <Typography sx={{ fontSize: 15, color: "text.secondary", lineHeight: 1.7 }}>
             {settings.description || t("settings.site.no_description", "未设置描述")}
           </Typography>
@@ -202,7 +203,7 @@ export default function SiteSettings() {
           icon={<Globe size={24} />}
           title={t("settings.site.basic_title", "基本信息")}
           description={t("settings.site.basic_description", "站点名称、描述与安装命令中的站点地址")}
-          meta={t("settings.site.current_site", "当前站点名称：{{name}}", { name: settings.sitename || "Lite" })}
+          meta={t("settings.site.current_site", "当前站点名称：{{name}}", { name: settings.sitename || LITE_NAME })}
           actionLabel={t("common.edit")}
           onAction={() => setPanel("basic")}
         />
@@ -1110,7 +1111,7 @@ function FaviconPanel({
           <Typography sx={{ fontSize: 12, lineHeight: 1.8, color: "text.secondary", textAlign: "center" }}>
             {t(
               "settings.site.reset_favicon_hint",
-              "当前自定义图标将被替换为 Lite 默认图标。之后可以重新上传。",
+              "当前自定义图标将被替换为 轻量.Lite 默认图标。之后可以重新上传。",
             )}
           </Typography>
         </Stack>

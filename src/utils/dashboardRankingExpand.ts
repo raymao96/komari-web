@@ -3,6 +3,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export const DASHBOARD_RANKING_ALL = 0;
 export const DASHBOARD_RANKING_PREFETCH_MS = 280;
 
+export type RankingOrder = "desc" | "asc";
+
+export function rankingOrdered<T>(items: readonly T[], order: RankingOrder): T[] {
+  if (order === "asc") return [...items].reverse();
+  return items.slice();
+}
+
+export function rankingPeak(values: readonly number[]): number {
+  let peak = 0;
+  for (const value of values) {
+    if (value > peak) peak = value;
+  }
+  return peak;
+}
+
+export function useRankingOrder(open: boolean) {
+  const [order, setOrder] = useState<RankingOrder>("desc");
+  useEffect(() => {
+    if (!open) setOrder("desc");
+  }, [open]);
+  const toggleOrder = useCallback(() => {
+    setOrder((current) => (current === "desc" ? "asc" : "desc"));
+  }, []);
+  return { order, toggleOrder };
+}
+
 export function useDashboardRankingExpand<T>(
   load: () => Promise<T>,
   options?: { allowPrefetch?: boolean },

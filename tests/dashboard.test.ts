@@ -238,10 +238,20 @@ test("ranking chips prefetch the full list on hover and open a dialog", () => {
     new URL("../src/components/admin/DashboardPanels.tsx", import.meta.url),
     "utf8",
   );
+  const css = readFileSync(new URL("../src/global.css", import.meta.url), "utf8");
   assert.match(source, /aria-haspopup="dialog"/);
   assert.match(source, /onMouseEnter=\{onPrefetch\}/);
   assert.match(source, /DASHBOARD_RANKING_ALL/);
   assert.match(source, /function DashboardRankingDialog/);
+  assert.match(source, /onToggleOrder/);
+  assert.match(source, /admin_dashboard\.ranking_asc/);
+  assert.match(source, /admin_dashboard\.ranking_desc/);
+  assert.match(source, /className="km-dashboard-chip km-dashboard-chip--muted"/);
+  assert.match(css, /\.km-dashboard-chip--muted/);
+  assert.doesNotMatch(source, /h-8 items-center gap-1 rounded-full border border-\[var\(--gray-a6\)\]/);
+  assert.match(source, /useRankingOrder/);
+  assert.match(source, /rankingOrdered/);
+  assert.match(source, /rankingPeak/);
   assert.match(source, /maxHeight: "88vh"/);
   assert.match(source, /maxWidth: 960/);
   assert.match(source, /function DashboardRankingPager/);
@@ -261,6 +271,9 @@ test("ranking chips prefetch the full list on hover and open a dialog", () => {
   assert.match(expand, /DASHBOARD_RANKING_PREFETCH_MS = 280/);
   assert.match(expand, /if \(!allowPrefetch\) return/);
   assert.match(expand, /if \(requestRef\.current\) return/);
+  assert.match(expand, /export function rankingOrdered/);
+  assert.match(expand, /export function rankingPeak/);
+  assert.match(expand, /export function useRankingOrder/);
   const api = readFileSync(
     new URL("../src/utils/dashboardApi.ts", import.meta.url),
     "utf8",

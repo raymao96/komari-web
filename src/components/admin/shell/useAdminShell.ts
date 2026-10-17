@@ -105,7 +105,7 @@ export function useAdminShell() {
     });
     const release = {
       tag_name: "2.2.3",
-      name: "Lite 2.2.3",
+      name: "轻量.Lite 2.2.3",
       html_url: "https://github.com/raymao96/komari/releases/tag/2.2.3",
       published_at: new Date().toISOString(),
       body: [
@@ -114,7 +114,7 @@ export function useAdminShell() {
         "## 重要提示",
         "",
         "> [!IMPORTANT]",
-        "> Lite 2.3.0 版本 目前仍处于管理页面UI焕新阶段，更新会较为频繁，如果不是追新党，可以静待2.3.1 版本更新",
+        "> 轻量.Lite 2.3.0 版本 目前仍处于管理页面UI焕新阶段，更新会较为频繁，如果不是追新党，可以静待2.3.1 版本更新",
         "",
         "## 主要更新",
         "",

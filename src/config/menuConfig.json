@@ -16,6 +16,11 @@
       "icon": "Payments"
     },
     {
+      "labelKey": "navigation.alert_center",
+      "path": "/admin/notification/center",
+      "icon": "BellRing"
+    },
+    {
       "labelKey": "navigation.monitoring",
       "path": "/admin/monitoring",
       "icon": "Activity",

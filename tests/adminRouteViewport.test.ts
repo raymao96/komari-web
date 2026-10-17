@@ -202,6 +202,14 @@ test("legacy theme admin dashboard uses the same admin home view", () => {
     }),
     "/admin",
   );
+  assert.equal(
+    getAdminRouteViewKey({
+      pathname: "/admin-app/index.html",
+      search: "",
+      hash: "",
+    }),
+    "/admin",
+  );
 });
 
 test("legacy dashboard URL can replace Navigate with the real home outlet", () => {

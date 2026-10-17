@@ -1,6 +1,5 @@
 import Loading from "@/components/loading";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import { AdminSheetTabs, AdminTabLabel } from "@/components/admin/AdminSheetTabs";
 import {
   AdminListFiltersBar,
   AdminListSearch,
@@ -26,7 +25,6 @@ import {
   LoadAlertProvider,
   useLoadAlert,
   type LoadAlert,
-  type CurrentLoadAlert,
 } from "@/contexts/LoadAlertContext";
 import {
   NodeDetailsProvider,
@@ -35,36 +33,26 @@ import {
 
 import {
   AppDialogContent,
-  Badge,
   Button,
   Callout,
   Dialog,
-  DropdownMenu,
   Flex,
   IconButton,
   Select,
-  Tabs,
   TextField,
 } from "@/components/admin/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  BellOff,
-  BellRing,
   CircleAlert,
   MoreHorizontal,
   Pencil,
-  Settings2,
   Trash,
 } from "@/components/admin/muiIcons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { useAdminTabParam } from "@/hooks/useAdminTabParam";
-import { useHeldTab } from "@/hooks/useHeldTab";
 import { toast } from "sonner";
 import MuiButton from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
-
-const LOAD_VIEWS = ["configuration", "current"] as const;
 
 const LoadPage = () => {
   return (
@@ -77,24 +65,13 @@ const LoadPage = () => {
 };
 
 const InnerLayout = () => {
+  const { loadAlerts, isLoading, error } = useLoadAlert();
   const {
-    loadAlerts,
-    currentAlerts,
-    isLoading,
-    currentLoading,
-    error,
-    currentError,
-    refreshCurrent,
-  } = useLoadAlert();
-  const { isLoading: nodeDetailLoading, error: nodeDetailError } =
-    useNodeDetails();
-  const { nodeDetail } = useNodeDetails();
+    isLoading: nodeDetailLoading,
+    error: nodeDetailError,
+    nodeDetail,
+  } = useNodeDetails();
   const { t } = useTranslation();
-  const [view, setView] = useAdminTabParam(LOAD_VIEWS, "configuration", {
-    param: "view",
-  });
-  const currentReady = view !== "current" || currentAlerts !== null || Boolean(currentError);
-  const displayView = useHeldTab(view, currentReady);
   const [search, setSearch] = React.useState("");
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const sortedAlerts = React.useMemo(
@@ -113,41 +90,7 @@ const InnerLayout = () => {
         .sort((a, b) => (b.id ?? 0) - (a.id ?? 0)),
     [loadAlerts, nodeDetail, normalizedSearch],
   );
-  const sortedCurrentAlerts = React.useMemo(
-    () =>
-      (currentAlerts || [])
-        .filter((alert) => {
-          if (!normalizedSearch) return true;
-          const status = alert.silenced
-            ? t("notification.load.silenced")
-            : t("notification.load.not_silenced");
-          const node = nodeDetail.find((item) => item.uuid === alert.client);
-          return `${alert.notification_name} ${alert.client_name} ${alert.client} ${node?.ipv4 || ""} ${node?.ipv6 || ""} ${alert.metric} ${status}`
-            .toLocaleLowerCase()
-            .includes(normalizedSearch);
-        })
-        .slice()
-        .sort((a, b) => {
-          const left = a.active_since ? new Date(a.active_since).getTime() : 0;
-          const right = b.active_since ? new Date(b.active_since).getTime() : 0;
-          return right - left;
-        }),
-    [currentAlerts, nodeDetail, normalizedSearch, t],
-  );
-  const configurationPagination =
-    useAdminPagination(sortedAlerts);
-  const currentPagination = useAdminPagination(sortedCurrentAlerts);
-
-  React.useEffect(() => {
-    if (view !== "current") return;
-    void refreshCurrent().catch(() => {
-      toast.error(t("notification.load.current_fetch_failed"));
-    });
-    const timer = window.setInterval(() => {
-      void refreshCurrent().catch(() => undefined);
-    }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [refreshCurrent, t, view]);
+  const pagination = useAdminPagination(sortedAlerts);
 
   if ((isLoading && loadAlerts === null) || nodeDetailLoading) {
     return <Loading />;
@@ -175,56 +118,14 @@ const InnerLayout = () => {
         </Callout.Root>
       ) : null}
 
-      <Tabs.Root value={displayView} onValueChange={setView}>
-        <AdminSheetTabs>
-          <Tabs.List>
-            <Tabs.Trigger value="configuration">
-              <AdminTabLabel icon={<Settings2 size={18} />}>
-                {t("notification.load.configuration")}
-              </AdminTabLabel>
-            </Tabs.Trigger>
-            <Tabs.Trigger value="current">
-              <AdminTabLabel icon={<BellRing size={18} />}>
-                {t("notification.load.current_alerts")}
-              </AdminTabLabel>
-            </Tabs.Trigger>
-          </Tabs.List>
-        </AdminSheetTabs>
-        <Tabs.Content value="configuration" className="admin-tab-panel pt-3">
-          <AdminListShell>
-            <LoadListToolbar search={search} onSearchChange={setSearch} showAdd />
-            <LoadConfigurationTable
-              alerts={configurationPagination.pageItems}
-              total={sortedAlerts.length}
-              pagination={configurationPagination}
-            />
-          </AdminListShell>
-        </Tabs.Content>
-        <Tabs.Content value="current" className="admin-tab-panel pt-3">
-          <AdminListShell>
-            <LoadListToolbar search={search} onSearchChange={setSearch} />
-            {currentError ? (
-              <Callout.Root color="red" className="mb-3" role="alert">
-                <Callout.Icon>
-                  <CircleAlert size={16} />
-                </Callout.Icon>
-                <Callout.Text>{currentError}</Callout.Text>
-              </Callout.Root>
-            ) : null}
-            <CurrentLoadAlertsTable
-              alerts={currentPagination.pageItems}
-              total={sortedCurrentAlerts.length}
-              pagination={currentPagination}
-              loading={currentLoading && currentAlerts === null}
-            />
-          </AdminListShell>
-          <div className="mt-4 border-l-2 border-[var(--accent-8)] pl-3 text-sm leading-6 text-muted-foreground">
-            <span
-              dangerouslySetInnerHTML={{ __html: t("notification.load.silence_tips") }}
-            />
-          </div>
-        </Tabs.Content>
-      </Tabs.Root>
+      <AdminListShell>
+        <LoadListToolbar search={search} onSearchChange={setSearch} />
+        <LoadConfigurationTable
+          alerts={pagination.pageItems}
+          total={sortedAlerts.length}
+          pagination={pagination}
+        />
+      </AdminListShell>
     </Flex>
   );
 };
@@ -232,11 +133,9 @@ const InnerLayout = () => {
 const LoadListToolbar = ({
   search,
   onSearchChange,
-  showAdd = false,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
-  showAdd?: boolean;
 }) => {
   const { t } = useTranslation();
   return (
@@ -252,11 +151,9 @@ const LoadListToolbar = ({
           onChange={onSearchChange}
           placeholder={t("common.search")}
         />
-        {showAdd ? (
-          <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "center" }}>
-            <AddButton />
-          </Stack>
-        ) : null}
+        <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "center" }}>
+          <AddButton />
+        </Stack>
       </Stack>
     </AdminListFiltersBar>
   );
@@ -327,229 +224,6 @@ const LoadConfigurationTable = ({
 const EmptyState = ({ children }: { children: React.ReactNode }) => (
   <div className="km-admin-list-empty">{children}</div>
 );
-
-const CurrentLoadAlertsTable = ({
-  alerts,
-  total,
-  pagination,
-  loading,
-}: {
-  alerts: CurrentLoadAlert[];
-  total: number;
-  pagination: PaginationState<CurrentLoadAlert>;
-  loading: boolean;
-}) => {
-  const { t } = useTranslation();
-  const isMobile = useIsMobile();
-  if (loading) {
-    return (
-      <div className="km-admin-list-empty">
-        <Loading inline />
-      </div>
-    );
-  }
-  if (total === 0) {
-    return <EmptyState>{t("notification.load.no_current_alerts")}</EmptyState>;
-  }
-  return (
-    <>
-      {isMobile ? (
-        <AdminMobileCardStack>
-          {alerts.map((alert) => (
-            <CurrentLoadAlertRow
-              key={`${alert.notification_id}:${alert.client}`}
-              alert={alert}
-              asCard
-            />
-          ))}
-        </AdminMobileCardStack>
-      ) : (
-      <div className="admin-responsive-table-wrap overflow-x-auto">
-        <Table container={false} className="admin-responsive-table admin-primary-first-table min-w-[940px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("common.name")}</TableHead>
-              <TableHead>{t("common.server")}</TableHead>
-              <TableHead>{t("loadAlert.metric")}</TableHead>
-              <TableHead>{t("notification.load.current_value")}</TableHead>
-              <TableHead>{t("common.threshold")}</TableHead>
-              <TableHead>{t("notification.load.triggered_at")}</TableHead>
-              <TableHead>{t("notification.load.silence_status")}</TableHead>
-              <TableHead>{t("common.action")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {alerts.map((alert) => (
-              <CurrentLoadAlertRow
-                key={`${alert.notification_id}:${alert.client}`}
-                alert={alert}
-              />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      )}
-      <AdminPagination
-        page={pagination.page}
-        total={total}
-        pageSize={pagination.pageSize}
-        onPageChange={pagination.setPage}
-        onPageSizeChange={pagination.setPageSize}
-        showSummary={false}
-      />
-    </>
-  );
-};
-
-const formatLoadValue = (metric: string, value: number) => {
-  const unit = metric === "net_in" || metric === "net_out" ? " Mbps" : "%";
-  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)}${unit}`;
-};
-
-const CurrentLoadAlertRow = ({
-  alert,
-  asCard = false,
-}: {
-  alert: CurrentLoadAlert;
-  asCard?: boolean;
-}) => {
-  const { t } = useTranslation();
-  const { refreshCurrent } = useLoadAlert();
-  const { nodeDetail } = useNodeDetails();
-  const [saving, setSaving] = React.useState(false);
-  const node = nodeDetail.find((item) => item.uuid === alert.client);
-  const clientName = alert.client_name || node?.name || alert.client;
-  const clientAddress = node?.ipv4?.trim() || node?.ipv6?.trim() || "";
-  const setSilence = async (mode: "off" | "24h" | "3d" | "7d" | "forever") => {
-    setSaving(true);
-    try {
-      const response = await fetch("/api/admin/notification/load/silence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          notification_id: alert.notification_id,
-          client: alert.client,
-          mode,
-        }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.message || t("common.error"));
-      }
-      toast.success(
-        t(mode === "off" ? "notification.load.unsilenced_success" : "notification.load.silenced_success"),
-      );
-      await refreshCurrent();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("common.error"));
-    } finally {
-      setSaving(false);
-    }
-  };
-  const silenceLabel = alert.silenced_forever
-    ? t("notification.load.silenced_forever")
-    : alert.silenced && alert.silenced_until
-      ? t("notification.load.silenced_until", {
-          time: new Date(alert.silenced_until).toLocaleString(),
-        })
-      : t("notification.load.not_silenced");
-  const serverValue = (
-    <div className="min-w-0">
-      <div className="truncate">{clientName}</div>
-      {clientAddress ? (
-        <div className="truncate text-xs text-muted-foreground">{clientAddress}</div>
-      ) : null}
-    </div>
-  );
-  const silenceBadge = (
-    <Badge color={alert.silenced ? "orange" : "red"} variant="soft">
-      {silenceLabel}
-    </Badge>
-  );
-  const actionButtons = (
-        <div className="admin-card-actions flex items-center gap-2">
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              <IconButton
-                type="button"
-                variant="soft"
-                color={alert.silenced ? "orange" : "gray"}
-                disabled={saving}
-                title={t("notification.load.silence_action")}
-                aria-label={t("notification.load.silence_action")}
-              >
-                {alert.silenced ? <BellOff size={16} /> : <BellRing size={16} />}
-              </IconButton>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end">
-              {alert.silenced ? (
-                <DropdownMenu.Item onSelect={() => void setSilence("off")}>
-                  <BellRing size={15} />
-                  {t("notification.load.unsilence")}
-                </DropdownMenu.Item>
-              ) : null}
-              <DropdownMenu.Item onSelect={() => void setSilence("24h")}>
-                {t("notification.load.silence_24h")}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item onSelect={() => void setSilence("3d")}>
-                {t("notification.load.silence_3d")}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item onSelect={() => void setSilence("7d")}>
-                {t("notification.load.silence_7d")}
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator />
-              <DropdownMenu.Item color="orange" onSelect={() => void setSilence("forever")}>
-                {t("notification.load.silence_forever")}
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-        </div>
-  );
-
-  if (asCard) {
-    return (
-      <AdminMobileListCard
-        title={alert.notification_name}
-        cells={[
-          [t("common.server"), serverValue],
-          [t("loadAlert.metric"), alert.metric.toUpperCase()],
-          [t("notification.load.current_value"), formatLoadValue(alert.metric, alert.latest_value)],
-          [t("common.threshold"), formatLoadValue(alert.metric, alert.threshold)],
-          [t("notification.load.triggered_at"), alert.active_since ? new Date(alert.active_since).toLocaleString() : "-"],
-          [t("notification.load.silence_status"), silenceBadge],
-        ]}
-        actions={actionButtons}
-      />
-    );
-  }
-
-  return (
-    <TableRow>
-      <TableCell data-label={t("common.name")}>
-        <span className="font-medium">{alert.notification_name}</span>
-      </TableCell>
-      <TableCell data-label={t("common.server")}>
-        {serverValue}
-      </TableCell>
-      <TableCell data-label={t("loadAlert.metric")}>{alert.metric.toUpperCase()}</TableCell>
-      <TableCell data-label={t("notification.load.current_value")} className="tabular-nums">
-        {formatLoadValue(alert.metric, alert.latest_value)}
-      </TableCell>
-      <TableCell data-label={t("common.threshold")} className="tabular-nums">
-        {formatLoadValue(alert.metric, alert.threshold)}
-      </TableCell>
-      <TableCell data-label={t("notification.load.triggered_at")} className="whitespace-nowrap text-sm">
-        {alert.active_since ? new Date(alert.active_since).toLocaleString() : "-"}
-      </TableCell>
-      <TableCell data-label={t("notification.load.silence_status")}>
-        {silenceBadge}
-      </TableCell>
-      <TableCell data-label={t("common.action")}>
-        {actionButtons}
-      </TableCell>
-    </TableRow>
-  );
-};
 
 const Row = ({
   alert,

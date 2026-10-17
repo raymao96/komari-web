@@ -58,6 +58,7 @@ test("keeps the admin navigation in the intended groups", () => {
       "/admin",
       "/admin/servers",
       "/admin/billing",
+      "/admin/notification/center",
       "/admin/monitoring",
       "/admin/remote-management",
       "/admin/notifications",
@@ -96,6 +97,12 @@ test("keeps the admin navigation in the intended groups", () => {
     notifications?.children?.some(
       (item) => item.path === "/admin/settings/notification",
     ),
+  );
+  assert.equal(
+    notifications?.children?.some(
+      (item) => item.path === "/admin/notification/center",
+    ),
+    false,
   );
 
   const remoteManagement = menuConfig.menu.find(
@@ -290,7 +297,7 @@ test("admin route changes keep the main content out of a composited animation la
 });
 
 test("EULA acceptance closes only after settings persist successfully", () => {
-  assert.match(settingsAPISource, /return \{[\s\S]*setSettings,[\s\S]*updateSetting/);
+  assert.match(settingsAPISource, /return React\.useMemo\(\(\) => \(\{[\s\S]*setSettings,[\s\S]*updateSetting/);
   assert.match(
     adminLayoutSource,
     /loading \|\| error \|\| settings\.eula_accepted !== false/,
@@ -328,7 +335,6 @@ test("admin multi-sheet pages share the node-detail tab bar", () => {
     returnRoutePageSource,
     readFileSync(new URL("../src/pages/admin/settings/metrics.tsx", import.meta.url), "utf8"),
     readFileSync(new URL("../src/pages/admin/settings/reverse-proxy.tsx", import.meta.url), "utf8"),
-    readFileSync(new URL("../src/pages/admin/notification/load.tsx", import.meta.url), "utf8"),
     readFileSync(new URL("../src/pages/admin/notification/ping_loss.tsx", import.meta.url), "utf8"),
   ];
   for (const source of sheetPages) {
@@ -397,7 +403,7 @@ test("admin checkboxes share the active accent palette", () => {
 test("node selector dialogs keep a single select-all control", () => {
   assert.match(selectorSource, /km-search-before-content/);
   assert.match(selectorSource, /showHeaderSelectAll = true/);
-  assert.match(selectorSource, /showHeaderSelectAll \? \([\s\S]*aria-label=\{t\("common\.select_all"\)\}/);
+  assert.match(selectorSource, /showHeaderSelectAll && !maxCount \? \([\s\S]*aria-label=\{t\("common\.select_all"\)\}/);
   assert.match(nodeSelectorSource, /showHeaderSelectAll=\{false\}/);
 });
 

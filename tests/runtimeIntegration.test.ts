@@ -93,15 +93,15 @@ test("theme switching removes only Lite navigation and theme cache entries", () 
   assert.match(source, /cache\.delete\(request\)/);
 });
 
-test("load alert configuration and current-alert requests own separate states", () => {
+test("load alert configuration requests own a bootstrap state", () => {
   const source = readFileSync("src/contexts/LoadAlertContext.tsx", "utf8");
   const page = readFileSync("src/pages/admin/notification/load.tsx", "utf8");
-  assert.match(source, /const \[currentError, setCurrentError\]/);
   assert.match(source, /loadAlertBootstrapResource\.read\(accountKey\)/);
   assert.match(source, /const refresh = React\.useCallback\(async \(\) =>/);
   assert.match(source, /finally \{\s*setIsLoading\(false\)/);
   assert.match(page, /isLoading && loadAlerts === null/);
   assert.doesNotMatch(source, /void refresh\(\);\s*\}, \[refresh\]\)/);
+  assert.doesNotMatch(source, /\/api\/admin\/notification\/load\/current/);
 });
 
 test("deep routes use an origin-root favicon before backend rewriting", () => {

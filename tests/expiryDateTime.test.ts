@@ -3,9 +3,11 @@ import test from "node:test";
 
 import { remainingExpiryDays } from "../src/utils/billing.ts";
 import {
+  clampExpiryDateInput,
   earlyRenewPayload,
   expiryFieldsIfChanged,
   formatInstantInTimezone,
+  nowInExpiryTimezone,
   toExpiryLocalDateTime,
 } from "../src/lib/expiryDateTime.ts";
 
@@ -40,6 +42,17 @@ test("year 0001 placeholder formats as a four-digit local date", () => {
     }),
     null,
   );
+});
+
+test("expiry date input keeps a four-digit year", () => {
+  assert.equal(clampExpiryDateInput("202066-10-23"), "2020-10-23");
+  assert.equal(clampExpiryDateInput("2026-10-23"), "2026-10-23");
+  assert.equal(clampExpiryDateInput(""), "");
+  assert.equal(clampExpiryDateInput("2026-10"), "2026-10");
+  const now = nowInExpiryTimezone("Asia/Shanghai");
+  assert.ok(now);
+  assert.match(now.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(now.time, /^\d{2}:\d{2}:\d{2}$/);
 });
 
 test("early renew payload keeps the seen expiry and does not invent the next due", () => {

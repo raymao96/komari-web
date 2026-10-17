@@ -105,6 +105,10 @@ test("node detail overview keeps flag assets, spec icons, and HK preview values"
     "src/components/admin/shell/AdminSidebar.tsx",
     "utf8",
   );
+  const sidebarBrandSource = readFileSync(
+    "src/components/admin/shell/SidebarBrand.tsx",
+    "utf8",
+  );
   assert.match(flagSource, /getAppAssetUrl\(`assets\/flags\/\$\{resolvedFlagFileName\}\.svg`\)/);
   assert.doesNotMatch(flagSource, /@\/components\/admin\/ui/);
   assert.match(detailSource, /const iconWellSx = \{[\s\S]*width: 48,[\s\S]*height: 48/);
@@ -122,7 +126,8 @@ test("node detail overview keeps flag assets, spec icons, and HK preview values"
   assert.match(detailSource, /displayOrEmpty\(node\.ipv4\)/);
   assert.doesNotMatch(detailSource, /PREVIEW\.cores/);
   assert.doesNotMatch(detailSource, /PREVIEW\.ipv4/);
-  assert.match(sidebarSource, /getAppAssetUrl\("assets\/logo\.png/);
+  assert.match(sidebarBrandSource, /data-testid="sidebar-brand"/);
+  assert.match(sidebarBrandSource, /viewBox="0 0 32 32"/);
   assert.match(sidebarSource, /fontSize: 16/);
   assert.match(sidebarSource, /fontWeight: active \? 600 : 400/);
 });

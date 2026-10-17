@@ -45,6 +45,7 @@ import {
 import UploadDialog from "@/components/UploadDialog";
 import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import { uploadArchive } from "@/utils/archiveUpload";
+import { DEFAULT_SITE_DESCRIPTION, LITE_NAME } from "@/theme/brand";
 import { getAppAssetUrl } from "@/utils/assetUrl";
 import { sameOriginApiPath, sameOriginFetchInit } from "@/utils/security";
 import {
@@ -193,10 +194,8 @@ export default function Install() {
   const [passwordAgain, setPasswordAgain] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordAgain, setShowPasswordAgain] = useState(false);
-  const [sitename, setSitename] = useState("Lite");
-  const [description, setDescription] = useState(
-    "All your servers, one simple view.",
-  );
+  const [sitename, setSitename] = useState(LITE_NAME);
+  const [description, setDescription] = useState(DEFAULT_SITE_DESCRIPTION);
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>(() =>
     isSQLiteDSN(SQLITE_DEFAULT_DSN) ? "sqlite" : "external",
   );
@@ -675,7 +674,7 @@ export default function Install() {
             <Box
               component="img"
               src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
-              alt="Lite"
+              alt={LITE_NAME}
               sx={{ width: 54, height: 54, objectFit: "contain" }}
             />
             <Typography variant="h3" sx={{ mt: 2.25 }}>

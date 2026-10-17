@@ -68,6 +68,20 @@ test("overview preset exactly matches the default dashboard modules", () => {
   assert.equal(settings.modules.find((module) => module.id === "storage_detail")?.enabled, false);
   assert.equal(settings.modules.find((module) => module.id === "traffic_30d_summary")?.enabled, false);
   assert.equal(settings.modules.find((module) => module.id === "renewal_calendar")?.span, 4);
+  assert.equal(settings.timezone, "Asia/Shanghai");
+});
+
+test("dashboard timezone survives presets and defaults to Beijing time", () => {
+  assert.match(dashboardSettingsSource, /settings\.dashboard\.timezone/);
+  assert.match(dashboardSettingsSource, /listTrafficResetTimezones/);
+  assert.match(dashboardSettingsSource, /current\?\.timezone/);
+  const utc = sanitizeDashboardSettings({
+    ...dashboardSettingsForPreset("overview"),
+    timezone: "UTC",
+  });
+  assert.equal(utc.preset, "overview");
+  assert.equal(utc.timezone, "UTC");
+  assert.equal(sanitizeDashboardSettings({}).timezone, "Asia/Shanghai");
 });
 
 test("dashboard preview stacks on phones and restores the desktop grid", () => {

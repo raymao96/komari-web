@@ -16,6 +16,7 @@ import HomeOutlined from "@mui/icons-material/HomeOutlined";
 import HubOutlined from "@mui/icons-material/HubOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
 import MoreHoriz from "@mui/icons-material/MoreHoriz";
+import NotificationsActiveOutlined from "@mui/icons-material/NotificationsActiveOutlined";
 import NotificationsOutlined from "@mui/icons-material/NotificationsOutlined";
 import PaletteOutlined from "@mui/icons-material/PaletteOutlined";
 import PowerOffOutlined from "@mui/icons-material/PowerOffOutlined";
@@ -64,6 +65,7 @@ export const iconMap: Record<string, ReturnType<typeof wrapMuiIcon>> = {
   MessageCircleMore: wrapMuiIcon(ChatOutlined),
   Ellipsis: wrapMuiIcon(MoreHoriz),
   Bell: wrapMuiIcon(NotificationsOutlined),
+  BellRing: wrapMuiIcon(NotificationsActiveOutlined),
   Unplug: wrapMuiIcon(PowerOffOutlined),
   TrendingUp: wrapMuiIcon(TrendingUpOutlined),
   Users: wrapMuiIcon(GroupOutlined),

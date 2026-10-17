@@ -45,14 +45,35 @@ test("billing dialog hydrates from the latest node when opened", () => {
   assert.match(firstPane, /admin\.nodeTable\.billingCycle/);
 });
 
+test("billing expiry has a now shortcut next to long-term", () => {
+  assert.match(billingButtonSource, /nowInExpiryTimezone\(expiryTimezone\)/);
+  assert.match(billingButtonSource, /admin\.nodeTable\.setToNow/);
+  assert.match(billingButtonSource, /km-expiry-quick-actions/);
+  assert.match(billingButtonSource, /km-expiry-quick-action/);
+  const nowIndex = billingButtonSource.indexOf("admin.nodeTable.setToNow");
+  const longTermIndex = billingButtonSource.indexOf("admin.nodeTable.setToLongTerm");
+  assert.ok(nowIndex > 0 && longTermIndex > nowIndex);
+  const css = readFileSync(new URL("../src/global.css", import.meta.url), "utf8");
+  assert.match(css, /\.km-expiry-quick-actions \{[\s\S]*justify-content:\s*flex-end/);
+  assert.match(css, /\.km-expiry-quick-action \{[\s\S]*padding:\s*2px 0/);
+  const dateField = readFileSync(
+    new URL("../src/components/admin/ExpiryDateField.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(dateField, /min=\{EXPIRY_DATE_MIN\}/);
+  assert.match(dateField, /max=\{EXPIRY_DATE_MAX\}/);
+  assert.match(dateField, /clampExpiryDateInput/);
+  assert.match(dateField, /9999-12-31/);
+});
+
 test("billing expiry picker icons sit on the trailing edge", () => {
   const css = readFileSync(new URL("../src/global.css", import.meta.url), "utf8");
   assert.match(css, /km-expiry-date input\[type="date"\]::-webkit-calendar-picker-indicator/);
   assert.match(css, /km-traffic-reset-time input\[type="time"\]::-webkit-calendar-picker-indicator/);
   assert.match(css, /display:\s*none/);
-  const source = readFileSync(new URL("../src/pages/admin/index.tsx", import.meta.url), "utf8");
-  assert.match(source, /km-datetime-picker-icon/);
-  assert.match(source, /TextField\.Slot side="right"/);
+  const source = readFileSync(new URL("../src/components/admin/ExpiryDateField.tsx", import.meta.url), "utf8");
+  assert.match(source, /type="date"/);
+  assert.match(source, /min=\{EXPIRY_DATE_MIN\}/);
   assert.match(
     css,
     /km-node-billing-dialog \.km-node-dialog-pane:first-child \{[\s\S]*padding-bottom:\s*0/,

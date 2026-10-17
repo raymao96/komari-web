@@ -6,7 +6,9 @@ import { alpha } from "@mui/material/styles";
 import {
   Activity,
   AlertCircle,
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
   ArrowUpDown,
   BellRing,
   CheckCircle2,
@@ -54,7 +56,11 @@ import {
 import { formatBytes } from "@/utils/unitHelper";
 import {
   DASHBOARD_RANKING_ALL,
+  rankingOrdered,
+  rankingPeak,
   useDashboardRankingExpand,
+  useRankingOrder,
+  type RankingOrder,
 } from "@/utils/dashboardRankingExpand";
 import {
   getDashboardChartsSnapshot,
@@ -248,6 +254,8 @@ function DashboardRankingDialog({
   title,
   description,
   trailing,
+  order,
+  onToggleOrder,
   loading,
   footer,
   children,
@@ -257,11 +265,14 @@ function DashboardRankingDialog({
   title: string;
   description?: string;
   trailing?: React.ReactNode;
+  order?: RankingOrder;
+  onToggleOrder?: () => void;
   loading?: boolean;
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const { t } = useTranslation();
+  const ascending = order === "asc";
   return (
     <Dialog
       open={open}
@@ -297,6 +308,20 @@ function DashboardRankingDialog({
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
           <h2 className="min-w-0 text-base font-semibold text-foreground">{title}</h2>
           <div className="flex shrink-0 items-center gap-2">
+            {onToggleOrder ? (
+              <button
+                type="button"
+                onClick={onToggleOrder}
+                aria-pressed={ascending}
+                title={t("admin_dashboard.ranking_order")}
+                className="km-dashboard-chip km-dashboard-chip--muted"
+              >
+                {ascending ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+                {ascending
+                  ? t("admin_dashboard.ranking_asc")
+                  : t("admin_dashboard.ranking_desc")}
+              </button>
+            ) : null}
             {trailing}
             <button
               type="button"
@@ -854,15 +879,20 @@ export function ResourceRankingPanel({
     [accountKey],
   );
   const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
+  const { order, toggleOrder } = useRankingOrder(expand.open);
   const groups = resourceRankingGroups(t, data);
   const allGroups = expand.data ? resourceRankingGroups(t, expand.data) : groups;
-  const rankCount = Math.max(0, ...allGroups.map((group) => group.items.length));
+  const orderedGroups = allGroups.map((group) => ({
+    ...group,
+    items: rankingOrdered(group.items, order),
+  }));
+  const rankCount = Math.max(0, ...orderedGroups.map((group) => group.items.length));
   const rankSlots = React.useMemo(
     () => Array.from({ length: rankCount }, (_, index) => index),
     [rankCount],
   );
   const paging = useAdminPagination(rankSlots);
-  const dialogGroups = allGroups.map((group) => ({
+  const dialogGroups = orderedGroups.map((group) => ({
     ...group,
     items: group.items.slice(paging.pageStart, paging.pageStart + paging.pageSize),
   }));
@@ -885,6 +915,8 @@ export function ResourceRankingPanel({
         title={t("admin_dashboard.resource_ranking")}
         description={t("admin_dashboard.resource_ranking_hint")}
         trailing={<DashboardChip>{t("admin_dashboard.ranking_all")}</DashboardChip>}
+        order={order}
+        onToggleOrder={toggleOrder}
         loading={expand.loading && !expand.data}
         footer={(
           <DashboardRankingPager
@@ -1069,9 +1101,12 @@ export function DailyTrafficRankingPanel({
     [accountKey],
   );
   const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
+  const { order, toggleOrder } = useRankingOrder(expand.open);
   const items = charts?.traffic.ranking ?? [];
   const allItems = expand.data?.traffic.ranking ?? items;
-  const paging = useAdminPagination(allItems);
+  const orderedItems = rankingOrdered(allItems, order);
+  const paging = useAdminPagination(orderedItems);
+  const trafficPeak = rankingPeak(allItems.map((item) => item.billable));
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
@@ -1090,11 +1125,13 @@ export function DailyTrafficRankingPanel({
         title={t("admin_dashboard.daily_traffic_ranking")}
         description={t("admin_dashboard.daily_traffic_ranking_hint")}
         trailing={<DashboardChip><ArrowUpDown size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        order={order}
+        onToggleOrder={toggleOrder}
         loading={expand.loading && !expand.data}
         footer={(
           <DashboardRankingPager
             page={paging.page}
-            total={allItems.length}
+            total={orderedItems.length}
             pageSize={paging.pageSize}
             onPageChange={paging.setPage}
             onPageSizeChange={paging.setPageSize}
@@ -1106,7 +1143,7 @@ export function DailyTrafficRankingPanel({
           error={expand.error}
           items={paging.pageItems}
           indexOffset={paging.pageStart}
-          peak={allItems[0]?.billable}
+          peak={trafficPeak}
         />
       </DashboardRankingDialog>
     </section>
@@ -1206,9 +1243,12 @@ export function LatencyRankingPanel({
     [accountKey],
   );
   const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
+  const { order, toggleOrder } = useRankingOrder(expand.open);
   const items = charts?.latency.ranking ?? [];
   const allItems = expand.data?.latency.ranking ?? items;
-  const paging = useAdminPagination(allItems);
+  const orderedItems = rankingOrdered(allItems, order);
+  const paging = useAdminPagination(orderedItems);
+  const latencyPeak = rankingPeak(allItems.map((item) => item.average));
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
@@ -1227,11 +1267,13 @@ export function LatencyRankingPanel({
         title={t("admin_dashboard.latency_ranking")}
         description={t("admin_dashboard.latency_ranking_hint")}
         trailing={<DashboardChip tone="orange"><Timer size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        order={order}
+        onToggleOrder={toggleOrder}
         loading={expand.loading && !expand.data}
         footer={(
           <DashboardRankingPager
             page={paging.page}
-            total={allItems.length}
+            total={orderedItems.length}
             pageSize={paging.pageSize}
             onPageChange={paging.setPage}
             onPageSizeChange={paging.setPageSize}
@@ -1243,7 +1285,7 @@ export function LatencyRankingPanel({
           error={expand.error || expand.data?.latency.error || null}
           items={paging.pageItems}
           indexOffset={paging.pageStart}
-          peak={allItems[0]?.average}
+          peak={latencyPeak}
         />
       </DashboardRankingDialog>
     </section>
@@ -1327,10 +1369,12 @@ export function LatencyJitterRankingPanel({
     [accountKey],
   );
   const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
+  const { order, toggleOrder } = useRankingOrder(expand.open);
   const items = charts?.latency.jitter_ranking ?? [];
   const allItems = expand.data?.latency.jitter_ranking ?? items;
-  const paging = useAdminPagination(allItems);
-  const jitterPeak = Math.max(0, ...allItems.map((item) => Math.abs(item.delta)));
+  const orderedItems = rankingOrdered(allItems, order);
+  const paging = useAdminPagination(orderedItems);
+  const jitterPeak = rankingPeak(allItems.map((item) => Math.abs(item.delta)));
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
@@ -1349,11 +1393,13 @@ export function LatencyJitterRankingPanel({
         title={t("admin_dashboard.latency_jitter_ranking")}
         description={t("admin_dashboard.latency_jitter_ranking_hint")}
         trailing={<DashboardChip tone="orange"><Activity size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        order={order}
+        onToggleOrder={toggleOrder}
         loading={expand.loading && !expand.data}
         footer={(
           <DashboardRankingPager
             page={paging.page}
-            total={allItems.length}
+            total={orderedItems.length}
             pageSize={paging.pageSize}
             onPageChange={paging.setPage}
             onPageSizeChange={paging.setPageSize}
@@ -1461,9 +1507,12 @@ export function PacketLossRankingPanel({
     [accountKey],
   );
   const expand = useDashboardRankingExpand(loadAll, { allowPrefetch });
+  const { order, toggleOrder } = useRankingOrder(expand.open);
   const items = charts?.packet_loss?.ranking ?? [];
   const allItems = expand.data?.packet_loss?.ranking ?? items;
-  const paging = useAdminPagination(allItems);
+  const orderedItems = rankingOrdered(allItems, order);
+  const paging = useAdminPagination(orderedItems);
+  const packetLossPeak = rankingPeak(allItems.map((item) => item.loss_rate));
   return (
     <section className="h-full min-w-0 km-admin-surface p-3">
       <PanelHeader
@@ -1482,11 +1531,13 @@ export function PacketLossRankingPanel({
         title={t("admin_dashboard.packet_loss_ranking")}
         description={t("admin_dashboard.packet_loss_ranking_hint")}
         trailing={<DashboardChip tone="red"><WifiOff size={13} /> {t("admin_dashboard.ranking_all")}</DashboardChip>}
+        order={order}
+        onToggleOrder={toggleOrder}
         loading={expand.loading && !expand.data}
         footer={(
           <DashboardRankingPager
             page={paging.page}
-            total={allItems.length}
+            total={orderedItems.length}
             pageSize={paging.pageSize}
             onPageChange={paging.setPage}
             onPageSizeChange={paging.setPageSize}
@@ -1498,7 +1549,7 @@ export function PacketLossRankingPanel({
           error={expand.error || expand.data?.packet_loss?.error || null}
           items={paging.pageItems}
           indexOffset={paging.pageStart}
-          peak={allItems[0]?.loss_rate}
+          peak={packetLossPeak}
         />
       </DashboardRankingDialog>
     </section>

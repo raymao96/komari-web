@@ -1371,7 +1371,7 @@ function GithubPanel({
           <SettingsDetailRow
             icon={providerIcon}
             title={provider}
-            description={t("account.sso_linked", "已关联当前 Lite 账户")}
+            description={t("account.sso_linked", "已关联当前 轻量.Lite 账户")}
             action={
               <Chip
                 size="small"
@@ -1383,7 +1383,7 @@ function GithubPanel({
           />
           <SettingsFacts rows={[[`${provider} ID`, uniqueId || "—"]]} />
           <Typography sx={{ fontSize: 12, lineHeight: 1.8, color: "text.secondary" }}>
-            {t("account.unbind_sso_hint", "解绑后，无法再通过这个 {{provider}} 账户登录 Lite。", {
+            {t("account.unbind_sso_hint", "解绑后，无法再通过这个 {{provider}} 账户登录 轻量.Lite。", {
               provider,
             })}
           </Typography>
@@ -1401,7 +1401,7 @@ function GithubPanel({
           />
           <SettingsFacts
             rows={[
-              [t("account.lite_account", "Lite 账户"), account?.username || "—"],
+              [t("account.lite_account", "轻量.Lite 账户"), account?.username || "—"],
               [
                 t("account.sso_binding", "{{provider}} 绑定", { provider }),
                 t("account_settings.sso_not_bound"),

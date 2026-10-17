@@ -10,13 +10,13 @@ const contextSource = readFileSync(
   new URL("../src/contexts/LoadAlertContext.tsx", import.meta.url),
   "utf8",
 );
-const globalStyles = readFileSync(
-  new URL("../src/global.css", import.meta.url),
+const centerSource = readFileSync(
+  new URL("../src/pages/admin/notification/center.tsx", import.meta.url),
   "utf8",
 );
 
 for (const locale of ["en", "ja_JP", "zh_CN", "zh_TW"]) {
-  test(`${locale} includes the complete current-load-alert copy`, () => {
+  test(`${locale} includes load-alert silence copy used by alert center`, () => {
     const messages = JSON.parse(
       readFileSync(
         new URL(`../src/i18n/locales/${locale}.json`, import.meta.url),
@@ -24,13 +24,11 @@ for (const locale of ["en", "ja_JP", "zh_CN", "zh_TW"]) {
       ),
     ).notification.load;
     for (const key of [
-      "configuration",
       "current_alerts",
       "silence_24h",
       "silence_3d",
       "silence_7d",
       "silence_forever",
-      "silence_tips",
       "unsilence",
     ]) {
       assert.equal(typeof messages[key], "string", key);
@@ -39,39 +37,21 @@ for (const locale of ["en", "ja_JP", "zh_CN", "zh_TW"]) {
   });
 }
 
-test("load notifications expose searchable configuration and current-alert tabs", () => {
-  assert.match(pageSource, /value="configuration"/);
-  assert.match(pageSource, /value="current"/);
+test("load notifications keep a searchable configuration list without a current-alert tab", () => {
   assert.match(pageSource, /normalizedSearch/);
-  assert.match(pageSource, /notification_name[\s\S]*client_name[\s\S]*metric[\s\S]*status/);
-  assert.match(contextSource, /\/api\/admin\/notification\/load\/current/);
-  assert.match(pageSource, /\/api\/admin\/notification\/load\/silence/);
-  assert.match(pageSource, /notification\.load\.silence_tips/);
-  assert.match(pageSource, /<LoadListToolbar[\s\S]*showAdd[\s\S]*<LoadConfigurationTable/);
-  assert.match(pageSource, /<LoadListToolbar[\s\S]*<CurrentLoadAlertsTable/);
+  assert.match(pageSource, /<LoadListToolbar[\s\S]*<LoadConfigurationTable/);
   assert.match(pageSource, /<AdminListShell/);
-  assert.match(pageSource, /"off" \| "24h" \| "3d" \| "7d" \| "forever"/);
+  assert.doesNotMatch(pageSource, /value="current"/);
+  assert.doesNotMatch(pageSource, /CurrentLoadAlertsTable/);
+  assert.doesNotMatch(pageSource, /useHeldTab/);
+  assert.doesNotMatch(pageSource, /\/api\/admin\/notification\/load\/silence/);
+  assert.doesNotMatch(pageSource, /\/api\/admin\/notification\/load\/current/);
+  assert.doesNotMatch(contextSource, /\/api\/admin\/notification\/load\/current/);
+  assert.doesNotMatch(contextSource, /refreshCurrent/);
 });
 
-test("current load alerts show the preferred node IP instead of the UUID", () => {
-  assert.match(
-    pageSource,
-    /node\?\.ipv4\?\.trim\(\) \|\| node\?\.ipv6\?\.trim\(\) \|\| ""/,
-  );
-  assert.match(
-    pageSource,
-    /clientAddress \? \([\s\S]*text-xs text-muted-foreground[\s\S]*\{clientAddress\}/,
-  );
-  assert.doesNotMatch(
-    pageSource,
-    /text-xs text-muted-foreground">\{alert\.client\}/,
-  );
-});
-
-test("load notification tabs keep the previous sheet until current alerts are ready", () => {
-  assert.match(pageSource, /className="admin-tab-panel pt-3"/);
-  assert.match(pageSource, /useHeldTab\(view, currentReady\)/);
-  assert.match(pageSource, /value=\{displayView\}/);
-  assert.match(globalStyles, /\.admin-tab-panel\[data-state="active"\][^{]*\{[^}]*animation: none/);
-  assert.match(globalStyles, /html\[data-reduce-motion="true"\][^,]*\.admin-tab-panel/);
+test("load alert silence stays on alert center", () => {
+  assert.match(centerSource, /\/api\/admin\/notification\/center\/silence/);
+  assert.match(centerSource, /"off" \| "24h" \| "3d" \| "7d" \| "forever"/);
+  assert.match(centerSource, /notification\.load\.silence_24h/);
 });

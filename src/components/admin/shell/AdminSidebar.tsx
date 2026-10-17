@@ -23,17 +23,16 @@ import {
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
-import LiteBrand from "@/components/LiteBrand";
 import {
   guardRemoteManagementNav,
   useOptionalRemoteManagementGate,
 } from "@/components/admin/RemoteManagementGate";
-import { getAppAssetUrl } from "@/utils/assetUrl";
 import type { MenuItem as AdminMenuItem } from "@/types/menu";
 import { iconMap } from "@/utils/iconHelper";
 import { preloadAdminRoute } from "@/routes";
 import { formatVersion } from "./adminShellModel";
 import { ChromeIconButton } from "./ChromeActions";
+import SidebarBrand from "./SidebarBrand";
 
 function renderIcon(icon: string, label: string, active?: boolean) {
   const link = /^(https?:\/\/|\/|\.\/|\.\.\/)/.test(icon);
@@ -765,7 +764,7 @@ export default function AdminSidebar({
         direction="row"
         spacing={mini ? 0 : 1}
         sx={{
-          px: mini ? 1 : { xs: 1.25, sm: 1.5 },
+          px: mini ? 1 : { xs: 1.25, sm: 2 },
           py: { xs: 1.5, sm: 2 },
           minHeight: { xs: 56, sm: 72 },
           alignItems: "center",
@@ -781,28 +780,7 @@ export default function AdminSidebar({
             <Close />
           </ChromeIconButton>
         ) : null}
-        <Box
-          component="a"
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1.25,
-            color: "inherit",
-            textDecoration: "none",
-            lineHeight: 0,
-          }}
-        >
-          <Box
-            component="img"
-            src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
-            alt=""
-            sx={{ width: 32, height: 32, display: "block", objectFit: "contain" }}
-          />
-          {mini ? null : <LiteBrand size={isMobile ? "sm" : "md"} />}
-        </Box>
+        <SidebarBrand mini={mini} compact={isMobile} />
       </Stack>
 
       <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>

@@ -6,16 +6,20 @@ import test from "node:test";
 const source = readFileSync(path.resolve("src/pages/admin/index.tsx"), "utf8");
 
 test("traffic calibration action sits between billing and delete", () => {
-  const billing = source.indexOf("<BillingButton node={node} />");
-  const calibration = source.indexOf("<TrafficCalibrationButton node={node} />");
-  const rotate = source.indexOf("<RotateTokenButton node={node} />");
-  const deletion = source.indexOf("<DeleteButton node={node} />");
+  const actions = source.slice(
+    source.indexOf("const ActionButtons"),
+    source.indexOf("function TrafficCalibrationButton"),
+  );
+  const billing = actions.indexOf('setDialog("billing")');
+  const calibration = actions.indexOf('setDialog("traffic")');
+  const rotate = actions.indexOf('setDialog("token")');
+  const deletion = actions.indexOf('setDialog("delete")');
   assert.ok(billing >= 0);
   assert.ok(calibration > billing);
   assert.ok(rotate > calibration);
   assert.ok(deletion > rotate);
-  assert.match(source, /<TrafficCalibrationButton node=\{node\} \/>/);
-  assert.match(source, /<RotateTokenButton node=\{node\} \/>/);
+  assert.match(actions, /<Gauge size="18" \/>/);
+  assert.match(actions, /<RefreshCw size="18" \/>/);
 });
 
 test("calibration dialog keeps form state independent from node polling", () => {

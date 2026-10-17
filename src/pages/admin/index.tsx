@@ -1,12 +1,12 @@
-import {
-  quotePowerShellArg,
-  quoteShellArg,
-  quoteShellArgs,
-} from "@/utils/shellQuote";
+import { quoteShellArgs } from "@/utils/shellQuote";
 import { publicVersion } from "@/utils/version";
 import {
   LITE_AGENT_DOCKER_IMAGE,
+  defaultInstallGitHubProxy,
   liteAgentInstallScriptUrl,
+  liteAgentLinuxInstallCommand,
+  liteAgentMacInstallCommand,
+  liteAgentWindowsInstallCommand,
 } from "@/utils/agentInstall";
 import { normalizeOptionalServiceUrl } from "@/utils/serviceUrl";
 import { writeClipboardText } from "@/utils/clipboard";
@@ -147,6 +147,7 @@ import {
   expiryTimezoneOptions,
   formatInstantInTimezone,
   normalizeExpiryTimezone,
+  nowInExpiryTimezone,
   toExpiryLocalDateTime,
 } from "@/lib/expiryDateTime";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
@@ -2325,7 +2326,9 @@ function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose 
           memoryIncludeCache: profile.memory_include_cache,
           getIpAddrFromNic: profile.get_ip_addr_from_nic,
           enableGpu: profile.enable_gpu,
-          ghproxy: profile.ghproxy || "",
+          ghproxy:
+            profile.ghproxy ||
+            (profile.enable_ghproxy ? defaultInstallGitHubProxy(settings) : ""),
           dir: profile.dir || "",
           serviceName: profile.service_name || "",
           includeNics: profile.include_nics || "",
@@ -2520,24 +2523,13 @@ function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose 
     let finalCommand = "";
     switch (selectedPlatform) {
       case "linux":
-        finalCommand =
-          `wget -qO- ${quoteShellArg(scriptUrl)} | sudo bash -s -- ` +
-          quoteShellArgs(args);
+        finalCommand = liteAgentLinuxInstallCommand(scriptUrl, args);
         break;
       case "windows":
-        finalCommand =
-          `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ` +
-          `"iwr ${quotePowerShellArg(scriptUrl)}` +
-          ` -UseBasicParsing -OutFile 'install.ps1'; &` +
-          ` '.\\install.ps1'`;
-        args.forEach((arg) => {
-          finalCommand += ` ${quotePowerShellArg(arg)}`;
-        });
-        finalCommand += `"`;
+        finalCommand = liteAgentWindowsInstallCommand(scriptUrl, args);
         break;
       case "macos":
-        finalCommand =
-          `zsh <(curl -sL ${quoteShellArg(scriptUrl)}) ` + quoteShellArgs(args);
+        finalCommand = liteAgentMacInstallCommand(scriptUrl, args);
         break;
       case "docker": {
         // Docker 运行时不支持安装脚本专用参数，剔除它们及其取值
@@ -2917,25 +2909,29 @@ function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose 
                 <Checkbox
                   checked={enableGhproxy}
                   onCheckedChange={(checked) => {
-                    setEnableGhproxy(Boolean(checked));
-                    if (!checked) {
-                      setInstallOptions((prev) => ({
-                        ...prev,
-                        ghproxy: "",
-                      }));
-                    }
+                    const enabled = Boolean(checked);
+                    setEnableGhproxy(enabled);
+                    setInstallOptions((prev) => ({
+                      ...prev,
+                      ghproxy: enabled
+                        ? prev.ghproxy.trim() ||
+                          defaultInstallGitHubProxy(settings)
+                        : "",
+                    }));
                   }}
                 />
                 <label
                   className="text-sm font-bold cursor-pointer"
                   onClick={() => {
-                    setEnableGhproxy(!enableGhproxy);
-                    if (enableGhproxy) {
-                      setInstallOptions((prev) => ({
-                        ...prev,
-                        ghproxy: "",
-                      }));
-                    }
+                    const enabled = !enableGhproxy;
+                    setEnableGhproxy(enabled);
+                    setInstallOptions((prev) => ({
+                      ...prev,
+                      ghproxy: enabled
+                        ? prev.ghproxy.trim() ||
+                          defaultInstallGitHubProxy(settings)
+                        : "",
+                    }));
                   }}
                 >
                   {t("admin.nodeTable.ghproxy", "GitHub 代理")}
@@ -2943,11 +2939,10 @@ function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose 
               </Flex>
               {enableGhproxy && (
                 <TextField.Root
-                  // placeholder={t(
-                  //   "admin.nodeTable.ghproxy_placeholder",
-                  //   "GitHub 代理，为空则不使用代理"
-                  // )}
-                  placeholder="https://ghfast.top/"
+                  placeholder={t(
+                    "settings.general.github_proxy_placeholder",
+                    "https://gh-proxy.com",
+                  )}
                   value={installOptions.ghproxy}
                   onChange={(e) =>
                     setInstallOptions((prev) => ({
@@ -3400,7 +3395,7 @@ function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose 
                   <Text size="1" color="gray">
                     {t(
                       "admin.nodeTable.monthRotateHint",
-                      "流量重置时间按厂商账单填写，Lite 会换算到北京时间才重置。",
+                      "流量重置时间按厂商账单填写，轻量.Lite 会换算到北京时间才重置。",
                     )}
                   </Text>
                 </Flex>
@@ -3927,7 +3922,7 @@ function EditButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail
               <p className="text-sm leading-6 text-muted-foreground">
                 {t(
                   "admin.nodeEdit.trafficResetDay_description",
-                  "0 表示关闭；1-31 为每月重置日。流量重置时间按厂商账单填写，Lite 会换算到北京时间才重置。存量数据为北京时间 0:00。保存后同步到 Agent。",
+                  "0 表示关闭；1-31 为每月重置日。流量重置时间按厂商账单填写，轻量.Lite 会换算到北京时间才重置。存量数据为北京时间 0:00。保存后同步到 Agent。",
                 )}
               </p>
             </div>
@@ -4342,10 +4337,22 @@ function BillingButton({ node, initiallyOpen = false, onClose }: { node: NodeDet
                 />
               </div>
             </div>
-            <Flex gap="2" align="center" justify="end">
-              <Button
+            <div className="km-expiry-quick-actions">
+              <button
                 type="button"
-                variant="ghost"
+                className="km-expiry-quick-action"
+                onClick={() => {
+                  const parts = nowInExpiryTimezone(expiryTimezone);
+                  if (!parts) return;
+                  setExpiryDate(parts.date);
+                  setExpiryTime(parts.time);
+                }}
+              >
+                {t("admin.nodeTable.setToNow", "今")}
+              </button>
+              <button
+                type="button"
+                className="km-expiry-quick-action"
                 onClick={() => {
                   const future = new Date();
                   future.setFullYear(future.getFullYear() + 200);
@@ -4356,8 +4363,8 @@ function BillingButton({ node, initiallyOpen = false, onClose }: { node: NodeDet
                 }}
               >
                 {t("admin.nodeTable.setToLongTerm", "设置为长期")}
-              </Button>
-            </Flex>
+              </button>
+            </div>
             <SettingCardSwitch
               bordless
               title={t("admin.nodeTable.autoRenewal")}

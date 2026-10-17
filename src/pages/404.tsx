@@ -5,6 +5,7 @@ import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { LITE_NAME } from "@/theme/brand";
 import { getAppAssetUrl } from "@/utils/assetUrl";
 
 export default function NotFound() {
@@ -34,7 +35,7 @@ export default function NotFound() {
         <Box
           component="img"
           src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
-          alt="Lite"
+          alt={LITE_NAME}
           sx={{ width: 64, height: 64, mb: 1, objectFit: "contain" }}
         />
 
