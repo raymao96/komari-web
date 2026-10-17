@@ -21,6 +21,15 @@ import re
 replacements = [
 
     # --------------------------------------------------------
+    # 特定名稱替換 (僅替換帶雙引號的 "轻量.Lite")
+    # --------------------------------------------------------
+
+    (
+        "\"轻量.Lite\"",
+        "\"Lite\"",
+    ),
+
+    # --------------------------------------------------------
     # Raw GitHub 完整 URL
     # --------------------------------------------------------
 
@@ -229,14 +238,6 @@ for root, dirs, files in os.walk("."):
 
         # ----------------------------------------------------
         # Raw GitHub URL 中的 /main/
-        #
-        # 例如：
-        #
-        # https://raw.githubusercontent.com/${LITE_AGENT_GITHUB_REPO}/main/
-        #
-        # →
-        #
-        # https://raw.githubusercontent.com/${LITE_AGENT_GITHUB_REPO}/github-nuomiiiii/
         # ----------------------------------------------------
 
         new_content, count = raw_url_main_pattern.subn(
