@@ -113,7 +113,9 @@ export function RenewalCalendarPanel() {
       }
       toast.success(t("admin_dashboard.renewal_done"));
       refresh();
-      setMenu(null);
+      if (menuServers.length <= 1) {
+        setMenu(null);
+      }
     } catch (renewError) {
       toast.error(`${t("admin_dashboard.renewal_failed")}: ${
         renewError instanceof Error ? renewError.message : String(renewError)

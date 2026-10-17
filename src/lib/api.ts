@@ -21,6 +21,7 @@ export interface SettingsResponse {
   auto_order_new_clients_by_region: boolean;
   allow_remote_management: boolean;
   allow_mcp: boolean;
+  github_proxy: string;
   geo_ip_enabled: boolean;
   geo_ip_provider: string;
   o_auth_provider: string;
@@ -40,6 +41,7 @@ const createDefaultSettings = (): SettingsResponse => ({
   auto_order_new_clients_by_region: false,
   allow_remote_management: false,
   allow_mcp: false,
+  github_proxy: "",
   geo_ip_enabled: false,
   geo_ip_provider: "",
   o_auth_provider: "",
@@ -224,7 +226,7 @@ function useSettingsController() {
   }, [accountLoading, hasAccountContext, loggedIn]);
 
   // Update a single setting
-  const updateSetting = async <K extends keyof SettingsResponse>(
+  const updateSetting = React.useCallback(async <K extends keyof SettingsResponse>(
     key: K,
     value: SettingsResponse[K]
   ) => {
@@ -237,10 +239,10 @@ function useSettingsController() {
       );
       throw err;
     }
-  };
+  }, [settings]);
 
   // Update multiple settings
-  const updateMultipleSettings = async (
+  const updateMultipleSettings = React.useCallback(async (
     newSettings: Partial<SettingsResponse>
   ) => {
     try {
@@ -253,7 +255,7 @@ function useSettingsController() {
       );
       throw err;
     }
-  };
+  }, [settings]);
 
   const refetch = React.useCallback(async () => {
     const data = await getSettings();
@@ -265,7 +267,7 @@ function useSettingsController() {
     void refetch().catch(() => undefined);
   }), [refetch]);
 
-  return {
+  return React.useMemo(() => ({
     settings,
     loading,
     error,
@@ -273,7 +275,14 @@ function useSettingsController() {
     updateSetting,
     updateMultipleSettings,
     refetch,
-  };
+  }), [
+    settings,
+    loading,
+    error,
+    updateSetting,
+    updateMultipleSettings,
+    refetch,
+  ]);
 }
 
 type SettingsContextValue = ReturnType<typeof useSettingsController>;

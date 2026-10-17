@@ -113,6 +113,27 @@ export default function GeneralSettings() {
           }));
         }}
       />
+      <SettingCardLabel>
+        {t("settings.general.github_proxy", "GitHub 代理")}
+      </SettingCardLabel>
+      <SettingCardShortTextInput
+        description={t(
+          "settings.general.github_proxy_description",
+          "用于主题的更新、导入和市场下载；节点部署指令勾选 GitHub 代理时会自动填入此地址，仍可再改。留空表示不使用代理。",
+        )}
+        defaultValue={settings.github_proxy || ""}
+        placeholder={t(
+          "settings.general.github_proxy_placeholder",
+          "https://gh-proxy.com",
+        )}
+        OnSave={async (data) => {
+          await updateSettingsWithToast(
+            { github_proxy: String(data ?? "").trim() },
+            t,
+          );
+          await refetch();
+        }}
+      />
       <SettingCardLabel>{t("settings.geoip.title")}</SettingCardLabel>
       <SettingCardSwitch
         title={t("settings.geoip.enable_title")}

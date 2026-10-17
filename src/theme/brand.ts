@@ -6,6 +6,10 @@ export const LITE_BLUE_SOFT_STRONG = "rgba(7, 141, 238, 0.16)";
 export const NODE_ONLINE = "#22C55E";
 export const NODE_OFFLINE = "#FF5630";
 export const LITE_NAME = "Lite";
+/** Mobile header wordmark only. Do not use this for sitename or other copy. */
+export const LITE_NAME_MOBILE = "Lite";
+export const LITE_ADMIN_TITLE = `${LITE_NAME} Monitor`;
+export const DEFAULT_SITE_DESCRIPTION = "Lite丨更适合MJJ的养老探针";
 /** dash.neburst.com grey.200 / background.neutral */
 export const NEBURST_NEUTRAL = "#F4F6F8";
 /** Admin form controls use a neutral surface; grey fill is reserved for disabled state. */

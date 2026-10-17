@@ -17,17 +17,17 @@ const rotateSource = source.slice(
 );
 
 test("reset token action sits immediately before delete", () => {
-  const rotate = source.indexOf("<RotateTokenButton node={node} />");
-  const deletion = source.indexOf("<DeleteButton node={node} />");
+  const actions = source.slice(
+    source.indexOf("const ActionButtons"),
+    source.indexOf("function TrafficCalibrationButton"),
+  );
+  const rotate = actions.indexOf('setDialog("token")');
+  const deletion = actions.indexOf('setDialog("delete")');
   assert.ok(rotate >= 0);
   assert.ok(deletion > rotate);
-  assert.equal(
-    source.slice(rotate, deletion).includes("<"),
-    true,
-  );
   assert.match(
-    source.slice(rotate, deletion),
-    /^<RotateTokenButton node=\{node\} \/>\s*$/,
+    actions.slice(rotate, deletion),
+    /^setDialog\("token"\)[\s\S]*<RefreshCw size="18" \/>[\s\S]*$/,
   );
 });
 

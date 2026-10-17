@@ -43,7 +43,7 @@ test("setting logs use the on-screen name in every language", () => {
     "zh_CN.json": "开启了「启用 MCP 代理」",
     "en.json": "Turned on Enable MCP Proxy",
     "ja_JP.json": "「MCP プロキシを有効にする」をオンにしました",
-    "zh_TW.json": "開啟了「啟用 MCP 服務」",
+    "zh_TW.json": "已啟用「啟用 MCP 服務」",
   };
   for (const [filename, sentence] of Object.entries(expected)) {
     const text = formatAuditMessage(message, translate(locale(filename)));
@@ -82,6 +82,26 @@ test("secret logs do not gain a value while changing language", () => {
   });
   const text = formatAuditMessage(message, translate(locale("zh_CN.json")));
   assert.equal(text, "更换了「站点 API 密钥」");
+});
+
+test("theme update logs show counts in every language", () => {
+  const message = JSON.stringify({
+    k: "audit.theme_update_all",
+    p: { updated: "1", current: "2", skipped: "3", failed: "0" },
+  });
+  const expected = {
+    "zh_CN.json": "执行了主题一键更新：更新 1 个，已是最新 2 个，跳过 3 个，失败 0 个",
+    "en.json": "Ran a one-click theme update: 1 updated, 2 already current, 3 skipped, 0 failed",
+    "ja_JP.json": "テーマの一括更新を実行しました。更新 1 件、最新 2 件、スキップ 3 件、失敗 0 件",
+    "zh_TW.json": "執行了主題一鍵更新：更新 1 個，已是最新 2 個，跳過 3 個，失敗 0 個",
+  };
+  for (const [filename, sentence] of Object.entries(expected)) {
+    assert.equal(
+      formatAuditMessage(message, translate(locale(filename))),
+      sentence,
+      filename,
+    );
+  }
 });
 
 test("command clipboard logs show the command name", () => {

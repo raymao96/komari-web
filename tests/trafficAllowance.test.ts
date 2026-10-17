@@ -29,6 +29,8 @@ test("reset traffic requires a billing reset day and shows the effective quota",
   assert.match(editSource, /admin\.nodeEdit\.trafficResetTime/);
   assert.match(editSource, /aria-label=\{t\("admin\.nodeEdit\.trafficResetTimezone"\)\}/);
   assert.match(editSource, /aria-label=\{t\("admin\.nodeEdit\.trafficResetAllowance"\)\}/);
+  assert.match(editSource, /isNegativeByteInput\(trafficResetAllowanceInput\)/);
+  assert.match(editSource, /isNegativeByteInput\(raw\)/);
   assert.match(editSource, /km-traffic-reset-clock-row/);
   assert.match(editSource, /space-y-2 pb-3 pt-2/);
   assert.doesNotMatch(editSource, /trafficResetType|traffic_reset_type/);

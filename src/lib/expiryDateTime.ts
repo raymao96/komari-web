@@ -37,9 +37,23 @@ function pad(value: number): string {
 }
 
 function padYear(value: string): string {
-  const digits = value.replace(/\D/g, "");
+  const digits = value.replace(/\D/g, "").slice(0, 4);
   if (!digits) return value;
   return digits.padStart(4, "0");
+}
+
+export function clampExpiryDateInput(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  const match = /^(\d+)-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) return trimmed;
+  const year = match[1].slice(0, 4);
+  if (year.length < 4) return trimmed;
+  return `${year}-${match[2]}-${match[3]}`;
+}
+
+export function nowInExpiryTimezone(timeZone: string): { date: string; time: string } | null {
+  return formatInstantInTimezone(new Date(), timeZone);
 }
 
 export function formatInstantInTimezone(

@@ -59,7 +59,7 @@ import { attachRemoteTerminalHighlight } from "./remoteTerminalHighlight";
 import Flag from "@/components/Flag";
 import { usageMetricCardSx } from "@/pages/admin/nodeDetailCardStyles";
 import { displayRemoteAddress } from "@/utils/remoteNodePicker";
-import { terminalControlByte } from "@/utils/terminalCtrl";
+import { terminalCutControlByte, terminalKeyAction } from "@/utils/terminalCtrl";
 import { REMOTE_COMPACT_QUERY, UNREPORTED_ADDRESS, remoteConfirmDialogProps } from "./remoteChrome";
 import { useTranslation } from "react-i18next";
 import { getAdminMenuProps } from "@/components/admin/adminMenu";
@@ -362,41 +362,76 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
         ws.send(new TextEncoder().encode(data));
       }
     });
+    let lastControl = -1;
+    let lastControlAt = 0;
+    const sendControlByte = (byte: number) => {
+      const now = performance.now();
+      if (lastControl === byte && now - lastControlAt < 50) return;
+      lastControl = byte;
+      lastControlAt = now;
+      const ws = socket.current;
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(new Uint8Array([byte]));
+      }
+    };
+    const swallowBrowserCut = (event: Event) => {
+      if (event instanceof InputEvent && event.inputType === "insertText") {
+        const leaked = lastControl >= 1 && lastControl <= 26
+          ? String.fromCharCode(lastControl + 96)
+          : "";
+        const data = (event.data || "").toLowerCase();
+        if (data.length === 1 && data === leaked && performance.now() - lastControlAt < 50) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+      const inputType = event instanceof InputEvent ? event.inputType : "deleteByCut";
+      const control = terminalCutControlByte(inputType);
+      if (control === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      sendControlByte(control);
+    };
     instance.attachCustomKeyEventHandler((event) => {
-      if (event.type !== "keydown") return true;
-      const key = event.key.toLowerCase();
-      const copyWithSelection = event.ctrlKey && !event.shiftKey && key === "c" && instance.hasSelection();
-      const copyShortcut = copyWithSelection ||
-        ((event.ctrlKey && event.shiftKey) || event.metaKey) && key === "c" ||
-        event.ctrlKey && event.key === "Insert";
-      if (copyShortcut) {
+      if (event.type !== "keydown" && event.type !== "keypress") return true;
+      const decision = terminalKeyAction(event, instance.hasSelection());
+      if (decision.action === "copy") {
         event.preventDefault();
         event.stopPropagation();
-        void copyTerminalSelection();
+        if (event.type === "keydown") void copyTerminalSelection();
         return false;
       }
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && key === "v") {
+      if (decision.action === "paste") {
         // Let the browser emit a ClipboardEvent. Its clipboardData works on
         // HTTP deployments where navigator.clipboard.readText is unavailable.
         return false;
       }
-      // xterm only turns Ctrl+A..Z into a C0 byte when keyCode is 65–90.
-      // A Chinese IME reports 229, so Ctrl+X never reaches nano.
-      const control = terminalControlByte(event);
-      if (control !== null) {
-        event.preventDefault();
+      if (decision.action === "send") {
         event.stopPropagation();
-        const ws = socket.current;
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(new Uint8Array([control]));
+        // Ctrl+C with no terminal selection still goes to the PTY, but the
+        // keydown default is left in place so the browser can copy.
+        if (!(decision.keepBrowserCopy && event.type === "keydown")) {
+          event.preventDefault();
         }
+        sendControlByte(decision.byte);
         return false;
+      }
+      if (event.type === "keypress" && event.key.length === 1 && lastControl >= 1 && lastControl <= 26) {
+        const leaked = String.fromCharCode(lastControl + 96);
+        if (event.key.toLowerCase() === leaked && performance.now() - lastControlAt < 50) {
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
+        }
       }
       return true;
     });
     const resizeObserver = new ResizeObserver(() => resizeTerminal());
     resizeObserver.observe(terminalHost.current);
     const host = terminalHost.current;
+    host.addEventListener("beforeinput", swallowBrowserCut, true);
+    host.addEventListener("cut", swallowBrowserCut, true);
     const paste = (event: ClipboardEvent) => {
       const text = event.clipboardData?.getData("text/plain") || "";
       if (!text) return;
@@ -473,6 +508,8 @@ export default function RemoteSession({ tabId, node, live, online, active, compa
       resizeObserver.disconnect();
       inputDisposable.dispose();
       host.removeEventListener("paste", paste, true);
+      host.removeEventListener("beforeinput", swallowBrowserCut, true);
+      host.removeEventListener("cut", swallowBrowserCut, true);
       host.removeEventListener("contextmenu", contextMenu);
       host.removeEventListener("touchstart", touchStart, true);
       host.removeEventListener("touchmove", touchMove, true);

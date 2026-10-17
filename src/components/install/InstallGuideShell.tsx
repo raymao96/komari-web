@@ -18,6 +18,7 @@ import {
   INSTALL_STEP_IDS,
   type InstallSummary,
 } from "@/components/install/installGuideModel";
+import { LITE_NAME } from "@/theme/brand";
 import { getAppAssetUrl } from "@/utils/assetUrl";
 
 type ServiceStatus = "checking" | "connected" | "error";
@@ -102,14 +103,14 @@ function InstallHeader({ status }: { status: ServiceStatus }) {
           <Box
             component="img"
             src={getAppAssetUrl("assets/logo.png?v=lite-icon-0e86dd")}
-            alt="Lite"
+            alt={LITE_NAME}
             sx={{ width: 34, height: 34, objectFit: "contain" }}
           />
           <Typography
             component="span"
             sx={{ color: "primary.main", fontSize: 20, fontWeight: 700 }}
           >
-            Lite
+            {LITE_NAME}
           </Typography>
         </Stack>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
@@ -446,7 +447,7 @@ export default function InstallGuideShell({
               <Divider sx={{ mb: 2.25 }} />
               {version ? (
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                  Lite {version}
+                  {LITE_NAME} {version}
                 </Typography>
               ) : null}
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>

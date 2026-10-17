@@ -79,7 +79,7 @@ test("admin node table keeps persisted ordering and prioritizes identity and bil
   assert.match(pageSource, /admin\.nodeEdit\.remarkPlaceholder/);
   assert.match(pageSource, /admin\.nodeEdit\.publicRemarkPlaceholder/);
   assert.doesNotMatch(pageSource, /km-node-edit-remark/);
-  assert.match(pageSource, /w-\[80px\].*admin\.nodeTable\.billing/);
+  assert.match(pageSource, /w-\[80px\][\s\S]*admin\.nodeTable\.billing/);
   assert.match(pageSource, /nodeTable\.agent[\s\S]*publicVersion\(node\.version\)/);
   assert.match(pageSource, /admin-node-country-flag/);
   assert.match(pageSource, /reorderEnabled=\{/);
@@ -368,12 +368,12 @@ test("desktop node table keeps readable name and network columns while resizing"
   assert.match(pageSource, /TableHead className="w-\[44px\]"/);
   assert.match(pageSource, /TableHead className="w-\[170px\]"/);
   assert.equal(pageSource.match(/TableHead className="w-\[170px\]"/g)?.length, 2);
-  assert.match(pageSource, /TableHead className="w-\[64px\] text-center"/);
-  assert.equal(pageSource.match(/TableHead className="w-\[64px\]/g)?.length, 3);
+  assert.match(pageSource, /className="w-\[64px\] text-center"/);
+  assert.equal(pageSource.match(/className="w-\[64px\]/g)?.length, 3);
   assert.match(pageSource, /TableHead className="w-\[80px\]"/);
   assert.match(pageSource, /TableHead className="w-\[308px\]"/);
-  assert.match(pageSource, /<BillingButton node=\{node\} \/>/);
-  assert.match(pageSource, /<TrafficCalibrationButton node=\{node\} \/>/);
+  assert.match(pageSource, /setDialog\("billing"\)/);
+  assert.match(pageSource, /setDialog\("traffic"\)/);
   assert.match(pageSource, /text-sm hover:bg-\[var\(--accent-a2\)\][^\n]*\[&>td\]:py-2\.5/);
   assert.match(pageSource, /text-sm leading-\[1\.125rem\]/);
   assert.match(pageSource, /data-label=\{t\("admin\.nodeTable\.name"\)\}[\s\S]{0,80}title=\{node\.name\}/);
@@ -456,8 +456,8 @@ test("admin tables clip group, remark, and tag overflow instead of wrapping", ()
   assert.doesNotMatch(execSelectorSource, /whitespace-normal break-words/);
 });
 
-test("load notifications persist the active tab and keep server names on one line", () => {
-  assert.match(loadSource, /useAdminTabParam\(LOAD_VIEWS, "configuration", \{[\s\S]*param: "view"/);
+test("load notifications keep server names on one line", () => {
+  assert.doesNotMatch(loadSource, /useAdminTabParam/);
   assert.match(loadSource, /table-fixed min-w-\[840px\]/);
   assert.match(loadSource, /TableCell className="max-w-0"/);
 });
@@ -521,8 +521,9 @@ test("list toolbars and pagination follow the compact layout", () => {
   assert.match(pageSource, /nodeSearchHaystack\(node\)/);
   assert.doesNotMatch(pageSource, /onRefresh=\{refresh\}/);
   assert.match(pageSource, /showSummary=\{false\}/);
-  assert.match(loadSource, /<Tabs\.Content value="configuration"[\s\S]*<AdminListShell[\s\S]*<LoadListToolbar[\s\S]*showAdd[\s\S]*<LoadConfigurationTable/);
-  assert.match(loadSource, /<Tabs\.Content value="current"[\s\S]*<AdminListShell[\s\S]*<LoadListToolbar[\s\S]*<CurrentLoadAlertsTable/);
+  assert.match(loadSource, /<AdminListShell[\s\S]*<LoadListToolbar[\s\S]*<LoadConfigurationTable/);
+  assert.doesNotMatch(loadSource, /CurrentLoadAlertsTable/);
+  assert.doesNotMatch(loadSource, /value="current"/);
   assert.match(loadSource, /<AdminListSearch/);
   assert.match(loadSource, /showSummary=\{false\}/);
   assert.match(offlineSource, /<AdminListShell[\s\S]*<AdminListSearch[\s\S]*common\.select_all[\s\S]*batch_edit/);

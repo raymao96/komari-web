@@ -49,6 +49,7 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin/return-route": loadAdminReturnRoute,
   "/admin/logs": () => import("./pages/admin/log"),
   "/admin/exec": () => import("./pages/admin/exec"),
+  "/admin/remote-management/schedules": () => import("./pages/admin/remote-management/schedules"),
   "/admin/remote-management/mcp": () => import("./pages/admin/remote-management/mcp"),
   "/admin/theme_managed": () => import("./pages/admin/theme_managed.tsx"),
   "/admin/theme_raw": () => import("./pages/admin/theme_raw.tsx"),
@@ -63,6 +64,7 @@ const adminRoutePreloaders: Record<string, () => Promise<unknown>> = {
   "/admin/settings/reverse-proxy": () => import("./pages/admin/settings/reverse-proxy"),
   "/admin/settings/metrics": () => import("./pages/admin/settings/metrics"),
   "/admin/settings/account-security": () => import("./pages/admin/settings/account-security"),
+  "/admin/notification/center": () => import("./pages/admin/notification/center"),
   "/admin/notification/offline": () => import("./pages/admin/notification/offline"),
   "/admin/notification/load": () => import("./pages/admin/notification/load"),
   "/admin/notification/general": () => import("./pages/admin/notification/general"),
@@ -305,6 +307,12 @@ export const routes: RouteObject[] = [
         path: "notification",
         children: [
           {
+            path: "center",
+            element: React.createElement(
+              lazy(() => import("./pages/admin/notification/center"))
+            ),
+          },
+          {
             path: "offline",
             element: React.createElement(
               lazy(() => import("./pages/admin/notification/offline"))
@@ -353,12 +361,32 @@ export const routes: RouteObject[] = [
         element: React.createElement(lazy(() => import("./pages/admin/exec"))),
       },
       {
+        path: "remote-management/schedules/:scheduleId?",
+        element: React.createElement(
+          lazy(() => import("./pages/admin/remote-management/schedules")),
+        ),
+      },
+      {
         path: "remote-management/mcp",
         element: React.createElement(
           lazy(() => import("./pages/admin/remote-management/mcp")),
         ),
       }
     ],
+  },
+  {
+    path: "/admin-app",
+    element: React.createElement(Navigate, {
+      replace: true,
+      to: "/admin",
+    }),
+  },
+  {
+    path: "/admin-app/*",
+    element: React.createElement(Navigate, {
+      replace: true,
+      to: "/admin",
+    }),
   },
   {
     path: "/terminal",

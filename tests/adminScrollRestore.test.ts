@@ -45,7 +45,6 @@ test("admin pages persist tabs in the URL and restore the shared scroll containe
     "src/pages/admin/pingTask.tsx",
     "src/pages/admin/billing.tsx",
     "src/pages/admin/NodeDetailPage.tsx",
-    "src/pages/admin/notification/load.tsx",
     "src/pages/admin/notification/ping_loss.tsx",
     "src/pages/admin/settings/account-security.tsx",
     "src/pages/admin/settings/reverse-proxy.tsx",

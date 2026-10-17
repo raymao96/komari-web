@@ -386,6 +386,7 @@ type TextFieldRootProps = LayoutProps & {
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   onFocus?: (event: FocusEvent<HTMLInputElement>) => void;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
+  onInput?: (event: FormEvent<HTMLInputElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   onMouseUp?: (event: MouseEvent<HTMLInputElement>) => void;
   onBeforeInput?: (event: FormEvent<HTMLInputElement>) => void;
@@ -411,6 +412,7 @@ export const TextFieldRoot = forwardRef<HTMLInputElement, TextFieldRootProps>(
       onChange,
       onFocus,
       onBlur,
+      onInput,
       onKeyDown,
       onMouseUp,
       onBeforeInput,
@@ -459,6 +461,7 @@ export const TextFieldRoot = forwardRef<HTMLInputElement, TextFieldRootProps>(
             pattern: rest.pattern,
             "aria-label": rest["aria-label"],
             "aria-expanded": rest["aria-expanded"],
+            onInput,
             onMouseUp,
             onBeforeInput,
           },

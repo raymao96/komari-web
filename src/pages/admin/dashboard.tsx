@@ -96,7 +96,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   React.useLayoutEffect(() => {
     const path = location.pathname.replace(/\/$/, "") || "/";
-    if (path === "/admin/dashboard") {
+    if (path === "/admin/dashboard" || path === "/admin-app" || path.startsWith("/admin-app/")) {
       navigate("/admin", { replace: true });
     }
   }, [location.pathname, navigate]);

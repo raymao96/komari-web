@@ -16,6 +16,7 @@ import HomeOutlined from "@mui/icons-material/HomeOutlined";
 import HubOutlined from "@mui/icons-material/HubOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
 import MoreHoriz from "@mui/icons-material/MoreHoriz";
+import NotificationsActiveOutlined from "@mui/icons-material/NotificationsActiveOutlined";
 import NotificationsOutlined from "@mui/icons-material/NotificationsOutlined";
 import PaletteOutlined from "@mui/icons-material/PaletteOutlined";
 import PowerOffOutlined from "@mui/icons-material/PowerOffOutlined";
@@ -24,6 +25,7 @@ import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import ShowChartOutlined from "@mui/icons-material/ShowChartOutlined";
 import SpeedOutlined from "@mui/icons-material/SpeedOutlined";
 import StorageOutlined from "@mui/icons-material/StorageOutlined";
+import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import StorefrontOutlined from "@mui/icons-material/StorefrontOutlined";
 import TerminalOutlined from "@mui/icons-material/TerminalOutlined";
 import TrendingUpOutlined from "@mui/icons-material/TrendingUpOutlined";
@@ -63,6 +65,7 @@ export const iconMap: Record<string, ReturnType<typeof wrapMuiIcon>> = {
   MessageCircleMore: wrapMuiIcon(ChatOutlined),
   Ellipsis: wrapMuiIcon(MoreHoriz),
   Bell: wrapMuiIcon(NotificationsOutlined),
+  BellRing: wrapMuiIcon(NotificationsActiveOutlined),
   Unplug: wrapMuiIcon(PowerOffOutlined),
   TrendingUp: wrapMuiIcon(TrendingUpOutlined),
   Users: wrapMuiIcon(GroupOutlined),
@@ -77,6 +80,7 @@ export const iconMap: Record<string, ReturnType<typeof wrapMuiIcon>> = {
   Terminal: wrapMuiIcon(TerminalOutlined),
   Hub: wrapMuiIcon(HubOutlined),
   Database: wrapMuiIcon(StorageOutlined),
+  Schedule: wrapMuiIcon(ScheduleOutlined),
   WifiOff: wrapMuiIcon(WifiOffOutlined),
   Gauge: wrapMuiIcon(SpeedOutlined),
   Store: wrapMuiIcon(StorefrontOutlined),

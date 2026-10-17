@@ -13,6 +13,12 @@
  * stringToBytes('1024');        // 1024 (默认为字节)
  * stringToBytes('1tb');         // 1099511627776
  */
+export function isNegativeByteInput(value: string): boolean {
+  if (typeof value !== "string") return false;
+  if (value.trim().startsWith("-")) return true;
+  return stringToBytes(value) < 0;
+}
+
 export function stringToBytes(str: string): number {
   if (typeof str !== "string" || str.length === 0) {
     return 0;

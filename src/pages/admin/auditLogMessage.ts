@@ -14,6 +14,7 @@ const SETTING_LABEL: Record<string, string> = {
   expire_notification_enabled: "admin.notification.expire_enable",
   expire_notification_lead_days: "admin.notification.expire_time",
   geo_ip_enabled: "settings.geoip.enable_title",
+  github_proxy: "settings.general.github_proxy",
   geo_ip_provider: "settings.geoip.provider_title",
   https_certificate_path: "settings.reverse_proxy.certificate_path",
   https_enabled: "settings.reverse_proxy.enable_https",

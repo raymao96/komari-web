@@ -41,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { SelectOrInput } from "@/components/ui/select-or-input";
 import { useAccount } from "@/contexts/AccountContext";
 import {
   getDashboardSettingsSnapshot,
@@ -49,6 +50,7 @@ import {
 } from "@/hooks/useDashboardSettings";
 import {
   DASHBOARD_PRESETS,
+  DEFAULT_DASHBOARD_TIMEZONE,
   dashboardModuleSpans,
   dashboardSettingsEqual,
   dashboardSettingsForPreset,
@@ -58,6 +60,10 @@ import {
   type DashboardModuleSpan,
   type DashboardSettings,
 } from "@/utils/dashboardSettings";
+import {
+  listTrafficResetTimezones,
+  normalizeTrafficResetTimezone,
+} from "@/utils/trafficResetTimezones";
 
 const previewSpan: Record<number, string> = {
   3: "col-span-1 sm:col-span-3",
@@ -274,8 +280,13 @@ export default function DashboardSettingsPage() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const enabledCount = draft.modules.filter((module) => module.enabled).length;
 
+  const timezoneOptions = React.useMemo(() => listTrafficResetTimezones(), []);
+
   const selectPreset = (preset: Exclude<DashboardSettings["preset"], "custom">) => {
-    setDraft(dashboardSettingsForPreset(preset));
+    setDraft((current) => dashboardSettingsForPreset(
+      preset,
+      current?.timezone || DEFAULT_DASHBOARD_TIMEZONE,
+    ));
   };
 
   const toggleModule = (id: DashboardModuleId, enabled: boolean) => {
@@ -388,6 +399,29 @@ export default function DashboardSettingsPage() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <section className="rounded-md border bg-[var(--color-panel-solid)] p-3">
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold">{t("settings.dashboard.timezone")}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{t("settings.dashboard.timezone_hint")}</p>
+        </div>
+        <div className="max-w-xl">
+          <SelectOrInput
+            options={timezoneOptions}
+            value={draft.timezone || DEFAULT_DASHBOARD_TIMEZONE}
+            allowCustomInput
+            onChange={(value) => setDraft((current) => {
+              if (!current) return current;
+              return {
+                ...current,
+                timezone: normalizeTrafficResetTimezone(value) || DEFAULT_DASHBOARD_TIMEZONE,
+              };
+            })}
+            placeholder={DEFAULT_DASHBOARD_TIMEZONE}
+            aria-label={t("settings.dashboard.timezone")}
+          />
         </div>
       </section>
 

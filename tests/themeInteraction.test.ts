@@ -19,6 +19,38 @@ const locales = [
   JSON.parse(readFileSync(`src/i18n/locales/${locale}.json`, "utf8")),
 );
 
+test("github proxy lives in general settings and is shared with deploy commands", () => {
+  const generalSource = readFileSync("src/pages/admin/settings/general.tsx", "utf8");
+  const nodeTableSource = readFileSync("src/pages/admin/index.tsx", "utf8");
+  assert.match(generalSource, /settings\.general\.github_proxy/);
+  assert.match(generalSource, /github_proxy:/);
+  assert.doesNotMatch(themeSettingsSource, /github-proxy/);
+  assert.doesNotMatch(themeSettingsSource, /theme\.github_proxy/);
+  assert.match(nodeTableSource, /defaultInstallGitHubProxy\(settings\)/);
+  assert.doesNotMatch(
+    readFileSync("src/utils/githubReleases.ts", "utf8"),
+    /github-proxy/,
+  );
+  assert.doesNotMatch(
+    readFileSync("src/utils/agentInstall.ts", "utf8"),
+    /theme\/github-proxy/,
+  );
+  for (const locale of locales) {
+    assert.equal(typeof locale.settings.general.github_proxy, "string");
+    assert.match(locale.settings.general.github_proxy, /^GitHub /);
+    assert.ok(locale.settings.general.github_proxy_description.length > 0);
+    assert.equal(
+      locale.settings.general.github_proxy_placeholder,
+      "https://gh-proxy.com",
+    );
+    assert.equal(
+      locale.admin.nodeTable.ghproxy,
+      locale.settings.general.github_proxy,
+    );
+    assert.equal(locale.theme.github_proxy, undefined);
+  }
+});
+
 test("theme management actions stay on one line on a two-column phone toolbar", () => {
   assert.match(themeSettingsSource, /grid w-full grid-cols-2/);
   assert.match(themeSettingsSource, /whitespace-nowrap/);

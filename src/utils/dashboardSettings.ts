@@ -44,6 +44,8 @@ export interface DashboardModuleSetting {
   span: DashboardModuleSpan;
 }
 
+export const DEFAULT_DASHBOARD_TIMEZONE = "Asia/Shanghai";
+
 export interface DashboardSettings {
   preset: DashboardPresetId;
   modules: DashboardModuleSetting[];
@@ -51,6 +53,7 @@ export interface DashboardSettings {
   chart_refresh_seconds: 15 | 30 | 60 | 120;
   ranking_limit: 5 | 10 | 15 | 20;
   layout_columns: typeof DASHBOARD_GRID_COLUMNS;
+  timezone: string;
 }
 
 interface DashboardPresetDefinition {
@@ -195,6 +198,7 @@ function buildPresetModules(preset: DashboardPresetDefinition): DashboardModuleS
 
 export function dashboardSettingsForPreset(
   presetId: Exclude<DashboardPresetId, "custom">,
+  timezone = DEFAULT_DASHBOARD_TIMEZONE,
 ): DashboardSettings {
   const preset = DASHBOARD_PRESETS.find((item) => item.id === presetId)
     ?? DASHBOARD_PRESETS[0];
@@ -205,6 +209,7 @@ export function dashboardSettingsForPreset(
     chart_refresh_seconds: preset.chart_refresh_seconds,
     ranking_limit: preset.ranking_limit,
     layout_columns: DASHBOARD_GRID_COLUMNS,
+    timezone,
   };
 }
 
@@ -273,9 +278,12 @@ function shrinkSummaryCardsToQuarter(modules: DashboardModuleSetting[]) {
 
 export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
   if (!isObject(value)) return dashboardSettingsForPreset("overview");
+  const timezone = typeof value.timezone === "string" && value.timezone.trim()
+    ? value.timezone.trim()
+    : DEFAULT_DASHBOARD_TIMEZONE;
 
   if (!Array.isArray(value.modules) || value.modules.length === 0) {
-    return dashboardSettingsForPreset("overview");
+    return dashboardSettingsForPreset("overview", timezone);
   }
 
   const seen = new Set<DashboardModuleId>();
@@ -336,7 +344,7 @@ export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
   const preset = typeof value.preset === "string" && presetIdSet.has(value.preset)
     ? value.preset as DashboardPresetId
     : "custom";
-  if (preset !== "custom") return dashboardSettingsForPreset(preset);
+  if (preset !== "custom") return dashboardSettingsForPreset(preset, timezone);
   const refresh = value.refresh_seconds === 15
     || value.refresh_seconds === 60
     || value.refresh_seconds === 120
@@ -363,6 +371,7 @@ export function sanitizeDashboardSettings(value: unknown): DashboardSettings {
     chart_refresh_seconds: chartRefresh,
     ranking_limit: rankingLimit,
     layout_columns: DASHBOARD_GRID_COLUMNS,
+    timezone,
   };
 }
 

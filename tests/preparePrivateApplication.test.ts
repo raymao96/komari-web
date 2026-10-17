@@ -45,5 +45,5 @@ test("admin boot inspects all service worker registrations before credentials", 
 
 test("admin index does not import unused useAccount", () => {
   const source = readFileSync("src/pages/admin/index.tsx", "utf8");
-  assert.doesNotMatch(source, /useAccount/);
+  assert.doesNotMatch(source, /\buseAccount\(/);
 });

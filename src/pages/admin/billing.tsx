@@ -77,6 +77,7 @@ import {
   isLongTermExpiry,
   readStoredBillingCurrency,
   requestBillingCached,
+  displayedRemainingDays,
   formatBillingMoney,
   type BillingCurrency,
   type BillingEntry,
@@ -587,10 +588,10 @@ function periodStatusColor(status: string) {
 }
 
 function billingExpiryCaption(t: TFunction, server: BillingServer) {
-  if (isLongTermExpiry(server.expired_at)) return null;
-  if (server.remaining_days == null) return t("billing.status.noExpiry");
-  if (server.remaining_days <= 0) return t("billing.status.expired");
-  return t("billing.status.remainingDays", { count: server.remaining_days });
+  const days = displayedRemainingDays(server.expired_at, server.remaining_days);
+  if (days == null) return null;
+  if (days <= 0) return t("billing.status.expired");
+  return t("billing.status.remainingDays", { count: days });
 }
 
 function ExpiryDisplay({ server }: { server: BillingServer }) {
@@ -614,7 +615,7 @@ function ExpiryDisplay({ server }: { server: BillingServer }) {
       {caption ? (
         <Typography
           component="div"
-          color={server.remaining_days != null && server.remaining_days <= 30 ? "warning.main" : "text.secondary"}
+          color={(displayedRemainingDays(server.expired_at, server.remaining_days) ?? 31) <= 30 ? "warning.main" : "text.secondary"}
           sx={{ fontSize: 11.5 }}
         >
           {caption}

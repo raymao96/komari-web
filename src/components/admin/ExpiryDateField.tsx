@@ -3,8 +3,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { TextField } from "@/components/admin/ui";
+import { clampExpiryDateInput } from "@/lib/expiryDateTime";
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const EXPIRY_DATE_MIN = "0001-01-01";
+const EXPIRY_DATE_MAX = "9999-12-31";
 
 function detectIOS() {
   if (typeof navigator === "undefined") return false;
@@ -33,6 +36,17 @@ function localeTag(language: string) {
   return language.replace(/_/g, "-") || "zh-CN";
 }
 
+function commitExpiryDate(
+  input: HTMLInputElement,
+  next: string,
+  onChange: (value: string) => void,
+) {
+  if (!next) return;
+  const clamped = clampExpiryDateInput(next);
+  if (input.value !== clamped) input.value = clamped;
+  onChange(clamped);
+}
+
 function NativeExpiryDateField({
   value,
   onChange,
@@ -46,8 +60,15 @@ function NativeExpiryDateField({
     <TextField.Root
       aria-label={ariaLabel}
       type="date"
+      min={EXPIRY_DATE_MIN}
+      max={EXPIRY_DATE_MAX}
       value={value}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={(event) => {
+        commitExpiryDate(event.currentTarget, event.currentTarget.value, onChange);
+      }}
+      onInput={(event) => {
+        commitExpiryDate(event.currentTarget, event.currentTarget.value, onChange);
+      }}
     />
   );
 }

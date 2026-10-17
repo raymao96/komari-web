@@ -105,9 +105,9 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         includeManifestIcons: false,
         manifest: {
-          name: "Lite",
+          name: "轻量.Lite",
           short_name: "Lite",
-          description: "All your servers, one simple view.",
+          description: "轻量.Lite丨更适合MJJ的养老探针",
           theme_color: "#2563eb",
           background_color: "#ffffff",
           display: "standalone",

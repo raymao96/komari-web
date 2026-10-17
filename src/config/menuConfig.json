@@ -16,6 +16,11 @@
       "icon": "Payments"
     },
     {
+      "labelKey": "navigation.alert_center",
+      "path": "/admin/notification/center",
+      "icon": "BellRing"
+    },
+    {
       "labelKey": "navigation.monitoring",
       "path": "/admin/monitoring",
       "icon": "Activity",
@@ -41,6 +46,11 @@
           "labelKey": "exec.title",
           "path": "/admin/exec",
           "icon": "Code"
+        },
+        {
+          "labelKey": "scheduled_exec.title",
+          "path": "/admin/remote-management/schedules",
+          "icon": "Schedule"
         },
         {
           "labelKey": "mcp.title",

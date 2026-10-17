@@ -6,7 +6,6 @@ const hookSource = readFileSync("src/hooks/useHeldTab.ts", "utf8");
 const loadingSource = readFileSync("src/components/loading.tsx", "utf8");
 const globalCss = readFileSync("src/global.css", "utf8");
 const billingSource = readFileSync("src/pages/admin/billing.tsx", "utf8");
-const loadSource = readFileSync("src/pages/admin/notification/load.tsx", "utf8");
 const returnRouteSource = readFileSync("src/pages/admin/returnRoute.tsx", "utf8");
 const reverseProxySource = readFileSync(
   "src/pages/admin/settings/reverse-proxy.tsx",
@@ -19,7 +18,6 @@ test("held tabs keep the previous sheet until the next one has data", () => {
   assert.match(hookSource, /return ready \? tab : held/);
   assert.match(billingSource, /useHeldTab\(tab, tabReady\)/);
   assert.match(billingSource, /displayTab === "monthly"/);
-  assert.match(loadSource, /useHeldTab\(view, currentReady\)/);
   assert.match(returnRouteSource, /useHeldTab\(activeTab, tabReady\)/);
   assert.match(reverseProxySource, /useHeldTab\(activeTab, tabReady\)/);
   assert.match(metricsSource, /useHeldTab\(activeTab, tabReady\)/);
@@ -59,7 +57,6 @@ test("full-page loading holds the previous admin route; in-page spinners do not"
   );
   assert.doesNotMatch(notificationSource, /if \(loading \|\| !hydrated\)/);
   assert.doesNotMatch(notificationSource, /Loading inline/);
-  assert.match(loadSource, /<Loading inline \/>/);
 });
 
 test("tab and route swaps do not fade through an empty frame", () => {

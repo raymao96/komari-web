@@ -59,7 +59,7 @@ import {
   formatExpiryLocalDisplay,
   normalizeExpiryTimezone,
 } from "@/lib/expiryDateTime";
-import { billingRequest, isLongTermExpiry } from "@/utils/billing";
+import { billingRequest, formatNodeRenewPrice, isLongTermExpiry } from "@/utils/billing";
 import NodeUsageStats from "@/pages/admin/NodeUsageStats";
 import {
   EMPTY_DISPLAY,
@@ -71,7 +71,7 @@ import { getRegionCode, getRegionDisplayName } from "@/utils/regionHelper";
 import { openRemoteTerminal } from "@/utils/remoteLaunch";
 import { useRemoteManagementGate } from "@/components/admin/RemoteManagementGate";
 import { nodeTrafficType, trafficUsed } from "@/utils/trafficAccounting";
-import { formatBytes, stringToBytes } from "@/utils/unitHelper";
+import { formatBytes, isNegativeByteInput, stringToBytes } from "@/utils/unitHelper";
 import { billingSaveFailedToast } from "@/utils/billingI18n";
 import { createRandomId } from "@/utils/randomId";
 import { LITE_BLUE, LITE_BLUE_SOFT_STRONG } from "@/theme/brand";
@@ -900,17 +900,18 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
   const [autoRenewal, setAutoRenewal] = useState(Boolean(node.auto_renewal));
   const expiryTimezone = normalizeExpiryTimezone(node.expiry_timezone);
   const displayPrice = node.price;
-  const hasPrice = !isEmptyValue(displayPrice);
   const displayCycle = Number(node.billing_cycle) || 0;
   const hasCycle = !isEmptyValue(displayCycle);
   const displayExpired = isLongTermExpiry(node.expired_at)
     ? t("common.long_term")
     : formatExpiryLocalDisplay(node.expired_at, expiryTimezone) || EMPTY_DISPLAY;
-  const renewPriceLabel = hasPrice
-    ? `${currency}${Number(displayPrice).toFixed(2)}${
-        hasCycle ? ` / ${cycleLabel(Number(displayCycle || billingCycle), t)}` : ""
-      }`
-    : EMPTY_DISPLAY;
+  const renewPriceLabel = formatNodeRenewPrice({
+    price: displayPrice,
+    currency,
+    cycleLabel: hasCycle ? cycleLabel(Number(displayCycle || billingCycle), t) : "",
+    freeLabel: t("common.free", "免费"),
+    emptyLabel: EMPTY_DISPLAY,
+  });
 
   const cycleOptions = useMemo(
     () => [
@@ -1021,7 +1022,7 @@ function BillingPanel({ node, onSaved }: { node: NodeDetail; onSaved: () => void
               icon={<RefreshCw size={19} />}
               label={t("admin.nodeDetail.renewPrice", "续费价格")}
               value={renewPriceLabel}
-              muted={!hasPrice}
+              muted={renewPriceLabel === EMPTY_DISPLAY}
             />
             <DetailValueTile
               icon={<Clock size={19} />}
@@ -1186,7 +1187,15 @@ function TrafficResetCostDialog({
 
   const submit = async () => {
     if (!amount.trim()) return;
+    if (isNegativeByteInput(allowance)) {
+      toast.error(t("admin.nodeEdit.trafficResetAllowanceNonNegative", "重置流量额度不能为负数"));
+      return;
+    }
     const nextAllowance = stringToBytes(allowance);
+    if (nextAllowance < 0) {
+      toast.error(t("admin.nodeEdit.trafficResetAllowanceNonNegative", "重置流量额度不能为负数"));
+      return;
+    }
     setSaving(true);
     try {
       await billingRequest(`/api/admin/client/${node.uuid}/billing/traffic-reset`, {
@@ -1246,8 +1255,19 @@ function TrafficResetCostDialog({
             <FieldLabel>{t("admin.nodeEdit.trafficResetAllowance", "重置流量额度")}</FieldLabel>
             <AdminTextField.Root
               value={allowance}
-              onChange={(event) => setAllowance(event.target.value)}
-              onBlur={() => setAllowance(formatBytes(stringToBytes(allowance)))}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (isNegativeByteInput(next)) return;
+                setAllowance(next);
+              }}
+              onBlur={() => {
+                if (isNegativeByteInput(allowance)) {
+                  setAllowance(formatBytes(Math.max(0, node.traffic_reset_allowance ?? 0)));
+                  return;
+                }
+                const bytes = stringToBytes(allowance);
+                setAllowance(formatBytes(bytes < 0 ? Math.max(0, node.traffic_reset_allowance ?? 0) : bytes));
+              }}
             />
             <p className="mt-1 text-xs text-muted-foreground">
               {t("admin.nodeEdit.trafficResetAllowance_description", "同一计费周期可多次调整；与原流量限额相加，并在下个重置日自动归零。")}

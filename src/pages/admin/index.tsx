@@ -1,12 +1,12 @@
-import {
-  quotePowerShellArg,
-  quoteShellArg,
-  quoteShellArgs,
-} from "@/utils/shellQuote";
+import { quoteShellArgs } from "@/utils/shellQuote";
 import { publicVersion } from "@/utils/version";
 import {
   LITE_AGENT_DOCKER_IMAGE,
+  defaultInstallGitHubProxy,
   liteAgentInstallScriptUrl,
+  liteAgentLinuxInstallCommand,
+  liteAgentMacInstallCommand,
+  liteAgentWindowsInstallCommand,
 } from "@/utils/agentInstall";
 import { normalizeOptionalServiceUrl } from "@/utils/serviceUrl";
 import { writeClipboardText } from "@/utils/clipboard";
@@ -118,7 +118,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatBytes, stringToBytes } from "@/utils/unitHelper";
+import { formatBytes, isNegativeByteInput, stringToBytes } from "@/utils/unitHelper";
 import { normalizeBandwidth } from "@/utils/bandwidth";
 import { formatTrafficCalibrationCycleRange } from "@/utils/trafficCycle";
 import {
@@ -147,6 +147,7 @@ import {
   expiryTimezoneOptions,
   formatInstantInTimezone,
   normalizeExpiryTimezone,
+  nowInExpiryTimezone,
   toExpiryLocalDateTime,
 } from "@/lib/expiryDateTime";
 import { currencyForDisplay, currencyForStorage } from "@/lib/currency";
@@ -1039,7 +1040,7 @@ const NodeTable = ({
   const activeWidths = columnWidths ?? defaultLayout;
   const activeSort = columnWidths ? sortColumnWidth : NODE_SORT_COLUMN_WIDTH;
 
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     if (isMobile) return;
     const root = tableWrapRef.current;
     if (!root) return;
@@ -1062,7 +1063,7 @@ const NodeTable = ({
     return () => observer.disconnect();
   }, [isMobile, sortColumnWidth, layoutMode]);
 
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     if (isMobile) return;
     const root = tableWrapRef.current;
     if (!root) return;
@@ -1457,9 +1458,13 @@ function formatSignedTraffic(value: number): string {
 const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) => {
   const { t } = useTranslation();
   const { ensureEnabled } = useRemoteManagementGate();
+  const [dialog, setDialog] = React.useState<"install" | "edit" | "billing" | "traffic" | "token" | "delete" | null>(null);
+  const closeDialog = () => setDialog(null);
   return (
     <div className="flex h-10 items-center justify-start gap-1 admin-node-actions max-md:w-full">
-      <GenerateCommandButton node={node} settings={settings} />
+      <IconButton variant="ghost" title={t("admin.nodeTable.installCommand")} onClick={() => setDialog("install")}>
+        <Download size="18" />
+      </IconButton>
       <IconButton
         title={t("terminal.title")}
         variant="ghost"
@@ -1470,18 +1475,34 @@ const ActionButtons = ({ node, settings }: { node: NodeDetail, settings: any }) 
       >
         <Terminal size="18" />
       </IconButton>
-      <EditButton node={node} />
-      <BillingButton node={node} />
-      <TrafficCalibrationButton node={node} />
-      <RotateTokenButton node={node} />
-      <DeleteButton node={node} />
+      <IconButton variant="ghost" title={t("admin.nodeEdit.editInfo", "编辑信息")} onClick={() => setDialog("edit")}>
+        <Pencil size="18" />
+      </IconButton>
+      <IconButton variant="ghost" title={t("admin.nodeTable.billing", "账单")} onClick={() => setDialog("billing")}>
+        <CircleDollarSign size="18" />
+      </IconButton>
+      <IconButton variant="ghost" title={t("admin.nodeTable.trafficCalibration.title")} onClick={() => setDialog("traffic")}>
+        <Gauge size="18" />
+      </IconButton>
+      <IconButton variant="ghost" title={t("admin.nodeTable.rotateToken")} onClick={() => setDialog("token")}>
+        <RefreshCw size="18" />
+      </IconButton>
+      <IconButton variant="ghost" color="red" title={t("delete")} onClick={() => setDialog("delete")}>
+        <Trash2Icon size="18" />
+      </IconButton>
+      {dialog === "install" ? <GenerateCommandButton node={node} settings={settings} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "edit" ? <EditButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "billing" ? <BillingButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "traffic" ? <TrafficCalibrationButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "token" ? <RotateTokenButton node={node} initiallyOpen onClose={closeDialog} /> : null}
+      {dialog === "delete" ? <DeleteButton node={node} initiallyOpen onClose={closeDialog} /> : null}
     </div>
   );
 };
 
-function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
+function TrafficCalibrationButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t, i18n } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [available, setAvailable] = useState(true);
@@ -1579,6 +1600,10 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
     }
   };
 
+  useEffect(() => {
+    if (initiallyOpen) void prepareCalibration();
+  }, [initiallyOpen]);
+
   const summaryItems = snapshot
     ? [
         [t("admin.nodeTable.trafficCalibration.raw"), snapshot.raw],
@@ -1600,10 +1625,13 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
       open={open}
       onOpenChange={(nextOpen) => {
         if (nextOpen) void prepareCalibration();
-        else setOpen(false);
+        else {
+          setOpen(false);
+          onClose?.();
+        }
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton
           variant="ghost"
           disabled={loading}
@@ -1611,8 +1639,8 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
         >
           <Gauge size="18" className={loading ? "animate-pulse" : undefined} />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent maxWidth="720px" className="max-h-[88vh] overflow-y-auto">
         <Dialog.Title>{t("admin.nodeTable.trafficCalibration.title")}</Dialog.Title>
         <Dialog.Description>
           <Trans
@@ -1734,16 +1762,16 @@ function TrafficCalibrationButton({ node }: { node: NodeDetail }) {
             </Flex>
           </Flex>
         )}
-      </AppDialogContent>
+      </AppDialogContent> : null}
     </Dialog.Root>
   );
 }
 
 export default NodeDetailsPage;
-function DeleteButton({ node }: { node: NodeDetail }) {
+function DeleteButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initiallyOpen);
   const [deleting, setDeleting] = React.useState(false);
   const handleDelete = async () => {
     try {
@@ -1753,6 +1781,7 @@ function DeleteButton({ node }: { node: NodeDetail }) {
       });
       toast.success(t("admin.nodeTable.deleteSuccess", { name: node.name }));
       setOpen(false);
+      onClose?.();
       refresh();
     } catch (error) {
       toast.error(
@@ -1765,12 +1794,15 @@ function DeleteButton({ node }: { node: NodeDetail }) {
     }
   };
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger>
+    <Dialog.Root open={open} onOpenChange={(next) => {
+      setOpen(next);
+      if (!next) onClose?.();
+    }}>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton variant="ghost" color="red" title={t("delete")}>
           <Trash2Icon size="18" />
         </IconButton>
-      </Dialog.Trigger>
+      </Dialog.Trigger>}
       <AppDialogContent className="admin-install-dialog">
         <Dialog.Title>{t("delete")}</Dialog.Title>
         <Dialog.Description>
@@ -1919,9 +1951,9 @@ function NodeIdentityAuthDialog({
   );
 }
 
-function RotateTokenButton({ node }: { node: NodeDetail }) {
+function RotateTokenButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initiallyOpen);
   const [rotating, setRotating] = React.useState(false);
   const [needTwoFactor, setNeedTwoFactor] = React.useState(false);
   const [twoFactorInvalid, setTwoFactorInvalid] = React.useState(false);
@@ -1938,6 +1970,7 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
     setOpen(false);
     setRotating(false);
     resetTwoFactor();
+    onClose?.();
   };
 
   React.useEffect(() => {
@@ -1992,11 +2025,11 @@ function RotateTokenButton({ node }: { node: NodeDetail }) {
         closeDialog();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton variant="ghost" title={t("admin.nodeTable.rotateToken")}>
           <RefreshCw size="18" />
         </IconButton>
-      </Dialog.Trigger>
+      </Dialog.Trigger>}
       <AppDialogContent className="admin-install-dialog">
         <Dialog.Title>{t("admin.nodeTable.rotateToken")}</Dialog.Title>
         <Dialog.Description>
@@ -2120,7 +2153,7 @@ type DeploymentDeliveryState = {
   finished_at?: string;
 };
 
-function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings: any }) {
+function GenerateCommandButton({ node, settings, initiallyOpen = false, onClose }: { node: NodeDetail; settings: any; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
   const isMobile = useIsMobile();
@@ -2166,7 +2199,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   const [enableMonthRotate, setEnableMonthRotate] = React.useState(
     initialResetDay !== "",
   );
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initiallyOpen);
   const [dialogTab, setDialogTab] = React.useState<"online" | "install">("online");
   const [loadingProfile, setLoadingProfile] = React.useState(false);
   const [profileAction, setProfileAction] = React.useState<"dispatch" | "copy" | null>(null);
@@ -2244,13 +2277,25 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   }, [installToken]);
 
   const revertTrafficResetClock = () => {
-    setEnableMonthRotate(initialResetDay !== "");
-    setInstallOptions((previous) => ({
-      ...previous,
-      monthRotate: initialResetDay,
-      monthRotateTime: initialResetTime,
-      monthRotateTimezone: initialResetTimezone,
-    }));
+    setEnableMonthRotate((current) => {
+      const next = initialResetDay !== "";
+      return current === next ? current : next;
+    });
+    setInstallOptions((previous) => {
+      if (
+        previous.monthRotate === initialResetDay &&
+        previous.monthRotateTime === initialResetTime &&
+        previous.monthRotateTimezone === initialResetTimezone
+      ) {
+        return previous;
+      }
+      return {
+        ...previous,
+        monthRotate: initialResetDay,
+        monthRotateTime: initialResetTime,
+        monthRotateTimezone: initialResetTimezone,
+      };
+    });
   };
 
   React.useLayoutEffect(() => {
@@ -2281,7 +2326,9 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           memoryIncludeCache: profile.memory_include_cache,
           getIpAddrFromNic: profile.get_ip_addr_from_nic,
           enableGpu: profile.enable_gpu,
-          ghproxy: profile.ghproxy || "",
+          ghproxy:
+            profile.ghproxy ||
+            (profile.enable_ghproxy ? defaultInstallGitHubProxy(settings) : ""),
           dir: profile.dir || "",
           serviceName: profile.service_name || "",
           includeNics: profile.include_nics || "",
@@ -2476,24 +2523,13 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
     let finalCommand = "";
     switch (selectedPlatform) {
       case "linux":
-        finalCommand =
-          `wget -qO- ${quoteShellArg(scriptUrl)} | sudo bash -s -- ` +
-          quoteShellArgs(args);
+        finalCommand = liteAgentLinuxInstallCommand(scriptUrl, args);
         break;
       case "windows":
-        finalCommand =
-          `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ` +
-          `"iwr ${quotePowerShellArg(scriptUrl)}` +
-          ` -UseBasicParsing -OutFile 'install.ps1'; &` +
-          ` '.\\install.ps1'`;
-        args.forEach((arg) => {
-          finalCommand += ` ${quotePowerShellArg(arg)}`;
-        });
-        finalCommand += `"`;
+        finalCommand = liteAgentWindowsInstallCommand(scriptUrl, args);
         break;
       case "macos":
-        finalCommand =
-          `zsh <(curl -sL ${quoteShellArg(scriptUrl)}) ` + quoteShellArgs(args);
+        finalCommand = liteAgentMacInstallCommand(scriptUrl, args);
         break;
       case "docker": {
         // Docker 运行时不支持安装脚本专用参数，剔除它们及其取值
@@ -2703,14 +2739,15 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
         tokenSessionRef.current?.closeDialog();
         setOtpInput("");
         setDialogTab("online");
+        onClose?.();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton variant="ghost" title={t("admin.nodeTable.installCommand")}>
           <Download size="18" />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent
         maxWidth="720px"
         className="km-node-dialog km-node-deploy-dialog"
       >
@@ -2872,25 +2909,29 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                 <Checkbox
                   checked={enableGhproxy}
                   onCheckedChange={(checked) => {
-                    setEnableGhproxy(Boolean(checked));
-                    if (!checked) {
-                      setInstallOptions((prev) => ({
-                        ...prev,
-                        ghproxy: "",
-                      }));
-                    }
+                    const enabled = Boolean(checked);
+                    setEnableGhproxy(enabled);
+                    setInstallOptions((prev) => ({
+                      ...prev,
+                      ghproxy: enabled
+                        ? prev.ghproxy.trim() ||
+                          defaultInstallGitHubProxy(settings)
+                        : "",
+                    }));
                   }}
                 />
                 <label
                   className="text-sm font-bold cursor-pointer"
                   onClick={() => {
-                    setEnableGhproxy(!enableGhproxy);
-                    if (enableGhproxy) {
-                      setInstallOptions((prev) => ({
-                        ...prev,
-                        ghproxy: "",
-                      }));
-                    }
+                    const enabled = !enableGhproxy;
+                    setEnableGhproxy(enabled);
+                    setInstallOptions((prev) => ({
+                      ...prev,
+                      ghproxy: enabled
+                        ? prev.ghproxy.trim() ||
+                          defaultInstallGitHubProxy(settings)
+                        : "",
+                    }));
                   }}
                 >
                   {t("admin.nodeTable.ghproxy", "GitHub 代理")}
@@ -2898,11 +2939,10 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
               </Flex>
               {enableGhproxy && (
                 <TextField.Root
-                  // placeholder={t(
-                  //   "admin.nodeTable.ghproxy_placeholder",
-                  //   "GitHub 代理，为空则不使用代理"
-                  // )}
-                  placeholder="https://ghfast.top/"
+                  placeholder={t(
+                    "settings.general.github_proxy_placeholder",
+                    "https://gh-proxy.com",
+                  )}
                   value={installOptions.ghproxy}
                   onChange={(e) =>
                     setInstallOptions((prev) => ({
@@ -3355,7 +3395,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
                   <Text size="1" color="gray">
                     {t(
                       "admin.nodeTable.monthRotateHint",
-                      "流量重置时间按厂商账单填写，Lite 会换算到北京时间才重置。",
+                      "流量重置时间按厂商账单填写，轻量.Lite 会换算到北京时间才重置。",
                     )}
                   </Text>
                 </Flex>
@@ -3473,7 +3513,7 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
           </Tabs.Content>
         </div>
         </Tabs.Root>
-      </AppDialogContent>
+      </AppDialogContent> : null}
       {needTwoFactor ? (
         <NodeIdentityAuthDialog
           otpFieldId="admin-node-deploy-otp"
@@ -3511,9 +3551,9 @@ function GenerateCommandButton({ node, settings }: { node: NodeDetail, settings:
   );
 }
 
-function EditButton({ node }: { node: NodeDetail }) {
+function EditButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t, i18n } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const { refresh } = useNodeDetails();
   const nameRef = React.useRef<HTMLInputElement>(null);
   const groupRef = React.useRef<HTMLInputElement>(null);
@@ -3521,10 +3561,10 @@ function EditButton({ node }: { node: NodeDetail }) {
   const bandwidthRef = React.useRef<HTMLInputElement>(null);
   const privateRemarkRef = React.useRef<HTMLInputElement>(null);
   const publicRemarkRef = React.useRef<HTMLInputElement>(null);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(node.hidden);
   const [saving, setSaving] = useState(false);
-  const [traffic_limit, setTrafficLimit] = useState(0);
-  const [traffic_limit_type, setTrafficLimitType] = useState("sum");
+  const [traffic_limit, setTrafficLimit] = useState(node.traffic_limit || 0);
+  const [traffic_limit_type, setTrafficLimitType] = useState(node.traffic_limit_type || "sum");
   const [trafficResetDay, setTrafficResetDay] = useState(node.traffic_reset_day ?? 0);
   const [trafficResetTime, setTrafficResetTime] = useState(() =>
     normalizeTrafficResetTime(node.traffic_reset_time),
@@ -3532,8 +3572,13 @@ function EditButton({ node }: { node: NodeDetail }) {
   const [trafficResetTimezone, setTrafficResetTimezone] = useState(() =>
     normalizeTrafficResetTimezone(node.traffic_reset_timezone),
   );
-  const [regionOverride, setRegionOverride] = useState("");
-  const [trafficResetAllowance, setTrafficResetAllowance] = useState(0);
+  const [regionOverride, setRegionOverride] = useState(() =>
+    node.region_override ? getRegionCode(node.region_override) : "",
+  );
+  const [trafficResetAllowance, setTrafficResetAllowance] = useState(Math.max(0, node.traffic_reset_allowance ?? 0));
+  const [trafficResetAllowanceInput, setTrafficResetAllowanceInput] = useState(() =>
+    formatBytes(Math.max(0, node.traffic_reset_allowance ?? 0)),
+  );
   const pendingSavedEditRef = React.useRef<{
     hidden: boolean;
     traffic_limit: number;
@@ -3546,21 +3591,24 @@ function EditButton({ node }: { node: NodeDetail }) {
   } | null>(null);
 
   const regionOptions = React.useMemo(
-    () => [
-      {
-        label: t("admin.nodeEdit.regionAuto", "自动识别"),
-        value: "",
-      },
-      ...getSupportedRegions().map((region) => {
-        const code = getRegionCode(region);
-        return {
-          label: `${code} ${getRegionDisplayName(region, i18n.language.startsWith("zh") ? "zh" : "en")}`,
-          value: code,
-          icon: <Flag flag={code} compact />,
-        };
-      }),
-    ],
-    [i18n.language, t],
+    () => {
+      if (!open) return [];
+      return [
+        {
+          label: t("admin.nodeEdit.regionAuto", "自动识别"),
+          value: "",
+        },
+        ...getSupportedRegions().map((region) => {
+          const code = getRegionCode(region);
+          return {
+            label: `${code} ${getRegionDisplayName(region, i18n.language.startsWith("zh") ? "zh" : "en")}`,
+            value: code,
+            icon: <Flag flag={code} compact />,
+          };
+        }),
+      ];
+    },
+    [open, i18n.language, t],
   );
 
   const editFormFromNode = () => ({
@@ -3582,7 +3630,9 @@ function EditButton({ node }: { node: NodeDetail }) {
     setTrafficResetTime(form.trafficResetTime);
     setTrafficResetTimezone(form.trafficResetTimezone);
     setRegionOverride(form.regionOverride);
-    setTrafficResetAllowance(form.trafficResetAllowance);
+    const allowance = Math.max(0, form.trafficResetAllowance);
+    setTrafficResetAllowance(allowance);
+    setTrafficResetAllowanceInput(formatBytes(allowance));
   };
 
   const hydrateEditForm = () => {
@@ -3620,6 +3670,10 @@ function EditButton({ node }: { node: NodeDetail }) {
   ]);
 
   const save = async () => {
+    if (isNegativeByteInput(trafficResetAllowanceInput) || trafficResetAllowance < 0) {
+      toast.error(t("admin.nodeEdit.trafficResetAllowanceNonNegative", "重置流量额度不能为负数"));
+      return;
+    }
     if (trafficResetAllowance > 0 && (trafficResetDay < 1 || trafficResetDay > 31)) {
       toast.error(
         t(
@@ -3681,6 +3735,7 @@ function EditButton({ node }: { node: NodeDetail }) {
       };
       refresh();
       setOpen(false);
+      onClose?.();
       toast.success(t("admin.nodeEdit.saveSuccess", "保存成功"));
     } catch (error) {
       console.error("Error updating client:", error);
@@ -3695,17 +3750,18 @@ function EditButton({ node }: { node: NodeDetail }) {
       onOpenChange={(next) => {
         if (next || !pendingSavedEditRef.current) hydrateEditForm();
         setOpen(next);
+        if (!next) onClose?.();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton
           variant="ghost"
           title={t("admin.nodeEdit.editInfo", "编辑信息")}
         >
           <Pencil size="18" />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent
         maxWidth={920}
         className="km-node-dialog km-node-edit-dialog"
       >
@@ -3866,7 +3922,7 @@ function EditButton({ node }: { node: NodeDetail }) {
               <p className="text-sm leading-6 text-muted-foreground">
                 {t(
                   "admin.nodeEdit.trafficResetDay_description",
-                  "0 表示关闭；1-31 为每月重置日。流量重置时间按厂商账单填写，Lite 会换算到北京时间才重置。存量数据为北京时间 0:00。保存后同步到 Agent。",
+                  "0 表示关闭；1-31 为每月重置日。流量重置时间按厂商账单填写，轻量.Lite 会换算到北京时间才重置。存量数据为北京时间 0:00。保存后同步到 Agent。",
                 )}
               </p>
             </div>
@@ -3923,13 +3979,26 @@ function EditButton({ node }: { node: NodeDetail }) {
                   "admin.nodeEdit.trafficResetAllowance_description",
                   "同一计费周期可多次调整；与原流量限额相加，按上方统计方式计算，并在下个重置日自动归零。",
                 )}
-                defaultValue={formatBytes(trafficResetAllowance || 0)}
+                value={trafficResetAllowanceInput}
                 showSaveButton={false}
                 onChange={(event) => {
-                  setTrafficResetAllowance(stringToBytes(event.currentTarget.value));
+                  const raw = event.currentTarget.value;
+                  if (isNegativeByteInput(raw)) return;
+                  setTrafficResetAllowanceInput(raw);
+                  const bytes = stringToBytes(raw);
+                  if (bytes >= 0) setTrafficResetAllowance(bytes);
                 }}
-                onBlur={(event) => {
-                  event.currentTarget.value = formatBytes(trafficResetAllowance);
+                onBlur={() => {
+                  if (isNegativeByteInput(trafficResetAllowanceInput)) {
+                    const restored = Math.max(0, trafficResetAllowance);
+                    setTrafficResetAllowance(restored);
+                    setTrafficResetAllowanceInput(formatBytes(restored));
+                    return;
+                  }
+                  const bytes = stringToBytes(trafficResetAllowanceInput);
+                  const next = bytes < 0 ? Math.max(0, trafficResetAllowance) : bytes;
+                  setTrafficResetAllowance(next);
+                  setTrafficResetAllowanceInput(formatBytes(next));
                 }}
               />
             </div>
@@ -3968,7 +4037,7 @@ function EditButton({ node }: { node: NodeDetail }) {
               : t("save", "保存")}
           </Button>
         </Flex>
-      </AppDialogContent>
+      </AppDialogContent> : null}
     </Dialog.Root>
   );
 }
@@ -4035,10 +4104,10 @@ function NodeNameLink({ node, online }: { node: NodeDetail; online: boolean | nu
   );
 }
 
-function BillingButton({ node }: { node: NodeDetail }) {
+function BillingButton({ node, initiallyOpen = false, onClose }: { node: NodeDetail; initiallyOpen?: boolean; onClose?: () => void }) {
   const { t } = useTranslation();
   const { refresh } = useNodeDetails();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [saving, setSaving] = useState(false);
   const [formEpoch, setFormEpoch] = useState(0);
   const [billingCycle, setBillingCycle] = React.useState("");
@@ -4074,6 +4143,13 @@ function BillingButton({ node }: { node: NodeDetail }) {
     };
     setFormEpoch((value) => value + 1);
   };
+
+  React.useLayoutEffect(() => {
+    if (open) hydrateBillingForm(node);
+    // Mounted already open, so the close-to-open handler never runs.
+    // A later list refresh must not wipe a draft that is already on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4137,6 +4213,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
       }
       if (followUp.close) {
         setOpen(false);
+        onClose?.();
       }
     } catch (error) {
       toast.error(
@@ -4155,17 +4232,18 @@ function BillingButton({ node }: { node: NodeDetail }) {
       onOpenChange={(next) => {
         if (next && !open) hydrateBillingForm(node);
         setOpen(next);
+        if (!next) onClose?.();
       }}
     >
-      <Dialog.Trigger>
+      {initiallyOpen ? null : <Dialog.Trigger>
         <IconButton
           variant="ghost"
           title={t("admin.nodeTable.billing", "账单")}
         >
           <CircleDollarSign size="18" />
         </IconButton>
-      </Dialog.Trigger>
-      <AppDialogContent
+      </Dialog.Trigger>}
+      {open ? <AppDialogContent
         maxWidth={820}
         className="km-node-dialog km-node-billing-dialog"
       >
@@ -4259,10 +4337,22 @@ function BillingButton({ node }: { node: NodeDetail }) {
                 />
               </div>
             </div>
-            <Flex gap="2" align="center" justify="end">
-              <Button
+            <div className="km-expiry-quick-actions">
+              <button
                 type="button"
-                variant="ghost"
+                className="km-expiry-quick-action"
+                onClick={() => {
+                  const parts = nowInExpiryTimezone(expiryTimezone);
+                  if (!parts) return;
+                  setExpiryDate(parts.date);
+                  setExpiryTime(parts.time);
+                }}
+              >
+                {t("admin.nodeTable.setToNow", "今")}
+              </button>
+              <button
+                type="button"
+                className="km-expiry-quick-action"
                 onClick={() => {
                   const future = new Date();
                   future.setFullYear(future.getFullYear() + 200);
@@ -4273,8 +4363,8 @@ function BillingButton({ node }: { node: NodeDetail }) {
                 }}
               >
                 {t("admin.nodeTable.setToLongTerm", "设置为长期")}
-              </Button>
-            </Flex>
+              </button>
+            </div>
             <SettingCardSwitch
               bordless
               title={t("admin.nodeTable.autoRenewal")}
@@ -4295,7 +4385,7 @@ function BillingButton({ node }: { node: NodeDetail }) {
             </Button>
           </Flex>
         </form>
-      </AppDialogContent>
+      </AppDialogContent> : null}
     </Dialog.Root>
   );
 }

@@ -33,6 +33,9 @@ export const getAdminRouteViewKey = ({
 }): string => {
   const normalized = pathname.replace(/\/$/, "") || "/";
   if (normalized === "/admin/dashboard") return "/admin";
+  if (normalized === "/admin-app" || normalized.startsWith("/admin-app/")) {
+    return "/admin";
+  }
   return pathname;
 };
 

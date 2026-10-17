@@ -11,7 +11,7 @@ test("long-term MCP authorization stays unchecked until the administrator opts i
   assert.match(authorizeSource, /setLongTerm\(false\)/);
   assert.match(authorizeSource, /checked=\{longTerm\}/);
   assert.match(authorizeSource, /"aria-describedby": "mcp-long-term-hint"/);
-  assert.match(authorizeSource, /duration_minutes: durationMinutes,\s*long_term: useLongTerm,/);
+  assert.match(authorizeSource, /mcpAuthorizationPolicy\(\{[\s\S]*?longTerm: useLongTerm,/);
   assert.match(source, /lease\.long_term \? <Badge color="blue">\{t\("mcp\.long_term_authorization"\)\}<\/Badge>/);
   assert.doesNotMatch(authorizeSource, /settings\.long_term_enabled === true \? \(/);
 });

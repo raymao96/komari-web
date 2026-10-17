@@ -1,4 +1,4 @@
-import { LITE_BLUE, LITE_NAME } from "@/theme/brand";
+import { LITE_BLUE, LITE_NAME, LITE_NAME_MOBILE } from "@/theme/brand";
 
 type LiteBrandProps = {
   size?: "sm" | "md";
@@ -23,7 +23,8 @@ export default function LiteBrand({
         className={`${sizeClasses[size]} font-bold leading-none`}
         style={{ color: LITE_BLUE }}
       >
-        {LITE_NAME}
+        <span className="hidden lg:inline">{LITE_NAME}</span>
+        <span className="lg:hidden">{LITE_NAME_MOBILE}</span>
       </span>
     </span>
   );

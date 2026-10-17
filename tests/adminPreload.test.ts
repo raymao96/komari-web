@@ -56,6 +56,8 @@ test("settings pages also warm the settings layout chunk", () => {
 test("legacy theme admin dashboard path aliases to /admin", () => {
   assert.equal(normalizeAdminPathname("/admin/dashboard"), "/admin");
   assert.equal(normalizeAdminPathname("/admin/dashboard/"), "/admin");
+  assert.equal(normalizeAdminPathname("/admin-app"), "/admin");
+  assert.equal(normalizeAdminPathname("/admin-app/index.html"), "/admin");
   assert.equal(
     normalizeAdminPathname("/admin/settings/dashboard"),
     "/admin/settings/dashboard",
