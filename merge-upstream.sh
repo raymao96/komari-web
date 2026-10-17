@@ -168,16 +168,6 @@ replacements = [
 
 # ============================================================
 # 處理變數插值型 Raw GitHub URL
-#
-# 例如：
-#
-# https://raw.githubusercontent.com/${LITE_AGENT_GITHUB_REPO}/main/
-#
-# 變成：
-#
-# https://raw.githubusercontent.com/${LITE_AGENT_GITHUB_REPO}/github-nuomiiiii/
-#
-# 只處理 raw.githubusercontent.com URL。
 # ============================================================
 
 raw_url_main_pattern = re.compile(
@@ -190,16 +180,15 @@ replacement_count = 0
 
 for root, dirs, files in os.walk("."):
 
-    # 不掃描 .git
     if ".git" in dirs:
         dirs.remove(".git")
 
-    # 不修改腳本自己
     if "merge-upstream.sh" in files:
         files.remove("merge-upstream.sh")
 
     for file in files:
         filepath = os.path.join(root, file)
+        normalized_path = filepath.replace(os.sep, "/")
 
         try:
             with open(
@@ -217,6 +206,16 @@ for root, dirs, files in os.walk("."):
         file_replacements = 0
 
         # ----------------------------------------------------
+        # 專屬替換：僅在 src/theme/brand.ts 中將 "轻量.Lite" 換成 "Lite"
+        # ----------------------------------------------------
+
+        if normalized_path.endswith("src/theme/brand.ts"):
+            count = new_content.count("轻量.Lite")
+            if count:
+                new_content = new_content.replace("轻量.Lite", "Lite")
+                file_replacements += count
+
+        # ----------------------------------------------------
         # 一般字面字串替換
         # ----------------------------------------------------
 
@@ -229,14 +228,6 @@ for root, dirs, files in os.walk("."):
 
         # ----------------------------------------------------
         # Raw GitHub URL 中的 /main/
-        #
-        # 例如：
-        #
-        # https://raw.githubusercontent.com/${LITE_AGENT_GITHUB_REPO}/main/
-        #
-        # →
-        #
-        # https://raw.githubusercontent.com/${LITE_AGENT_GITHUB_REPO}/github-nuomiiiii/
         # ----------------------------------------------------
 
         new_content, count = raw_url_main_pattern.subn(
@@ -292,12 +283,3 @@ echo
 echo "========================================"
 echo "合併與全域路徑替換完成！"
 echo "========================================"
-echo
-echo "目前所有變更已加入 Git 暫存區。"
-echo
-echo "請執行："
-echo
-echo "  git status"
-echo "  git diff --cached"
-echo
-echo "確認無誤後再自行 commit。"
