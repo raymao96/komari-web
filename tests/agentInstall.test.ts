@@ -15,7 +15,9 @@ import {
 
 test("one-click install uses Lite-agent latest, not a pinned release", () => {
   assert.equal(LITE_AGENT_GITHUB_REPO, "raymao96/komari-agent");
+  assert.match(LITE_AGENT_INSTALL_USER_AGENT, /github\.com\/nuomiiiii\/Lite-agent/);
   assert.equal(LITE_AGENT_DOCKER_IMAGE, "ghcr.io/raymao96/komari-agent:latest");
+  assert.doesNotMatch(LITE_AGENT_DOCKER_IMAGE, /Lite-agent/);
   assert.match(LITE_AGENT_DOCKER_IMAGE, /:latest$/);
   assert.doesNotMatch(LITE_AGENT_DOCKER_IMAGE, /\d+\.\d+\.\d+\.\d+/);
   assert.equal(
